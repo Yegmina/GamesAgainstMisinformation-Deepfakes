@@ -43,9 +43,51 @@
       "url": "http://127.0.0.1:8765/"
     },
     {
+      "name": "email debug turn 1",
+      "item": {
+        "id": "email-agent-1",
+        "selected": null,
+        "resolved": false,
+        "chat_turns": 1,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
+    },
+    {
       "name": "email custom reply turn one",
       "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\07-email-agent-response.png",
       "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "email debug turn 2",
+      "item": {
+        "id": "email-agent-1",
+        "selected": null,
+        "resolved": false,
+        "chat_turns": 2,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
+    },
+    {
+      "name": "email debug turn 3",
+      "item": {
+        "id": "email-agent-1",
+        "selected": "__custom__",
+        "resolved": true,
+        "chat_turns": 3,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
     },
     {
       "name": "email thread resolved after three turns",
@@ -58,9 +100,51 @@
       "url": "http://127.0.0.1:8765/"
     },
     {
+      "name": "telegram debug turn 1",
+      "item": {
+        "id": "tg-agent-1",
+        "selected": null,
+        "resolved": false,
+        "chat_turns": 1,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
+    },
+    {
       "name": "telegram custom reply turn one",
       "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\08-telegram-agent-response.png",
       "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "telegram debug turn 2",
+      "item": {
+        "id": "tg-agent-1",
+        "selected": null,
+        "resolved": false,
+        "chat_turns": 2,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
+    },
+    {
+      "name": "telegram debug turn 3",
+      "item": {
+        "id": "tg-agent-1",
+        "selected": "__custom__",
+        "resolved": true,
+        "chat_turns": 3,
+        "min_turns": 3,
+        "max_turns": 3,
+        "correct_option": "b",
+        "reply_agent_mode": "openai"
+      },
+      "gameId": "a0822bb9-12ff-478e-b93d-e36a00348ad2"
     },
     {
       "name": "telegram thread resolved after three turns",
@@ -82,7 +166,7 @@
       "values": {
         "public_trust": 91,
         "editorial_integrity": 82,
-        "community_care": 63,
+        "community_care": 67,
         "newsroom_momentum": 65
       },
       "quests": {
@@ -104,7 +188,7 @@
         }
       },
       "worldAdvancedDepth": 5,
-      "agentStatus": "Agent runtime: local / local-fallback / last world: local"
+      "agentStatus": "Agent runtime: openai / gpt-5.3-chat-latest / last world: openai"
     }
   ]
 }

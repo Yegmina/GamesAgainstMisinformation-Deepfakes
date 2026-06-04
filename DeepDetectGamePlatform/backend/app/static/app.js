@@ -4,6 +4,7 @@
   user: JSON.parse(localStorage.getItem("dd_user") || "null"),
   game: null,
   activeEmailId: "",
+  actionPending: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -38,6 +39,15 @@ function showApp() {
     $("#game-title").textContent = state.game?.title || `DeepDetect / ${state.user.name}`;
   }
   $("#agent-status").classList.toggle("hidden", !state.game);
+}
+
+function setCurrentGame(game) {
+  state.game = game;
+  if (game?.id) localStorage.setItem("dd_game_id", game.id);
+}
+
+function currentGameId() {
+  return localStorage.getItem("dd_game_id") || state.game?.id;
 }
 
 async function handleAuth(event) {
@@ -165,6 +175,20 @@ function customReplyForm(surface, itemId, placeholder) {
   `;
 }
 
+function setActionControlsDisabled(disabled) {
+  $$("[data-action], .custom-reply button, #advance-world").forEach((control) => {
+    control.disabled = disabled;
+  });
+}
+
+function restoreTopbarActions() {
+  const advance = $("#advance-world");
+  if (advance && state.game) {
+    advance.disabled = false;
+    advance.textContent = "Advance World";
+  }
+}
+
 function emailResultClass(item) {
   if (item.correct === true) return "resolved-good";
   if (item.correct === false) return "resolved-bad";
@@ -187,8 +211,8 @@ function newsStatus(item) {
 function threadProgress(item) {
   if (item.selected || item.resolved) return "Resolved";
   const turns = Number(item.chat_turns || 0);
-  const minTurns = Number(item.min_turns || 3);
-  return `Thread ${turns}/${minTurns}`;
+  const maxTurns = Number(item.max_turns || item.min_turns || 3);
+  return `Thread ${Math.min(turns, maxTurns)}/${maxTurns}`;
 }
 
 function renderNews() {
@@ -422,7 +446,7 @@ async function generateGame() {
   });
   try {
     const data = await api("/api/game/generate", { method: "POST", body: "{}" });
-    state.game = data.game;
+    setCurrentGame(data.game);
     renderGame();
   } catch (error) {
     alert(error.message);
@@ -435,46 +459,81 @@ async function generateGame() {
 }
 
 async function sendAction(button) {
-  const data = await api(`/api/game/${state.game.id}/action`, {
-    method: "POST",
-    body: JSON.stringify({
-      surface: button.dataset.action,
-      item_id: button.dataset.id,
-      choice: button.dataset.choice,
-    }),
-  });
-  state.game = data.game;
-  renderGame();
+  if (state.actionPending) return;
+  state.actionPending = true;
+  setActionControlsDisabled(true);
+  let succeeded = false;
+  try {
+    const data = await api(`/api/game/${currentGameId()}/action`, {
+      method: "POST",
+      body: JSON.stringify({
+        surface: button.dataset.action,
+        item_id: button.dataset.id,
+        choice: button.dataset.choice,
+      }),
+    });
+    setCurrentGame(data.game);
+    renderGame();
+    succeeded = true;
+  } catch (error) {
+    alert(error.message);
+    if (!succeeded) setActionControlsDisabled(false);
+  } finally {
+    state.actionPending = false;
+    if (succeeded) restoreTopbarActions();
+  }
 }
 
 async function sendCustomReply(form) {
   const customText = String(new FormData(form).get("customText") || "").trim();
   if (!customText) return;
+  if (state.actionPending) return;
+  state.actionPending = true;
+  const button = form.querySelector("button");
+  setActionControlsDisabled(true);
+  let succeeded = false;
   if (form.dataset.customSurface === "email") state.activeEmailId = form.dataset.customId;
-  const data = await api(`/api/game/${state.game.id}/action`, {
-    method: "POST",
-    body: JSON.stringify({
-      surface: form.dataset.customSurface,
-      item_id: form.dataset.customId,
-      choice: "__custom__",
-      custom_text: customText,
-    }),
-  });
-  state.game = data.game;
-  renderGame();
+  try {
+    const data = await api(`/api/game/${currentGameId()}/action`, {
+      method: "POST",
+      body: JSON.stringify({
+        surface: form.dataset.customSurface,
+        item_id: form.dataset.customId,
+        choice: "__custom__",
+        custom_text: customText,
+      }),
+    });
+    setCurrentGame(data.game);
+    renderGame();
+    succeeded = true;
+  } catch (error) {
+    alert(error.message);
+    if (!succeeded) setActionControlsDisabled(false);
+  } finally {
+    state.actionPending = false;
+    if (succeeded) restoreTopbarActions();
+  }
 }
 
 async function advanceWorld() {
   if (!state.game) return;
+  if (state.actionPending) return;
+  state.actionPending = true;
   const button = $("#advance-world");
-  button.disabled = true;
+  setActionControlsDisabled(true);
   button.textContent = "Simulating...";
+  let succeeded = false;
   try {
-    const data = await api(`/api/game/${state.game.id}/tick`, { method: "POST", body: "{}" });
-    state.game = data.game;
+    const data = await api(`/api/game/${currentGameId()}/tick`, { method: "POST", body: "{}" });
+    setCurrentGame(data.game);
     renderGame();
+    succeeded = true;
+  } catch (error) {
+    alert(error.message);
   } finally {
-    button.disabled = false;
+    state.actionPending = false;
+    if (succeeded) restoreTopbarActions();
+    if (!succeeded) setActionControlsDisabled(false);
     button.textContent = "Advance World";
   }
 }
@@ -488,6 +547,7 @@ function switchTab(tabName) {
 function logout() {
   localStorage.removeItem("dd_token");
   localStorage.removeItem("dd_user");
+  localStorage.removeItem("dd_game_id");
   state.token = "";
   state.user = null;
   state.game = null;
@@ -503,6 +563,7 @@ document.addEventListener("click", (event) => {
   }
   const button = event.target.closest("button");
   if (!button) return;
+  if (button.closest(".custom-reply")) return;
   if (button.id === "show-login") setAuthMode("login");
   if (button.id === "show-register") setAuthMode("register");
   if (button.id === "generate-game" || button.id === "generate-game-empty") generateGame();

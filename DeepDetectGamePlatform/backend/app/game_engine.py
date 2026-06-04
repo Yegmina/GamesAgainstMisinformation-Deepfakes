@@ -63,47 +63,10 @@ def option_label(item: dict[str, Any], choice: str) -> str:
     return match["label"] if match else choice
 
 
-def custom_reply_is_responsible(text: str) -> bool:
-    lowered = text.lower()
-    good = [
-        "verify",
-        "verified",
-        "source",
-        "evidence",
-        "wait",
-        "check",
-        "confirm",
-        "corroborate",
-        "credible",
-        "archive",
-        "not publish",
-        "hold",
-        "do not share",
-        "don't share",
-        "not forward",
-    ]
-    risky = ["publish now", "share now", "viral", "ignore", "sounds true", "send it", "no need"]
-    return any(word in lowered for word in good) and not any(word in lowered for word in risky)
-
-
-def agent_followup(surface: str, item: dict[str, Any], correct: bool) -> str:
-    if surface == "email":
-        if correct:
-            return "Good call. I am logging the source trail and holding the story until the evidence is clean."
-        return "I am worried about that response. The claim is still not verified, so I am escalating it to the fact desk."
-    if surface == "telegram":
-        contact = item.get("contact", "They")
-        if correct:
-            return f"{contact}: Okay, I will not forward it yet. Send me the checked version when you have it."
-        return f"{contact}: That still sounds like I should act fast. I might send it unless you give me a clearer reason."
-    if correct:
-        return "Assignment Editor: Decision logged. The queue has been updated and the desk agrees with your reasoning."
-    return "Assignment Editor: Decision logged, but the desk flags this as a risky editorial call."
-
-
 def ensure_thread_state(item: dict[str, Any]) -> None:
     item.setdefault("chat_turns", 0)
     item.setdefault("min_turns", 3)
+    item.setdefault("max_turns", 3)
     item.setdefault("resolved", bool(item.get("selected")))
     item.setdefault("agent_response", "")
     item.setdefault("agent_reason", "")
@@ -115,6 +78,7 @@ def new_thread_state() -> dict[str, Any]:
         "agent_reason": "",
         "chat_turns": 0,
         "min_turns": 3,
+        "max_turns": 3,
         "resolved": False,
         "correct": None,
     }
@@ -243,65 +207,29 @@ def update_quests(state: dict[str, Any]) -> None:
             state["action_log"].append(f"Quest complete: {quest['title']} (+{bonus})")
 
 
-def local_continue_thread(surface: str, item: dict[str, Any], answer_text: str) -> dict[str, Any]:
-    turns = int(item.get("chat_turns", 0))
-    correct = custom_reply_is_responsible(answer_text)
-    if turns < int(item.get("min_turns", 3)):
-        if surface == "email":
-            response = "Before I move this, tell me which source or evidence trail you want attached to the decision."
-        else:
-            response = f"{item.get('contact', 'They')}: What should I check first so I do not accidentally spread something false?"
-        return {
-            "resolved": False,
-            "correct": False,
-            "response": response,
-            "reason": "local follow-up before minimum conversation depth",
-            "options": item.get("options", []),
-            "mode": "local",
-        }
-    return {
-        "resolved": True,
-        "correct": correct,
-        "response": agent_followup(surface, item, correct),
-        "reason": "local final evaluation after multi-turn thread",
-        "options": item.get("options", []),
-        "mode": "local",
-    }
-
-
 def continue_conversation(surface: str, item: dict[str, Any], answer_text: str) -> dict[str, Any]:
     ensure_thread_state(item)
     item["chat_turns"] = int(item.get("chat_turns", 0)) + 1
     turn_number = int(item["chat_turns"])
     min_turns = int(item.get("min_turns", 3))
-    if ai_agents.enabled():
-        try:
-            result = ai_agents.continue_thread(
-                surface,
-                item.get("from_name") or item.get("contact") or "Agent",
-                item.get("messages", []),
-                answer_text,
-                turn_number,
-                min_turns,
-            )
-            if turn_number < min_turns:
-                result["resolved"] = False
-                result["correct"] = False
-            elif not result.get("resolved") and custom_reply_is_responsible(answer_text):
-                result["resolved"] = True
-                result["correct"] = True
-                result["reason"] = f"{result.get('reason', '')} GameDirector resolved after required multi-turn verification depth.".strip()
-            elif turn_number >= min_turns + 2:
-                result["resolved"] = True
-                result["correct"] = custom_reply_is_responsible(answer_text)
-                result["reason"] = f"{result.get('reason', '')} GameDirector forced closure after extended thread depth.".strip()
-            result["mode"] = "openai"
-            return result
-        except Exception as exc:
-            result = local_continue_thread(surface, item, answer_text)
-            result["reason"] = f"{result['reason']} after {type(exc).__name__}"
-            return result
-    return local_continue_thread(surface, item, answer_text)
+    max_turns = int(item.get("max_turns", min_turns))
+    if not ai_agents.enabled():
+        raise RuntimeError("Agent conversation requires OPENAI_API_KEY; no canned chat fallback is allowed.")
+    result = ai_agents.continue_thread(
+        surface,
+        item.get("from_name") or item.get("contact") or "Agent",
+        item,
+        item.get("messages", []),
+        answer_text,
+        turn_number,
+        min_turns,
+        max_turns,
+    )
+    if turn_number < min_turns:
+        result["resolved"] = False
+        result["correct"] = False
+    result["mode"] = "openai"
+    return result
 
 
 def fetch_recent_news(limit: int = 8) -> list[dict[str, Any]]:
@@ -330,60 +258,6 @@ def fetch_recent_news(limit: int = 8) -> list[dict[str, Any]]:
             if len(articles) >= limit:
                 return articles
     return FALLBACK_NEWS[:limit]
-
-
-def distort_article(article: dict[str, Any], rng: random.Random) -> dict[str, Any]:
-    hooks = [
-        "Leaked documents prove",
-        "Experts are hiding that",
-        "Viral footage confirms",
-        "Anonymous insiders claim",
-    ]
-    pressure = [
-        "competitors are already posting it",
-        "the morning editor wants a fast decision",
-        "a sponsor is asking why it is not live yet",
-        "the story is trending in private chats",
-    ]
-    title = article["title"]
-    distorted_title = f"{rng.choice(hooks)}: {title}"
-    return {
-        **article,
-        "title": distorted_title,
-        "summary": (
-            f"{article['summary']} The version in the queue adds unsupported certainty, emotional wording, "
-            "and a missing-source claim that has not been verified."
-        ),
-        "truth_label": "manipulated",
-        "editor_note": "Manipulated framing: verify the original source before publishing.",
-        "public_pressure": rng.choice(pressure),
-    }
-
-
-def build_newsdesk(articles: list[dict[str, Any]], rng: random.Random) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    for index, article in enumerate(articles[:6]):
-        is_manipulated = index % 2 == 1
-        item = distort_article(article, rng) if is_manipulated else {
-            **article,
-            "truth_label": "real",
-            "editor_note": "Real source found. Still check relevance and wording before publishing.",
-            "public_pressure": rng.choice([
-                "low pressure; enough time to verify",
-                "homepage slot opens in ten minutes",
-                "audience team says the topic is rising",
-            ]),
-        }
-        item.update(
-            {
-                "id": f"news-{index + 1}",
-                "decision": None,
-                "correct": None,
-                "points": 0,
-            }
-        )
-        items.append(item)
-    return items
 
 
 def hydrate_news_items(items: list[dict[str, Any]], rng: random.Random) -> list[dict[str, Any]]:
@@ -416,11 +290,7 @@ def hydrate_emails(items: list[dict[str, Any]], news_items: list[dict[str, Any]]
         body = raw.get("body") or "Can you verify this before it moves?"
         options = raw.get("options") if isinstance(raw.get("options"), list) else []
         if len(options) < 3:
-            options = [
-                {"id": "verify-first", "label": "Verify first and hold publication"},
-                {"id": "publish-fast", "label": "Publish fast while traffic is high"},
-                {"id": "ask-source", "label": "Ask for source documents"},
-            ]
+            raise ValueError("Email agent response must include three generated options")
         emails.append(
             {
                 "id": f"email-agent-{index + 1}",
@@ -448,11 +318,7 @@ def hydrate_telegram(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raw_messages = raw.get("messages") if isinstance(raw.get("messages"), list) else ["Is this real?"]
         options = raw.get("options") if isinstance(raw.get("options"), list) else []
         if len(options) < 3:
-            options = [
-                {"id": "ask-wait", "label": "Ask them to wait while you verify"},
-                {"id": "share-fast", "label": "Tell them to forward it"},
-                {"id": "request-evidence", "label": "Request source and screenshots"},
-            ]
+            raise ValueError("Telegram agent response must include three generated options")
         threads.append(
             {
                 "id": f"tg-agent-{index + 1}",
@@ -468,100 +334,6 @@ def hydrate_telegram(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return threads
-
-
-def build_emails(news_items: list[dict[str, Any]], rng: random.Random) -> list[dict[str, Any]]:
-    real_item = next((item for item in news_items if item["truth_label"] == "real"), news_items[0])
-    fake_item = next((item for item in news_items if item["truth_label"] == "manipulated"), news_items[-1])
-    emails = [
-        {
-            "id": "email-source-check",
-            "from_name": "Mira / Senior Editor",
-            "from_email": "mira@newmedia.local",
-            "subject": "Need source check before homepage",
-            "body": f"Can you verify whether this story is safe to publish? It references: {real_item['title']}",
-            "messages": [
-                message("Mira / Senior Editor", f"Can you verify whether this story is safe to publish? It references: {real_item['title']}")
-            ],
-            "linked_news_id": real_item["id"],
-            "options": [
-                {"id": "send-source-pack", "label": "Send source pack and mark verified"},
-                {"id": "publish-without-check", "label": "Tell her to publish immediately"},
-                {"id": "ignore", "label": "Ignore until after lunch"},
-            ],
-            "correct_option": "send-source-pack",
-            "selected": None,
-            "custom_answer": "",
-            **new_thread_state(),
-        },
-        {
-            "id": "email-sponsor-pressure",
-            "from_name": "Brand Partner",
-            "from_email": "promo@brand-partner.example",
-            "subject": "Small wording request for today",
-            "body": f"Please remove uncertainty from this headline and make it sound confirmed: {fake_item['title']}",
-            "messages": [
-                message("Brand Partner", f"Please remove uncertainty from this headline and make it sound confirmed: {fake_item['title']}")
-            ],
-            "linked_news_id": fake_item["id"],
-            "options": [
-                {"id": "push-back", "label": "Push back and request evidence"},
-                {"id": "accept-pressure", "label": "Accept the wording request"},
-                {"id": "forward-family", "label": "Forward it to a friend for vibes"},
-            ],
-            "correct_option": "push-back",
-            "selected": None,
-            "custom_answer": "",
-            **new_thread_state(),
-        },
-    ]
-    rng.shuffle(emails)
-    return emails
-
-
-def build_telegram(news_items: list[dict[str, Any]], rng: random.Random) -> list[dict[str, Any]]:
-    suspicious = next((item for item in news_items if item["truth_label"] == "manipulated"), news_items[-1])
-    real_item = next((item for item in news_items if item["truth_label"] == "real"), news_items[0])
-    return [
-        {
-            "id": "tg-mom-rumor",
-            "contact": "Mom",
-            "relationship": "family",
-            "messages": [
-                message("Mom", "Hey, this scary headline is everywhere in my group chat."),
-                message("Mom", suspicious["title"]),
-                message("Mom", "Should I share it so people are warned?"),
-            ],
-            "options": [
-                {"id": "ask-wait", "label": "Ask her to wait while you verify"},
-                {"id": "share-fast", "label": "Tell her to share quickly"},
-                {"id": "mock", "label": "Mock the group chat"},
-            ],
-            "correct_option": "ask-wait",
-            "selected": None,
-            "custom_answer": "",
-            **new_thread_state(),
-        },
-        {
-            "id": "tg-friend-tip",
-            "contact": "Leo",
-            "relationship": "friend",
-            "messages": [
-                message("Leo", "I found the original source for a story you are editing."),
-                message("Leo", real_item["url"]),
-                message("Leo", "Want me to send screenshots too?"),
-            ],
-            "options": [
-                {"id": "request-evidence", "label": "Request screenshots and archive the link"},
-                {"id": "dismiss", "label": "Dismiss it as boring"},
-                {"id": "publish-credit", "label": "Publish and credit Leo as official source"},
-            ],
-            "correct_option": "request-evidence",
-            "selected": None,
-            "custom_answer": "",
-            **new_thread_state(),
-        },
-    ]
 
 
 def update_goals(state: dict[str, Any]) -> None:
@@ -591,30 +363,18 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
     ]
     articles = fetch_recent_news()
     generation_log.append(f"NewsScoutAgent: prepared {len(articles)} source stories")
-    agent_mode = "local"
+    if not ai_agents.enabled():
+        raise RuntimeError("OPENAI_API_KEY is required because game generation is agentic-only.")
+    agent_mode = "openai"
     agent_error = ""
     title = "Morning Shift: False Signal"
-    try:
-        if ai_agents.enabled():
-            bundle = ai_agents.generate_shift_bundle(articles)
-            title = str(bundle.get("title") or title)
-            news_items = hydrate_news_items(bundle.get("news_items") or [], rng)
-            emails = hydrate_emails(bundle.get("emails") or [], news_items)
-            telegram = hydrate_telegram(bundle.get("telegram_threads") or [])
-            generation_log.extend(str(line) for line in (bundle.get("generation_log") or []))
-            generation_log.append("OpenAIAgentRuntime: live OpenAI generation completed")
-            agent_mode = "openai"
-        else:
-            raise RuntimeError("OPENAI_API_KEY not available")
-    except Exception as exc:
-        agent_error = f"{type(exc).__name__}: {str(exc)[:160]}"
-        news_items = build_newsdesk(articles, rng)
-        generation_log.append("DistortionAgent: created manipulated variants and verification notes")
-        emails = build_emails(news_items, rng)
-        generation_log.append("InboxAgent: generated newsroom email pressure and source-check tasks")
-        telegram = build_telegram(news_items, rng)
-        generation_log.append("SideQuestAgent: generated family/friend misinformation sidequests")
-        generation_log.append(f"OpenAIAgentRuntime: fallback used ({agent_error})")
+    bundle = ai_agents.generate_shift_bundle(articles)
+    title = str(bundle.get("title") or title)
+    news_items = hydrate_news_items(bundle.get("news_items") or [], rng)
+    emails = hydrate_emails(bundle.get("emails") or [], news_items)
+    telegram = hydrate_telegram(bundle.get("telegram_threads") or [])
+    generation_log.extend(str(line) for line in (bundle.get("generation_log") or []))
+    generation_log.append("OpenAIAgentRuntime: live OpenAI generation completed")
     generation_log.append("MissionDirector: packaged playable shift goals and scoring")
     state = {
         "id": str(uuid.uuid4()),
@@ -622,7 +382,7 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
         "player": {"name": user["name"], "role": "New Media Editor"},
         "created_at": datetime.now(timezone.utc).isoformat(),
         "agent_mode": agent_mode,
-        "agent_model": ai_agents.MODEL if agent_mode == "openai" else "local-fallback",
+        "agent_model": ai_agents.MODEL,
         "agent_error": agent_error,
         "score": 0,
         "complete": False,
@@ -648,6 +408,8 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
 def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str, custom_text: str | None = None) -> dict[str, Any]:
     ensure_game_systems(state)
     if surface == "news":
+        if not ai_agents.enabled():
+            raise RuntimeError("OPENAI_API_KEY is required because newsdesk feedback is agentic-only.")
         item = next((entry for entry in state["news_items"] if entry["id"] == item_id), None)
         if not item:
             raise ValueError("News item not found")
@@ -657,7 +419,10 @@ def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str,
         item["decision"] = choice
         item["correct"] = choice == correct_choice
         item["points"] = 100 if item["correct"] else -50
-        item["agent_response"] = agent_followup("news", item, item["correct"])
+        decision_reply = ai_agents.news_decision_reply(item, choice, item["correct"])
+        item["agent_response"] = decision_reply["response"]
+        item["agent_reason"] = decision_reply["reason"]
+        item["reply_agent_mode"] = "openai"
         state["score"] += item["points"]
         if item["correct"]:
             add_value(state, "public_trust", 6)
@@ -743,6 +508,8 @@ def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str,
 
 def advance_world(state: dict[str, Any]) -> dict[str, Any]:
     ensure_game_systems(state)
+    if not ai_agents.enabled():
+        raise RuntimeError("OPENAI_API_KEY is required because world simulation is agentic-only.")
     tick = int(state.get("world_tick", 0)) + 1
     state["world_tick"] = tick
     add_value(state, "newsroom_momentum", -1)
@@ -750,92 +517,25 @@ def advance_world(state: dict[str, Any]) -> dict[str, Any]:
     state.setdefault("world_feed", [])
     state.setdefault("generation_log", [])
     articles = fetch_recent_news(limit=8)
-    article = articles[tick % len(articles)] if articles else FALLBACK_NEWS[tick % len(FALLBACK_NEWS)]
-
-    try:
-        if ai_agents.enabled():
-            event = ai_agents.world_event(state, articles)
-            kind = event.get("kind")
-            raw_item = event.get("item") or {}
-            if kind == "news":
-                item = hydrate_news_items([{**raw_item, "agent_generated": True}], rng)[0]
-                item["id"] = f"news-live-{tick}"
-                state["news_items"].insert(0, item)
-            elif kind == "email":
-                item = hydrate_emails([raw_item], state.get("news_items") or [])[0]
-                item["id"] = f"email-live-{tick}"
-                state["emails"].insert(0, item)
-            elif kind == "telegram":
-                item = hydrate_telegram([raw_item])[0]
-                item["id"] = f"tg-live-{tick}"
-                state["telegram_threads"].insert(0, item)
-            else:
-                raise ValueError(f"Unknown world event kind: {kind}")
-            line = str(event.get("log") or f"OpenAIWorldDirector: added {kind} event")
-            state["last_world_agent_mode"] = "openai"
-        else:
-            raise RuntimeError("OPENAI_API_KEY not available")
-    except Exception as exc:
-        line = ""
-        state["last_world_agent_mode"] = "local"
-        state["last_world_agent_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
-    if not line:
-        if tick % 3 == 1:
-            item = distort_article(article, rng) if tick % 2 else {
-                **article,
-                "truth_label": "real",
-                "editor_note": "Fresh wire story. Verify source, relevance, and wording.",
-                "public_pressure": "new alert from the live desk",
-            }
-            item.update({"id": f"news-live-{tick}", "decision": None, "correct": None, "points": 0})
-            state["news_items"].insert(0, item)
-            line = f"NewsScoutAgent: new live story entered the queue: {item['title']}"
-        elif tick % 3 == 2:
-            item = {
-                "id": f"email-live-{tick}",
-                "from_name": rng.choice(["Copy Chief", "Legal Desk", "Audience Editor", "Freelance Source"]),
-                "from_email": "live-desk@newmedia.local",
-                "subject": rng.choice(["Can you clear this update?", "Urgent wording check", "Source wants a reply", "Homepage slot opened"]),
-                "body": f"The live desk needs your judgement on this developing item: {article['title']}. What should we do before it moves?",
-                "messages": [
-                    message("Live Desk", f"The live desk needs your judgement on this developing item: {article['title']}. What should we do before it moves?")
-                ],
-                "linked_news_id": None,
-                "options": [
-                    {"id": "verify-first", "label": "Verify first and hold publication"},
-                    {"id": "publish-fast", "label": "Publish fast while traffic is high"},
-                    {"id": "ask-source", "label": "Ask for source documents"},
-                ],
-                "correct_option": rng.choice(["verify-first", "ask-source"]),
-                "selected": None,
-                "custom_answer": "",
-                **new_thread_state(),
-            }
-            state["emails"].insert(0, item)
-            line = f"InboxAgent: new email arrived from {item['from_name']}: {item['subject']}"
-        else:
-            contact = rng.choice(["Dad", "Sara", "Niko", "Aunt Lina", "Classmate"])
-            item = {
-                "id": f"tg-live-{tick}",
-                "contact": contact,
-                "relationship": rng.choice(["family", "friend", "source"]),
-                "messages": [
-                    message(contact, "This just popped up in my feed. Is it real?"),
-                    message(contact, article["title"]),
-                    message(contact, "I need a quick answer before I forward it."),
-                ],
-                "options": [
-                    {"id": "ask-wait", "label": "Ask them to wait while you verify"},
-                    {"id": "share-fast", "label": "Tell them to forward it"},
-                    {"id": "request-evidence", "label": "Request source and screenshots"},
-                ],
-            "correct_option": rng.choice(["ask-wait", "request-evidence"]),
-            "selected": None,
-            "custom_answer": "",
-            **new_thread_state(),
-            }
-            state["telegram_threads"].insert(0, item)
-            line = f"SideQuestAgent: {contact} sent a new private-message sidequest"
+    event = ai_agents.world_event(state, articles)
+    kind = event.get("kind")
+    raw_item = event.get("item") or {}
+    if kind == "news":
+        item = hydrate_news_items([{**raw_item, "agent_generated": True}], rng)[0]
+        item["id"] = f"news-live-{tick}"
+        state["news_items"].insert(0, item)
+    elif kind == "email":
+        item = hydrate_emails([raw_item], state.get("news_items") or [])[0]
+        item["id"] = f"email-live-{tick}"
+        state["emails"].insert(0, item)
+    elif kind == "telegram":
+        item = hydrate_telegram([raw_item])[0]
+        item["id"] = f"tg-live-{tick}"
+        state["telegram_threads"].insert(0, item)
+    else:
+        raise ValueError(f"Unknown world event kind: {kind}")
+    line = str(event.get("log") or f"OpenAIWorldDirector: added {kind} event")
+    state["last_world_agent_mode"] = "openai"
 
     state["world_feed"].insert(0, line)
     state["generation_log"].append(line)

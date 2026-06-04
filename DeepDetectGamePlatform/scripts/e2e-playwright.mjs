@@ -22,30 +22,58 @@ const record = async (name, screenshotName) => {
 
 const fetchDebugState = async () => page.evaluate(async () => {
   const token = localStorage.getItem("dd_token");
-  const gamesResponse = await fetch("/api/games", { headers: { Authorization: `Bearer ${token}` } });
-  const games = await gamesResponse.json();
-  const gameId = games.games[0].id;
+  const gameId = localStorage.getItem("dd_game_id");
+  if (!gameId) throw new Error("No active game id in browser storage");
   const debugResponse = await fetch(`/api/game/${gameId}/debug`, { headers: { Authorization: `Bearer ${token}` } });
   return debugResponse.json();
 });
 
-const waitForThreadTurn = async (collectionName, id, turn) => page.waitForFunction(
-  async ({ collectionName, id, turn }) => {
-    const token = localStorage.getItem("dd_token");
-    const gamesResponse = await fetch("/api/games", { headers: { Authorization: `Bearer ${token}` } });
-    const games = await gamesResponse.json();
-    const gameId = games.games[0].id;
-    const debugResponse = await fetch(`/api/game/${gameId}/debug`, { headers: { Authorization: `Bearer ${token}` } });
-    const debug = await debugResponse.json();
-    const item = debug[collectionName].find((entry) => entry.id === id);
-    return item && item.chat_turns >= turn;
-  },
-  { collectionName, id, turn },
-  { timeout: 90000 },
-);
+const pinActiveGameId = async () => page.evaluate(async () => {
+  const token = localStorage.getItem("dd_token");
+  const gamesResponse = await fetch("/api/games", { headers: { Authorization: `Bearer ${token}` } });
+  const games = await gamesResponse.json();
+  if (!games.games?.[0]?.id) throw new Error("No game available to pin");
+  localStorage.setItem("dd_game_id", games.games[0].id);
+  return games.games[0].id;
+});
+
+const waitForDebug = async (predicate, timeout = 90000) => {
+  const deadline = Date.now() + timeout;
+  let lastDebug = null;
+  while (Date.now() < deadline) {
+    lastDebug = await fetchDebugState();
+    if (predicate(lastDebug)) return lastDebug;
+    await page.waitForTimeout(500);
+  }
+  throw new Error(`Timed out waiting for debug state: ${JSON.stringify(lastDebug)}`);
+};
+
+const waitForThreadTurn = async (collectionName, id, turn) => waitForDebug((debug) => {
+  const item = debug[collectionName].find((entry) => entry.id === id);
+  return item && item.chat_turns >= turn;
+});
+
+const waitForThreadResolved = async (collectionName, id) => waitForDebug((debug) => {
+  const item = debug[collectionName].find((entry) => entry.id === id);
+  return item && item.selected && item.resolved;
+});
+
+const getDebugItem = async (collectionName, id) => {
+  const debug = await fetchDebugState();
+  return debug[collectionName].find((entry) => entry.id === id);
+};
+
+const waitForNewsDecision = async (id) => waitForDebug((debug) => {
+  const item = debug.news_truth.find((entry) => entry.id === id);
+  return item && item.decision;
+});
+
+const waitForWorldTick = async (tick) => waitForDebug((debug) => debug.world_tick >= tick, 120000);
 
 try {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Register" }).click();
   const stamp = Date.now();
   await page.getByPlaceholder("Editor name").fill("Browser Agent");
@@ -57,11 +85,18 @@ try {
 
   await page.getByRole("button", { name: "Generate Game" }).first().click();
   await page.getByText("Agent runtime:", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
+  await page.getByText("gpt-5.3-chat-latest", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
+  const activeGameId = await pinActiveGameId();
   await record("generated game newsdesk", "02-generated-newsdesk.png");
 
   for (let depth = 1; depth <= 5; depth += 1) {
     await page.getByRole("button", { name: "Advance World" }).click();
-    await page.getByText("last world:", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
+    await waitForWorldTick(depth);
+    await page.waitForFunction(
+      () => [...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Advance World" && !button.disabled),
+      null,
+      { timeout: 90000 },
+    );
     await page.locator(".log-line").first().waitFor({ state: "visible", timeout: 90000 });
     await record(`live world tick ${depth}`, `06-live-world-tick-${depth}.png`);
   }
@@ -77,6 +112,7 @@ try {
     const locator = page.locator(`button[data-action="news"][data-id="${itemId}"][data-choice="${choice}"]`);
     await locator.waitFor({ state: "visible" });
     await locator.click();
+    await waitForNewsDecision(itemId);
   }
   await page.getByText("4/4 complete", { exact: true }).waitFor({ state: "visible" });
 
@@ -89,24 +125,29 @@ try {
   await page.locator(`[data-email-id="${targetEmail.id}"]`).click();
   const emailReplies = [
     "Please wait while I verify the original source and keep the item out of the feed.",
-    "I found the source trail, but I still need corroborating evidence before we move.",
-    "I will archive the source trail and recommend holding until the claim is verified.",
+    "I will check the official or primary source and compare it with a second reliable report before we move.",
+    "The final decision is to hold publication, archive the source trail, and send only verified facts to the fact desk.",
+    "Do not publish this yet; only a verified summary with official confirmation should move.",
+    "Do not publish this yet; only a verified summary with official confirmation should move.",
   ];
   for (const [index, reply] of emailReplies.entries()) {
+    const current = await getDebugItem("email_modes", targetEmail.id);
+    if (current?.selected) break;
+    await page.evaluate((id) => localStorage.setItem("dd_game_id", id), activeGameId);
     await page.locator(`form[data-custom-surface="email"][data-custom-id="${targetEmail.id}"] textarea`).fill(reply);
     await page.locator(`form[data-custom-surface="email"][data-custom-id="${targetEmail.id}"] button`).click();
     await waitForThreadTurn("email_modes", targetEmail.id, index + 1);
+    const afterTurn = await getDebugItem("email_modes", targetEmail.id);
+    steps.push({ name: `email debug turn ${index + 1}`, item: afterTurn, gameId: activeGameId });
     if (index === 0) await record("email custom reply turn one", "07-email-agent-response.png");
   }
-  await page.waitForFunction(
-    (id) => !document.querySelector(`form[data-custom-surface="email"][data-custom-id="${id}"]`),
-    targetEmail.id,
-    { timeout: 90000 },
-  );
+  await waitForThreadResolved("email_modes", targetEmail.id);
   await record("email thread resolved after three turns", "09-email-multiturn-resolved.png");
   const debugAfterEmailCustom = await fetchDebugState();
   const resolvedEmail = debugAfterEmailCustom.email_modes.find((item) => item.id === targetEmail.id);
-  if (!resolvedEmail?.selected || resolvedEmail.chat_turns < 3) throw new Error("Expected email to resolve after at least three turns");
+  if (!resolvedEmail?.selected || resolvedEmail.chat_turns < targetEmail.min_turns || resolvedEmail.chat_turns > targetEmail.max_turns) {
+    throw new Error("Expected email to resolve within configured thread turns");
+  }
 
   await page.getByRole("button", { name: "Telegram" }).click();
   await page.locator('button[data-action="telegram"]').first().waitFor({ state: "visible" });
@@ -118,22 +159,27 @@ try {
     "Do not forward it yet; I will inspect the source first.",
     "Please send me where it came from and any screenshots so I can check the evidence.",
     "I checked it; wait for a verified summary before sharing anything.",
+    "Do not share it in the group chat; I will send you a checked version if it is real.",
+    "The safe action is to stop forwarding, keep the screenshot, and wait for confirmation.",
   ];
   for (const [index, reply] of telegramReplies.entries()) {
+    const current = await getDebugItem("telegram_modes", targetTelegram.id);
+    if (current?.selected) break;
+    await page.evaluate((id) => localStorage.setItem("dd_game_id", id), activeGameId);
     await page.locator(`form[data-custom-surface="telegram"][data-custom-id="${targetTelegram.id}"] textarea`).fill(reply);
     await page.locator(`form[data-custom-surface="telegram"][data-custom-id="${targetTelegram.id}"] button`).click();
     await waitForThreadTurn("telegram_modes", targetTelegram.id, index + 1);
+    const afterTurn = await getDebugItem("telegram_modes", targetTelegram.id);
+    steps.push({ name: `telegram debug turn ${index + 1}`, item: afterTurn, gameId: activeGameId });
     if (index === 0) await record("telegram custom reply turn one", "08-telegram-agent-response.png");
   }
-  await page.waitForFunction(
-    (id) => !document.querySelector(`form[data-custom-surface="telegram"][data-custom-id="${id}"]`),
-    targetTelegram.id,
-    { timeout: 90000 },
-  );
+  await waitForThreadResolved("telegram_modes", targetTelegram.id);
   await record("telegram thread resolved after three turns", "10-telegram-multiturn-resolved.png");
   const debugAfterTelegramCustom = await fetchDebugState();
   const resolvedTelegram = debugAfterTelegramCustom.telegram_modes.find((item) => item.id === targetTelegram.id);
-  if (!resolvedTelegram?.selected || resolvedTelegram.chat_turns < 3) throw new Error("Expected Telegram to resolve after at least three turns");
+  if (!resolvedTelegram?.selected || resolvedTelegram.chat_turns < targetTelegram.min_turns || resolvedTelegram.chat_turns > targetTelegram.max_turns) {
+    throw new Error("Expected Telegram to resolve within configured thread turns");
+  }
 
   await page.getByRole("button", { name: "Briefing" }).click();
   await page.getByRole("heading", { name: /Shift active/ }).waitFor({ state: "visible" });
@@ -157,7 +203,11 @@ try {
   await fs.writeFile(reportPath, JSON.stringify({ ok: true, baseUrl, steps }, null, 2));
   console.log(JSON.stringify({ ok: true, score, actionLogCount, reportPath }, null, 2));
 } catch (error) {
-  await fs.writeFile(reportPath, JSON.stringify({ ok: false, baseUrl, error: String(error), steps }, null, 2));
+  const debugMeta = await page.evaluate(() => ({
+    tokenPresent: Boolean(localStorage.getItem("dd_token")),
+    gameId: localStorage.getItem("dd_game_id"),
+  })).catch(() => ({}));
+  await fs.writeFile(reportPath, JSON.stringify({ ok: false, baseUrl, error: String(error), debugMeta, steps }, null, 2));
   console.error(error);
   process.exitCode = 1;
 } finally {

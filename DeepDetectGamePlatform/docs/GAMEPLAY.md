@@ -28,7 +28,7 @@ The top HUD is part of the game, not just decoration. Mission goals track requir
 - **Community care** rises when private conversations slow down rumors without humiliating people.
 - **Newsroom momentum** changes as the desk moves or stalls under pressure.
 
-When `OPENAI_API_KEY` is available, the visible badge shows the live runtime, for example `Agent runtime: openai / gpt-4o-mini`. The shift is no longer static. **Advance World** simulates time passing and lets agents inject fresh news, letters, or Telegram sidequests into the live game state.
+When `OPENAI_API_KEY` is configured, the visible badge shows the live runtime, for example `Agent runtime: openai / gpt-5.3-chat-latest`. The shift is no longer static. **Advance World** simulates time passing and lets agents inject fresh news, letters, or Telegram sidequests into the live game state. The game requires this agent runtime for generation, live world events, newsdesk feedback, and chat replies.
 
 ![Live world tick](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/06-live-world-tick-5.png)
 
@@ -52,7 +52,7 @@ Telegram sidequests add social pressure from family and friends. These missions 
 
 ![Telegram sidequest](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/04-telegram.png)
 
-Custom Telegram replies also receive in-world responses from the simulated contact. Like email, the thread can continue for several turns before it is scored.
+Custom Telegram replies also receive in-world responses from the simulated contact. Like email, the thread can continue for several turns, but the agent must score and close the conversation by the thread's max-turn limit.
 
 ![Telegram agent response](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/08-telegram-agent-response.png)
 
@@ -71,4 +71,4 @@ cd C:\Erasmus\DeepDetectGamePlatform
 npm run e2e
 ```
 
-Result: registration, game generation, quest/value HUD validation, five world-advancement ticks, adaptive Newsdesk decisions against generated truth labels, a three-turn Inbox conversation, a three-turn Telegram conversation, final Briefing review, score/action-log assertions, quest progress assertions, value-change assertions, and visible agent-runtime assertion all passed. The report is saved at `docs/browser-test-report.json`.
+Result: registration, agent-backed game generation, quest/value HUD validation, five agent-backed world-advancement ticks, adaptive Newsdesk decisions against generated truth labels, multi-turn Inbox conversation, multi-turn Telegram conversation, final Briefing review, score/action-log assertions, quest progress assertions, value-change assertions, and visible agent-runtime assertion all passed. The report is saved at `docs/browser-test-report.json`.

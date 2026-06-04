@@ -95,7 +95,10 @@ def games(user: dict = Depends(current_user)) -> dict:
 
 @app.post("/api/game/generate")
 def generate(user: dict = Depends(current_user)) -> dict:
-    state = generate_game(user)
+    try:
+        state = generate_game(user)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     save_game(state["id"], user["id"], state)
     return {"game": state}
 
@@ -120,7 +123,15 @@ def debug_game(game_id: str, user: dict = Depends(current_user)) -> dict:
         "world_tick": state.get("world_tick", 0),
         "values": state.get("values", {}),
         "quests": state.get("quests", []),
-        "news_truth": [{"id": item["id"], "truth_label": item.get("truth_label")} for item in state.get("news_items", [])],
+        "news_truth": [
+            {
+                "id": item["id"],
+                "truth_label": item.get("truth_label"),
+                "decision": item.get("decision"),
+                "correct": item.get("correct"),
+            }
+            for item in state.get("news_items", [])
+        ],
         "email_modes": [
             {
                 "id": item["id"],
@@ -128,6 +139,7 @@ def debug_game(game_id: str, user: dict = Depends(current_user)) -> dict:
                 "resolved": item.get("resolved"),
                 "chat_turns": item.get("chat_turns", 0),
                 "min_turns": item.get("min_turns", 3),
+                "max_turns": item.get("max_turns", 3),
                 "correct_option": item.get("correct_option"),
                 "reply_agent_mode": item.get("reply_agent_mode"),
             }
@@ -140,6 +152,7 @@ def debug_game(game_id: str, user: dict = Depends(current_user)) -> dict:
                 "resolved": item.get("resolved"),
                 "chat_turns": item.get("chat_turns", 0),
                 "min_turns": item.get("min_turns", 3),
+                "max_turns": item.get("max_turns", 3),
                 "correct_option": item.get("correct_option"),
                 "reply_agent_mode": item.get("reply_agent_mode"),
             }
@@ -157,6 +170,8 @@ def action(game_id: str, payload: ActionIn, user: dict = Depends(current_user)) 
         state = apply_action(state, payload.surface, payload.item_id, payload.choice, payload.custom_text)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     save_game(game_id, user["id"], state)
     return {"game": state}
 
@@ -166,6 +181,9 @@ def tick(game_id: str, user: dict = Depends(current_user)) -> dict:
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
-    state = advance_world(state)
+    try:
+        state = advance_world(state)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     save_game(game_id, user["id"], state)
     return {"game": state}

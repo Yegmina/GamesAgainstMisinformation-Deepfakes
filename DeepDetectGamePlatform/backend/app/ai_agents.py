@@ -6,7 +6,7 @@ from typing import Any
 
 from openai import OpenAI
 
-MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-4o-mini")
+MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
 
 
 def enabled() -> bool:
@@ -98,7 +98,52 @@ Score correct=false when the player amplifies, publishes, forwards, mocks withou
     }
 
 
-def continue_thread(surface: str, participant: str, messages: list[dict[str, Any]], player_answer: str, turn_number: int, min_turns: int) -> dict[str, Any]:
+def news_decision_reply(item: dict[str, Any], choice: str, correct: bool) -> dict[str, str]:
+    prompt = f"""
+You are the DeepDetect assignment editor. React in-world to a player's newsdesk decision.
+
+Return ONLY valid JSON:
+{{"response": "one concise newsroom reply", "reason": "short editorial reason"}}
+
+The player chose: {choice}
+The choice was scored as: {"correct" if correct else "risky"}
+News item:
+{json.dumps({
+    "title": item.get("title", ""),
+    "summary": item.get("summary", ""),
+    "source": item.get("source", ""),
+    "url": item.get("url", ""),
+    "truth_label": item.get("truth_label", ""),
+    "editor_note": item.get("editor_note", ""),
+    "public_pressure": item.get("public_pressure", ""),
+}, ensure_ascii=False)}
+
+Rules:
+- Do not use a canned generic line.
+- Mention the actual story or editorial issue.
+- If risky, explain the concrete newsroom risk.
+- If correct, explain what protection or verification value the decision created.
+"""
+    data = _json_response(prompt, max_output_tokens=500)
+    response = str(data.get("response") or "").strip()
+    if not response:
+        raise ValueError("News decision agent did not return a response")
+    return {
+        "response": response,
+        "reason": str(data.get("reason") or ""),
+    }
+
+
+def continue_thread(
+    surface: str,
+    participant: str,
+    item_context: dict[str, Any],
+    messages: list[dict[str, Any]],
+    player_answer: str,
+    turn_number: int,
+    min_turns: int,
+    max_turns: int,
+) -> dict[str, Any]:
     compact_messages = [
         {
             "sender": item.get("sender", ""),
@@ -108,6 +153,23 @@ def continue_thread(surface: str, participant: str, messages: list[dict[str, Any
         for item in messages[-12:]
         if isinstance(item, dict)
     ]
+    safe_context = {
+        key: value
+        for key, value in item_context.items()
+        if key
+        in {
+            "id",
+            "from_name",
+            "from_email",
+            "subject",
+            "body",
+            "contact",
+            "relationship",
+            "linked_news_id",
+            "correct_option",
+            "options",
+        }
+    }
     prompt = f"""
 You are a DeepDetect in-world conversation agent. Continue a realistic multi-turn chat with the player.
 
@@ -125,27 +187,73 @@ Return ONLY valid JSON:
 }}
 
 Rules:
+- You are the ONLY evaluator for this conversation turn. Judge the actual player text, not a prewritten answer key.
+- React directly to the latest player reply. If the player says nonsense, slang, "amogus", "wtf", insults, or anything unclear, the character should be confused, annoyed, or ask for a real actionable answer. Do not pretend the player asked for verification.
 - Do not resolve before turn {min_turns}; if turn_number is lower, ask a useful follow-up question.
-- Resolve only when the player has meaningfully handled verification, evidence, source tracing, and whether to publish/share.
+- Resolve as soon as the player has meaningfully handled verification, evidence, source tracing, and whether to publish/share.
+- The conversation must end by turn {max_turns}. If turn_number is {max_turns} or higher, set resolved=true and score correct=true only if the player gave a usable verification/safety action; otherwise resolved=true and correct=false.
+- Evaluate the player's newsroom or private-chat action, not whether they actually browsed the web inside the game.
+- For email/newsroom threads, correct=true when the player says to hold, delay, reject unsupported wording, attach/archive the source trail, request primary or official confirmation, send to the fact desk, or publish only a verified/corroborated summary.
+- For Telegram/private threads, correct=true when the player asks the contact to stop sharing, wait, provide the original source, preserve screenshots for checking, or rely on verified/official reporting.
 - correct=true only when the resolved outcome slows or prevents misinformation.
+- correct=false when the player is unclear, hostile, jokes, amplifies the claim, or gives no usable verification action.
 - If unresolved, response should ask for the next concrete clarification/action.
+- Do not ask broad looping questions like "what specifically are you looking for?" after the player already proposed a reasonable verification action. Either ask for one precise missing item, or resolve.
 - Keep the character believable for {surface}; do not lecture like a narrator.
+- Suggested options must be newly generated for this situation and should fit the character's last reply.
 
 Surface: {surface}
 Character/contact: {participant}
 Turn number after this player reply: {turn_number}
 Minimum turns before resolution: {min_turns}
+Maximum turns before forced resolution: {max_turns}
+Item context:
+{json.dumps(safe_context, ensure_ascii=False)}
 Recent thread:
 {json.dumps(compact_messages, ensure_ascii=False)}
 Latest player reply:
 {player_answer}
 """
     data = _json_response(prompt, max_output_tokens=700)
+    if turn_number >= max_turns and not bool(data.get("resolved")):
+        repair_prompt = f"""
+Your previous DeepDetect conversation JSON violated the max-turn rule by leaving resolved=false at turn {turn_number}/{max_turns}.
+
+Return ONLY corrected valid JSON with the same shape:
+{{
+  "resolved": true,
+  "correct": false,
+  "response": "one in-character final reply",
+  "reason": "short final scoring reason",
+  "options": [
+    {{"id": "short-id", "label": "short suggested reply"}},
+    {{"id": "short-id-2", "label": "short suggested reply"}},
+    {{"id": "short-id-3", "label": "short suggested reply"}}
+  ]
+}}
+
+Evaluate the player's action, not whether they actually browsed the web inside the game. Decide correct=true if the player gave a usable verification/safety action such as holding publication, seeking official/primary confirmation, attaching the source trail, escalating to the fact desk, stopping forwarding, or waiting for verified reporting. Decide correct=false if the player was vague, hostile, joking, amplifying, or did not provide a concrete safe action.
+
+Surface: {surface}
+Character/contact: {participant}
+Item context: {json.dumps(safe_context, ensure_ascii=False)}
+Recent thread: {json.dumps(compact_messages, ensure_ascii=False)}
+Latest player reply: {player_answer}
+Previous invalid JSON: {json.dumps(data, ensure_ascii=False)}
+"""
+        data = _json_response(repair_prompt, max_output_tokens=700)
     options = data.get("options") if isinstance(data.get("options"), list) else []
+    response = str(data.get("response") or "").strip()
+    if not response:
+        raise ValueError("Conversation agent did not return a response")
+    if turn_number >= max_turns and not bool(data.get("resolved")):
+        raise ValueError("Conversation agent did not resolve at the configured max turn")
+    if len(options) < 3:
+        raise ValueError("Conversation agent did not return three suggested options")
     return {
         "resolved": bool(data.get("resolved")),
         "correct": bool(data.get("correct")),
-        "response": str(data.get("response") or "What evidence should we check before deciding?"),
+        "response": response,
         "reason": str(data.get("reason") or ""),
         "options": options[:3],
     }
