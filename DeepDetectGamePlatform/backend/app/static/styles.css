@@ -1,0 +1,1167 @@
+:root {
+  color-scheme: light;
+  --ink: #17212b;
+  --muted: #657383;
+  --line: #d8e0e8;
+  --paper: #f7f9fb;
+  --panel: #ffffff;
+  --blue: #1e5aa8;
+  --blue-dark: #16447f;
+  --green: #19745b;
+  --red: #b9383f;
+  --amber: #a66300;
+  --shadow: 0 16px 48px rgba(20, 38, 59, 0.14);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 0.9fr);
+  background:
+    linear-gradient(rgba(15, 28, 44, 0.45), rgba(15, 28, 44, 0.6)),
+    url("https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=1800&q=80") center / cover;
+}
+
+.brand-panel {
+  color: white;
+  padding: min(9vw, 96px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 820px;
+}
+
+.kicker {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #6aa5ff;
+}
+
+.brand-panel h1,
+.topbar h1 {
+  margin: 0;
+  line-height: 1.02;
+}
+
+.brand-panel h1 {
+  font-size: clamp(2.6rem, 8vw, 6.8rem);
+  max-width: 760px;
+}
+
+.lede {
+  max-width: 560px;
+  font-size: 1.18rem;
+  line-height: 1.6;
+}
+
+.auth-card {
+  align-self: center;
+  justify-self: center;
+  width: min(420px, calc(100vw - 32px));
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e8eef5;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.segmented button,
+.tab {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 700;
+}
+
+.segmented button.active,
+.tab.active {
+  background: white;
+  color: var(--blue);
+  box-shadow: 0 1px 5px rgba(30, 90, 168, 0.14);
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #324253;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+}
+
+.primary,
+#auth-submit {
+  background: var(--blue);
+  color: white;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-weight: 800;
+}
+
+.primary:hover,
+#auth-submit:hover {
+  background: var(--blue-dark);
+}
+
+.large {
+  font-size: 1.05rem;
+  padding: 14px 18px;
+}
+
+.ghost {
+  background: #edf2f7;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+.error {
+  margin: 0;
+  color: var(--red);
+  min-height: 1.2em;
+}
+
+.game-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.topbar h1 {
+  font-size: 1.5rem;
+}
+
+.agent-status {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scorebox {
+  min-width: 96px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fbfdff;
+}
+
+.scorebox span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.scorebox strong {
+  font-size: 1.4rem;
+}
+
+.empty-state {
+  max-width: 720px;
+  margin: 12vh auto;
+  padding: 0 24px;
+}
+
+.empty-state h2 {
+  font-size: clamp(2rem, 5vw, 4.3rem);
+  margin: 0 0 12px;
+}
+
+.empty-state p {
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.6;
+}
+
+#active-game {
+  padding: 20px 28px 42px;
+}
+
+.mission-strip {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.goals,
+.agent-log,
+.grid,
+.briefing {
+  display: grid;
+  gap: 12px;
+}
+
+.hud-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.hud-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.hud-heading strong {
+  font-size: 0.92rem;
+}
+
+.hud-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.goal-list {
+  display: grid;
+  gap: 10px;
+}
+
+.goal,
+.log-line,
+.card,
+.briefing {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.goal {
+  padding: 14px;
+}
+
+.goal strong {
+  display: block;
+}
+
+.goal span,
+.meta,
+.card p,
+.log-line {
+  color: var(--muted);
+}
+
+.goal.complete {
+  border-color: rgba(25, 116, 91, 0.35);
+  background: #f0faf6;
+}
+
+.values-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.values-panel .hud-heading {
+  grid-column: 1 / -1;
+}
+
+.value-meter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.value-meter strong,
+.quest strong {
+  display: block;
+}
+
+.value-meter span,
+.quest p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.value-meter b {
+  color: var(--blue);
+}
+
+.meter-track {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eef5;
+}
+
+.meter-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1e5aa8, #19745b);
+}
+
+.quest-panel {
+  align-content: start;
+}
+
+.quest {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.quest.complete {
+  border-color: rgba(25, 116, 91, 0.35);
+  background: #effaf5;
+}
+
+.quest-type {
+  display: inline-flex;
+  margin-bottom: 3px;
+  color: var(--blue);
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.reward-line {
+  border-color: rgba(25, 116, 91, 0.35);
+  background: #f0faf6;
+  color: var(--green);
+  font-weight: 800;
+}
+
+.log-line {
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 22px 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+}
+
+.card {
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #f7fafc;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.choices button {
+  padding: 10px 11px;
+  border-radius: 6px;
+  background: #edf2f7;
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.choices button.publish {
+  background: #e8f6f1;
+  color: var(--green);
+}
+
+.choices button.reject {
+  background: #fff0f1;
+  color: var(--red);
+}
+
+.choices button:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.result {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.result.good {
+  background: #e8f6f1;
+  color: var(--green);
+}
+
+.result.bad {
+  background: #fff0f1;
+  color: var(--red);
+}
+
+.message {
+  background: #f4f7fb;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.briefing {
+  padding: 16px;
+}
+
+.briefing-systems {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 12px 0 16px;
+}
+
+.briefing-systems > div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.briefing-systems p {
+  margin: 0 0 8px;
+  color: #425466;
+  line-height: 1.45;
+}
+
+.briefing ol {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.75;
+}
+
+.newsroom-shell {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  min-height: 680px;
+  background: #e9edf2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.news-sidebar {
+  background: #17202a;
+  color: #d9e1ea;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 8px;
+}
+
+.news-logo {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  color: #17202a;
+  border-radius: 6px;
+  font-weight: 900;
+}
+
+.news-tool {
+  width: 100%;
+  padding: 10px 4px;
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.news-tool.active,
+.news-tool:hover {
+  background: #243044;
+  color: white;
+}
+
+.news-main {
+  min-width: 0;
+  background: #f5f6f8;
+}
+
+.news-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.news-toolbar strong {
+  display: block;
+}
+
+.news-toolbar span,
+.news-filters span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.news-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.news-filters span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #f8fafc;
+}
+
+.lead-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
+  padding: 20px 22px;
+  background: white;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.story-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: #5f6b7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.story-kicker span {
+  border-right: 1px solid #ccd4dd;
+  padding-right: 8px;
+}
+
+.story-kicker span:last-child {
+  border-right: 0;
+}
+
+.desk-label {
+  color: #b4232a;
+}
+
+.lead-copy h2 {
+  margin: 10px 0;
+  font-size: clamp(1.4rem, 3vw, 2.35rem);
+  line-height: 1.12;
+}
+
+.lead-copy p,
+.wire-copy p {
+  color: #425466;
+  line-height: 1.55;
+}
+
+.news-evidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+
+.news-evidence span {
+  display: grid;
+  gap: 5px;
+  min-height: 78px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #dbe3eb;
+  border-radius: 6px;
+  color: #425466;
+  line-height: 1.35;
+}
+
+.news-evidence strong {
+  color: #17212b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.decision-panel {
+  align-self: start;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #dbe3eb;
+  border-radius: 8px;
+}
+
+.decision-panel span {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.wire-list {
+  display: grid;
+  gap: 0;
+  background: white;
+}
+
+.wire-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) minmax(160px, 220px);
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.wire-row.decided {
+  background: #fbfdff;
+}
+
+.wire-status {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  color: var(--blue);
+  font-size: 0.78rem;
+}
+
+.wire-status strong {
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.wire-status span {
+  color: #657383;
+  word-break: break-word;
+}
+
+.wire-copy h3 {
+  margin: 2px 0 8px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.wire-copy p {
+  margin: 0 0 8px;
+}
+
+.desk-note {
+  padding-left: 10px;
+  border-left: 3px solid #c8d2dd;
+}
+
+.compact {
+  align-content: start;
+}
+
+.gmail-shell {
+  min-height: 680px;
+  background: #f6f8fc;
+  border: 1px solid #dfe3eb;
+  border-radius: 8px;
+  overflow: hidden;
+  color: #202124;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.gmail-header {
+  height: 64px;
+  display: grid;
+  grid-template-columns: 220px minmax(240px, 720px) 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  background: #f6f8fc;
+}
+
+.gmail-brand,
+.gmail-icons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gmail-brand img {
+  width: 36px;
+  height: 36px;
+}
+
+.gmail-brand strong {
+  font-size: 1.45rem;
+  font-weight: 500;
+}
+
+.hamburger {
+  font-size: 1.35rem;
+  color: #5f6368;
+}
+
+.gmail-search {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: #eaf1fb;
+  border-radius: 24px;
+  color: #5f6368;
+}
+
+.gmail-search::before {
+  content: "⌕";
+  margin-right: 12px;
+  font-size: 1.2rem;
+}
+
+.gmail-icons {
+  justify-content: flex-end;
+  color: #5f6368;
+}
+
+.gmail-icons img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.gmail-body {
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr) 56px;
+  min-height: 616px;
+}
+
+.gmail-leftnav,
+.gmail-rightnav {
+  background: #f6f8fc;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 12px 8px;
+  color: #5f6368;
+  font-size: 0.86rem;
+}
+
+.gmail-leftnav span,
+.gmail-rightnav span {
+  padding: 8px 12px;
+  border-radius: 0 16px 16px 0;
+}
+
+.gmail-leftnav .active-mailbox {
+  background: #d3e3fd;
+  color: #001d35;
+  font-weight: 700;
+}
+
+.compose-dot {
+  width: 118px;
+  height: 46px;
+  border-radius: 12px;
+  background: #c2e7ff;
+  color: #202124;
+  font-size: 1.15rem;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.24);
+}
+
+.gmail-main {
+  min-width: 0;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+}
+
+.gmail-toolbar {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  border-bottom: 1px solid #edf0f2;
+  color: #5f6368;
+}
+
+.gmail-toolbar strong {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.gmail-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  border-bottom: 1px solid #edf0f2;
+}
+
+.gmail-categories button {
+  height: 50px;
+  background: white;
+  color: #5f6368;
+  font-weight: 700;
+  border-bottom: 3px solid transparent;
+}
+
+.gmail-categories button.active {
+  color: #0b57d0;
+  border-bottom-color: #0b57d0;
+}
+
+.gmail-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(420px, 1.1fr);
+  min-height: 520px;
+}
+
+.gmail-list {
+  border-right: 1px solid #edf0f2;
+}
+
+.gmail-row {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 28px 140px minmax(120px, 220px) minmax(160px, 1fr) 86px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid #edf0f2;
+  background: #fff;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.gmail-row.selected {
+  background: #f2f6fc;
+}
+
+.gmail-row.resolved-good {
+  border-left: 4px solid var(--green);
+}
+
+.gmail-row.resolved-bad {
+  border-left: 4px solid var(--red);
+}
+
+.star,
+.gmail-snippet,
+.gmail-row time {
+  color: #5f6368;
+}
+
+.gmail-subject {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gmail-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gmail-row time {
+  font-size: 0.78rem;
+  justify-self: end;
+}
+
+.gmail-reader {
+  padding: 26px 32px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.reader-meta {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid #edf0f2;
+  padding-bottom: 16px;
+}
+
+.reader-meta h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 500;
+}
+
+.gmail-message-head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.gmail-message-head time {
+  color: #5f6368;
+  font-size: 0.82rem;
+}
+
+.gmail-avatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1a73e8;
+  color: white;
+  font-weight: 800;
+}
+
+.reader-meta span,
+.gmail-reader p {
+  color: #5f6368;
+}
+
+.gmail-reader p {
+  margin: 0;
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+.email-actions {
+  align-items: start;
+}
+
+.email-thread,
+.chat-thread,
+.custom-reply {
+  display: grid;
+  gap: 10px;
+}
+
+.bubble {
+  display: grid;
+  gap: 4px;
+  max-width: 82%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f4f8;
+  color: #27364a;
+  line-height: 1.45;
+}
+
+.bubble strong {
+  font-size: 0.78rem;
+  color: #5f6368;
+}
+
+.bubble.player {
+  justify-self: end;
+  background: #dff3ec;
+  color: #124738;
+}
+
+.chat-thread .bubble.agent {
+  background: #eef2f8;
+}
+
+.custom-reply {
+  margin-top: 4px;
+}
+
+.gmail-reply-card {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.14);
+}
+
+.custom-reply textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.custom-reply button {
+  justify-self: start;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--blue);
+  color: white;
+  font-weight: 800;
+}
+
+@media (max-width: 820px) {
+  .auth-shell,
+  .mission-strip,
+  .values-panel,
+  .briefing-systems {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-panel {
+    min-height: 42vh;
+    padding: 36px 20px;
+  }
+
+  .auth-card {
+    margin: 24px 0;
+  }
+
+  .topbar,
+  .topbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar-actions,
+  .tabs {
+    width: 100%;
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .newsroom-shell,
+  .lead-story,
+  .wire-row,
+  .gmail-header,
+  .gmail-body,
+  .gmail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .news-sidebar,
+  .gmail-leftnav,
+  .gmail-rightnav {
+    display: none;
+  }
+
+  .lead-story,
+  .wire-row {
+    padding: 14px;
+  }
+
+  .gmail-header {
+    height: auto;
+    padding: 12px;
+  }
+
+  .gmail-categories {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gmail-row {
+    grid-template-columns: 24px minmax(90px, 130px) minmax(0, 1fr);
+  }
+
+  .gmail-snippet,
+  .gmail-row time {
+    display: none;
+  }
+}

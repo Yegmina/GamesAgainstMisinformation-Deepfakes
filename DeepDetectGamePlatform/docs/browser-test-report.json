@@ -1,0 +1,110 @@
+{
+  "ok": true,
+  "baseUrl": "http://127.0.0.1:8765",
+  "steps": [
+    {
+      "name": "registered dashboard",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\01-dashboard.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "generated game newsdesk",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\02-generated-newsdesk.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "live world tick 1",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\06-live-world-tick-1.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "live world tick 2",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\06-live-world-tick-2.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "live world tick 3",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\06-live-world-tick-3.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "live world tick 4",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\06-live-world-tick-4.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "live world tick 5",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\06-live-world-tick-5.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "inbox mission",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\03-inbox.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "email custom reply turn one",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\07-email-agent-response.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "email thread resolved after three turns",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\09-email-multiturn-resolved.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "telegram sidequest",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\04-telegram.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "telegram custom reply turn one",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\08-telegram-agent-response.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "telegram thread resolved after three turns",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\10-telegram-multiturn-resolved.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "briefing and action log",
+      "screenshot": "C:\\Erasmus\\DeepDetectGamePlatform\\docs\\screenshots\\05-briefing.png",
+      "url": "http://127.0.0.1:8765/"
+    },
+    {
+      "name": "assertions",
+      "score": "910",
+      "actionLogCount": 10,
+      "customReplies": true,
+      "emailTurns": 3,
+      "telegramTurns": 3,
+      "values": {
+        "public_trust": 91,
+        "editorial_integrity": 82,
+        "community_care": 63,
+        "newsroom_momentum": 65
+      },
+      "quests": {
+        "homepage-guardian": {
+          "current": 4,
+          "complete": true
+        },
+        "source-chain": {
+          "current": 1,
+          "complete": false
+        },
+        "social-firebreak": {
+          "current": 1,
+          "complete": false
+        },
+        "balanced-desk": {
+          "current": 4,
+          "complete": true
+        }
+      },
+      "worldAdvancedDepth": 5,
+      "agentStatus": "Agent runtime: local / local-fallback / last world: local"
+    }
+  ]
+}
