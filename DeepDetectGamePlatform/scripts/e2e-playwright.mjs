@@ -9,7 +9,7 @@ const reportPath = path.resolve("docs", "browser-test-report.json");
 await fs.mkdir(screenshotDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
 
 const steps = [];
 const record = async (name, screenshotName) => {
@@ -80,13 +80,17 @@ try {
   await page.getByPlaceholder("you@example.com").fill(`browser.agent.${stamp}@example.com`);
   await page.getByPlaceholder("At least 6 characters").fill("secret123");
   await page.getByRole("button", { name: "Register" }).last().click();
-  await page.getByRole("button", { name: "Generate Game" }).first().waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "New Session" }).first().waitFor({ state: "visible" });
   await record("registered dashboard", "01-dashboard.png");
 
-  await page.getByRole("button", { name: "Generate Game" }).first().click();
+  await page.getByRole("button", { name: "New Session" }).first().click();
   await page.getByText("Agent runtime:", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
   await page.getByText("gpt-5.3-chat-latest", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
   const activeGameId = await pinActiveGameId();
+  await page.locator("#session-library .session-card").first().waitFor({ state: "visible", timeout: 90000 });
+  await page.locator(`button[data-session-action="load"][data-session-id="${activeGameId}"]`).waitFor({ state: "visible" });
+  await page.locator(`button[data-session-action="backup"][data-session-id="${activeGameId}"]`).waitFor({ state: "visible" });
+  await page.locator(`button[data-session-action="export"][data-session-id="${activeGameId}"]`).waitFor({ state: "visible" });
   await record("generated game newsdesk", "02-generated-newsdesk.png");
 
   for (let depth = 1; depth <= 5; depth += 1) {
@@ -199,7 +203,15 @@ try {
   if (!finalQuests["homepage-guardian"]?.complete) throw new Error("Expected Homepage Guardian quest to complete");
   if ((finalQuests["source-chain"]?.current || 0) < 1) throw new Error("Expected Source Chain quest to progress");
   if ((finalQuests["social-firebreak"]?.current || 0) < 1) throw new Error("Expected Social Firebreak quest to progress");
-  steps.push({ name: "assertions", score, actionLogCount, customReplies: true, emailTurns: resolvedEmail.chat_turns, telegramTurns: resolvedTelegram.chat_turns, values: finalValues, quests: finalQuests, worldAdvancedDepth: 5, agentStatus });
+  const sessionCountBeforeBackup = await page.locator("#session-library .session-card").count();
+  await page.locator(`button[data-session-action="backup"][data-session-id="${activeGameId}"]`).click();
+  await page.waitForFunction(
+    (count) => document.querySelectorAll("#session-library .session-card").length > count,
+    sessionCountBeforeBackup,
+    { timeout: 90000 },
+  );
+  const sessionCountAfterBackup = await page.locator("#session-library .session-card").count();
+  steps.push({ name: "assertions", score, actionLogCount, customReplies: true, emailTurns: resolvedEmail.chat_turns, telegramTurns: resolvedTelegram.chat_turns, values: finalValues, quests: finalQuests, worldAdvancedDepth: 5, agentStatus, sessionCountBeforeBackup, sessionCountAfterBackup });
   await fs.writeFile(reportPath, JSON.stringify({ ok: true, baseUrl, steps }, null, 2));
   console.log(JSON.stringify({ ok: true, score, actionLogCount, reportPath }, null, 2));
 } catch (error) {

@@ -3,6 +3,7 @@
   token: localStorage.getItem("dd_token") || "",
   user: JSON.parse(localStorage.getItem("dd_user") || "null"),
   game: null,
+  games: [],
   activeEmailId: "",
   actionPending: false,
 };
@@ -35,10 +36,12 @@ function showApp() {
   $("#auth-screen").classList.toggle("hidden", signedIn);
   $("#game-shell").classList.toggle("hidden", !signedIn);
   $("#advance-world").classList.toggle("hidden", !signedIn || !state.game);
+  $("#session-library").classList.toggle("hidden", !signedIn);
   if (signedIn) {
     $("#game-title").textContent = state.game?.title || `DeepDetect / ${state.user.name}`;
   }
   $("#agent-status").classList.toggle("hidden", !state.game);
+  if (signedIn) renderSessionLibrary();
 }
 
 function setCurrentGame(game) {
@@ -68,9 +71,107 @@ async function handleAuth(event) {
     localStorage.setItem("dd_token", state.token);
     localStorage.setItem("dd_user", JSON.stringify(state.user));
     showApp();
+    await loadSessions();
+    await loadStoredSession();
   } catch (error) {
     $("#auth-error").textContent = error.message;
   }
+}
+
+function formatSessionDate(value) {
+  if (!value) return "saved";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "saved";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function sessionProgress(game) {
+  const progress = game.progress || {};
+  const parts = [
+    ["News", progress.news],
+    ["Inbox", progress.email],
+    ["Telegram", progress.telegram],
+  ];
+  return parts.map(([label, item]) => `${label} ${item?.done || 0}/${item?.total || 0}`).join(" · ");
+}
+
+function renderSessionLibrary() {
+  const library = $("#session-library");
+  if (!library) return;
+  const currentId = state.game?.id || currentGameId();
+  library.innerHTML = `
+    <div class="session-heading">
+      <div>
+        <strong>Game sessions</strong>
+        <span>${state.games.length ? `${state.games.length} saved` : "No saved sessions yet"}</span>
+      </div>
+      <button id="refresh-sessions" class="ghost">Refresh</button>
+    </div>
+    <div class="session-list">
+      ${state.games.map((game) => `
+        <article class="session-card ${game.id === currentId ? "active" : ""}">
+          <div>
+            <div class="session-title">
+              <strong>${game.title}</strong>
+              ${game.is_backup ? "<span>Backup</span>" : ""}
+              ${game.complete ? "<span>Complete</span>" : ""}
+            </div>
+            <p>${sessionProgress(game)}</p>
+            <small>Score ${game.score} · Tick ${game.world_tick || 0} · ${formatSessionDate(game.updated_at)}</small>
+          </div>
+          <div class="session-actions">
+            <button class="primary" data-session-action="load" data-session-id="${game.id}">Play</button>
+            <button class="ghost" data-session-action="backup" data-session-id="${game.id}">Backup</button>
+            <button class="ghost" data-session-action="export" data-session-id="${game.id}">Export</button>
+          </div>
+        </article>
+      `).join("") || "<p class='session-empty'>Start a new session to create your first saved shift.</p>"}
+    </div>
+  `;
+}
+
+async function loadSessions() {
+  if (!state.token) return;
+  const data = await api("/api/games");
+  state.games = data.games || [];
+  renderSessionLibrary();
+}
+
+async function loadGameSession(gameId) {
+  const data = await api(`/api/game/${gameId}`);
+  setCurrentGame(data.game);
+  renderGame();
+  await loadSessions();
+}
+
+async function loadStoredSession() {
+  const storedGameId = localStorage.getItem("dd_game_id");
+  if (!storedGameId) return;
+  try {
+    await loadGameSession(storedGameId);
+  } catch {
+    localStorage.removeItem("dd_game_id");
+  }
+}
+
+async function backupSession(gameId) {
+  const data = await api(`/api/game/${gameId}/backup`, { method: "POST", body: "{}" });
+  state.games = data.games || [];
+  setCurrentGame(data.game);
+  renderGame();
+}
+
+async function exportSession(gameId) {
+  const data = await api(`/api/game/${gameId}`);
+  const game = data.game;
+  const safeTitle = String(game.title || "deepdetect-session").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+  const blob = new Blob([JSON.stringify(game, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${safeTitle || "deepdetect-session"}-${game.id}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderGoals() {
@@ -430,6 +531,7 @@ function renderGame() {
   $("#agent-status").classList.remove("hidden");
   $("#agent-status").textContent = `Agent runtime: ${state.game.agent_mode || "local"} / ${state.game.agent_model || "unknown"}${state.game.last_world_agent_mode ? ` / last world: ${state.game.last_world_agent_mode}` : ""}`;
   $("#score").textContent = state.game.score;
+  renderSessionLibrary();
   renderGoals();
   renderAgentLog();
   renderNews();
@@ -441,6 +543,7 @@ function renderGame() {
 async function generateGame() {
   const buttons = [$("#generate-game"), $("#generate-game-empty")];
   buttons.forEach((button) => {
+    if (!button) return;
     button.disabled = true;
     button.textContent = "Generating...";
   });
@@ -448,12 +551,14 @@ async function generateGame() {
     const data = await api("/api/game/generate", { method: "POST", body: "{}" });
     setCurrentGame(data.game);
     renderGame();
+    await loadSessions();
   } catch (error) {
     alert(error.message);
   } finally {
     buttons.forEach((button) => {
+      if (!button) return;
       button.disabled = false;
-      button.textContent = "Generate Game";
+      button.textContent = "New Session";
     });
   }
 }
@@ -474,6 +579,7 @@ async function sendAction(button) {
     });
     setCurrentGame(data.game);
     renderGame();
+    loadSessions();
     succeeded = true;
   } catch (error) {
     alert(error.message);
@@ -505,6 +611,7 @@ async function sendCustomReply(form) {
     });
     setCurrentGame(data.game);
     renderGame();
+    loadSessions();
     succeeded = true;
   } catch (error) {
     alert(error.message);
@@ -527,6 +634,7 @@ async function advanceWorld() {
     const data = await api(`/api/game/${currentGameId()}/tick`, { method: "POST", body: "{}" });
     setCurrentGame(data.game);
     renderGame();
+    loadSessions();
     succeeded = true;
   } catch (error) {
     alert(error.message);
@@ -551,6 +659,7 @@ function logout() {
   state.token = "";
   state.user = null;
   state.game = null;
+  state.games = [];
   showApp();
 }
 
@@ -564,6 +673,22 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.closest(".custom-reply")) return;
+  if (button.id === "refresh-sessions") {
+    loadSessions();
+    return;
+  }
+  if (button.dataset.sessionAction === "load") {
+    loadGameSession(button.dataset.sessionId);
+    return;
+  }
+  if (button.dataset.sessionAction === "backup") {
+    backupSession(button.dataset.sessionId);
+    return;
+  }
+  if (button.dataset.sessionAction === "export") {
+    exportSession(button.dataset.sessionId);
+    return;
+  }
   if (button.id === "show-login") setAuthMode("login");
   if (button.id === "show-register") setAuthMode("register");
   if (button.id === "generate-game" || button.id === "generate-game-empty") generateGame();
@@ -580,5 +705,17 @@ document.addEventListener("submit", (event) => {
   event.preventDefault();
   sendCustomReply(form);
 });
-setAuthMode("login");
-showApp();
+
+async function initialize() {
+  setAuthMode("login");
+  showApp();
+  if (!state.token || !state.user) return;
+  try {
+    await loadSessions();
+    await loadStoredSession();
+  } catch {
+    logout();
+  }
+}
+
+initialize();

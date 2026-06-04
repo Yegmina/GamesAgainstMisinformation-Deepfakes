@@ -4,13 +4,13 @@ DeepDetect is a browser game where the player works as a new-media editor during
 
 ## 1. Register or Login
 
-The platform starts with account access. New players can register; returning players can log in and keep their generated game history in the local SQLite database.
+The platform starts with account access. New players can register; returning players can log in and keep their game-session history in the local SQLite database. After login, the session shelf shows saved shifts, resume buttons, backup controls, and JSON export controls.
 
 ![Dashboard after registration](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/01-dashboard.png)
 
-## 2. Generate Game
+## 2. Start Or Resume A Session
 
-Click **Generate Game** to run the preparation pipeline and open the full shift HUD:
+Click **New Session** to run the preparation pipeline and open the full shift HUD, or click **Play** on an older session to continue it:
 
 - `NewsScoutAgent` scrapes recent public RSS news.
 - `DistortionAgent` creates suspicious manipulated versions of some stories.
@@ -20,6 +20,8 @@ Click **Generate Game** to run the preparation pipeline and open the full shift 
 - `WorldDirector` keeps the shift alive after generation so new events can arrive while the player is working.
 
 ![Generated newsdesk](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/02-generated-newsdesk.png)
+
+Use **Backup** to duplicate a session inside the account before experimenting, and **Export** to download that session as a JSON backup.
 
 The top HUD is part of the game, not just decoration. Mission goals track required work, quests reward larger arcs, and values show the consequences of editorial choices:
 
@@ -71,4 +73,4 @@ cd C:\Erasmus\DeepDetectGamePlatform
 npm run e2e
 ```
 
-Result: registration, agent-backed game generation, quest/value HUD validation, five agent-backed world-advancement ticks, adaptive Newsdesk decisions against generated truth labels, multi-turn Inbox conversation, multi-turn Telegram conversation, final Briefing review, score/action-log assertions, quest progress assertions, value-change assertions, and visible agent-runtime assertion all passed. The report is saved at `docs/browser-test-report.json`.
+Result: registration, saved-session creation, session shelf validation, agent-backed game generation, quest/value HUD validation, five agent-backed world-advancement ticks, adaptive Newsdesk decisions against generated truth labels, multi-turn Inbox conversation, multi-turn Telegram conversation, final Briefing review, score/action-log assertions, quest progress assertions, value-change assertions, backup-session assertion, and visible agent-runtime assertion all passed. The report is saved at `docs/browser-test-report.json`.

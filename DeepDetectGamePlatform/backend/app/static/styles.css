@@ -222,6 +222,88 @@ input {
   font-size: 1.4rem;
 }
 
+.session-library {
+  display: grid;
+  gap: 12px;
+  padding: 16px 28px;
+  background: #edf3f8;
+  border-bottom: 1px solid var(--line);
+}
+
+.session-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.session-heading strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.session-heading span,
+.session-card small,
+.session-card p {
+  color: var(--muted);
+}
+
+.session-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.session-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.session-card.active {
+  border-color: rgba(30, 90, 168, 0.45);
+  box-shadow: 0 0 0 2px rgba(30, 90, 168, 0.08);
+}
+
+.session-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-title span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #e8eef5;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.session-card p {
+  margin: 8px 0 4px;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-actions button {
+  padding: 9px 11px;
+}
+
+.session-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+}
+
 .empty-state {
   max-width: 720px;
   margin: 12vh auto;

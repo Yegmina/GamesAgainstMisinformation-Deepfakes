@@ -97,6 +97,12 @@ def list_games(user_id: int) -> list[dict[str, Any]]:
     games: list[dict[str, Any]] = []
     for row in rows:
         state = json.loads(row["state_json"])
+        news_total = len(state.get("news_items", []))
+        news_done = sum(1 for item in state.get("news_items", []) if item.get("decision"))
+        email_total = len(state.get("emails", []))
+        email_done = sum(1 for item in state.get("emails", []) if item.get("selected"))
+        telegram_total = len(state.get("telegram_threads", []))
+        telegram_done = sum(1 for item in state.get("telegram_threads", []) if item.get("selected"))
         games.append(
             {
                 "id": row["id"],
@@ -105,6 +111,15 @@ def list_games(user_id: int) -> list[dict[str, Any]]:
                 "score": state.get("score", 0),
                 "title": state.get("title", "Untitled shift"),
                 "complete": state.get("complete", False),
+                "agent_model": state.get("agent_model", "unknown"),
+                "world_tick": state.get("world_tick", 0),
+                "is_backup": bool(state.get("backup_of")),
+                "backup_of": state.get("backup_of"),
+                "progress": {
+                    "news": {"done": news_done, "total": news_total},
+                    "email": {"done": email_done, "total": email_total},
+                    "telegram": {"done": telegram_done, "total": telegram_total},
+                },
             }
         )
     return games

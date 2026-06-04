@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import copy
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -109,6 +112,22 @@ def get_game(game_id: str, user: dict = Depends(current_user)) -> dict:
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
     return {"game": state}
+
+
+@app.post("/api/game/{game_id}/backup")
+def backup_game(game_id: str, user: dict = Depends(current_user)) -> dict:
+    state = load_game(game_id, user["id"])
+    if not state:
+        raise HTTPException(status_code=404, detail="Game not found")
+    backup = copy.deepcopy(state)
+    backup_id = str(uuid.uuid4())
+    backup["id"] = backup_id
+    backup["backup_of"] = game_id
+    backup["backup_created_at"] = datetime.now(timezone.utc).isoformat()
+    backup["title"] = f"Backup: {state.get('title', 'Untitled shift')}"
+    backup.setdefault("action_log", []).append("Session backup created.")
+    save_game(backup_id, user["id"], backup)
+    return {"game": backup, "games": list_games(user["id"])}
 
 
 @app.get("/api/game/{game_id}/debug")
