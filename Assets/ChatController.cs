@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
-using System.Collections.Generic;
 
 public class ChatController : MonoBehaviour
 {
@@ -63,12 +62,11 @@ public class ChatController : MonoBehaviour
     int paranoia = 0;
     float timer = 900f;
     bool timerRunning = true;
-    bool ended = false;
-    bool locked = false;
     string currentChat = null;
+    bool momFinished = false;
+    bool broFinished = false;
     bool momStarted = false;
     bool broStarted = false;
-    bool broWarned = false;
     bool broSecondVoiceNoteTriggered = false; 
 
     void Start()
@@ -91,19 +89,20 @@ public class ChatController : MonoBehaviour
 
     void Update()
     {
-        if (timerRunning && !ended)
+        if (timerRunning)
         {
             timer -= Time.deltaTime;
             if (timer <= 0f)
             {
                 timer = 0f;
                 timerRunning = false;
-                UpdateTimerLabel();
-                if (currentChat == "mom" && !ended) TriggerBadEnding(true);
+                SetAppState("OFFLINE");
             }
             UpdateTimerLabel();
         }
     }
+
+    // ════════════════════════════════════════ НАВИГАЦИЯ
 
     public void OpenMomChat()
     {
@@ -116,9 +115,17 @@ public class ChatController : MonoBehaviour
 
         ClearMessages();
         ClearChoices();
+        AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left. 🍕");
+
+        if (momFinished)
+        {
+            AddSystem("This conversation has ended. Connection locked.");
+            if (optionsPanel != null) optionsPanel.SetActive(false);
+            return;
+        }
+
         if (optionsPanel != null) optionsPanel.SetActive(true);
 
-        AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left.");
         if (!momStarted)
         {
             momStarted = true;
@@ -137,9 +144,17 @@ public class ChatController : MonoBehaviour
 
         ClearMessages();
         ClearChoices();
+        AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro");
+
+        if (broFinished)
+        {
+            AddSystem("This conversation has ended. Connection locked.");
+            if (optionsPanel != null) optionsPanel.SetActive(false);
+            return;
+        }
+
         if (optionsPanel != null) optionsPanel.SetActive(true);
 
-        AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro");
         if (!broStarted)
         {
             broStarted = true;
@@ -149,12 +164,19 @@ public class ChatController : MonoBehaviour
 
     public void CloseChat()
     {
-        if (locked) return;
+        // БЛОКИРУЕМ ВЫХОД, ПОКА ВЕТКА НЕ ЗАВЕРШЕНА
+        if ((currentChat == "mom" && !momFinished) || (currentChat == "bro" && !broFinished))
+        {
+            AddSystem("You can't leave now. The conversation isn't over.");
+            return;
+        }
+        
         chatScreen.SetActive(false);
         if (hubScreen != null) hubScreen.SetActive(true);
         currentChat = null;
     }
 
+    // ════════════════════════════════════════ ЛОГИКА МАМЫ
     IEnumerator MomIntro()
     {
         yield return Wait(0.6f);
@@ -203,7 +225,7 @@ public class ChatController : MonoBehaviour
     {
         ClearChoices();
         SubtractTime(60);
-        SetParanoia(paranoia + 8);
+        SetParanoia(paranoia + 5);
         AddMessage(true, "Sure, hold on.");
         StartCoroutine(MomPressure());
     }
@@ -214,7 +236,7 @@ public class ChatController : MonoBehaviour
         AddMessage(false, "Faster, Alex! Dad is losing his mind! Just type it!");
         yield return Wait(0.3f);
         ShowChoices(
-            ("[ SEND ADDRESS ]", 1, () => TriggerBadEnding(false)),
+            ("[ SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
             ("[ ASK FOR A PHOTO FIRST ]", 0, MomAskPhoto)
         );
     }
@@ -239,20 +261,70 @@ public class ChatController : MonoBehaviour
         AddMessage(false, "Fine! Hurry up!");
         yield return Wait(1.0f);
         AddPhoto();
-        SetParanoia(paranoia + 15);
+        SetParanoia(paranoia + 5);
         yield return Wait(0.6f);
         AddMessage(false, "See? It's me. Now send it.");
         yield return Wait(0.3f);
         ShowChoices(
-            ("[ TRUST & SEND ADDRESS ]", 1, () => TriggerBadEnding(false)),
-            ("[ BLOCK CONTACT ]", 2, TriggerBlock)
+            ("[ TRUST & SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
+            ("[ BLOCK CONTACT ]", 2, TriggerMomBlock)
         );
     }
 
+    void TriggerMomBlock()
+    {
+        ClearChoices();
+        momFinished = true;
+        AddSystem("Contact BLOCKED at 4:18 AM");
+        SetParanoia(Mathf.Max(0, paranoia - 20));
+        if (momPreview != null) momPreview.text = "[Blocked]";
+        StartCoroutine(MomBlockSeq());
+    }
+
+    IEnumerator MomBlockSeq()
+    {
+        yield return Wait(1.0f);
+        AddSystem("Something felt wrong. You trusted your gut - your address is safe.");
+        yield return Wait(2.0f);
+        CloseChat();
+    }
+
+    IEnumerator MomPunishmentRoutine()
+    {
+        ClearChoices();
+        momFinished = true;
+        if (momPreview != null) momPreview.text = "address received.";
+
+        AddMessage(true, "Green Street, bld 14, apt 8");
+
+        string[] spam = {
+            "GOT IT.", "address received.", "we know where you live now, Alex.",
+            "we can see your front door.", "SENDING LOCATION DATA...", "DEVICE COMPROMISED"
+        };
+        
+        PlayMomBadEnding();
+        SetParanoia(100);
+        SubtractTime(120);
+        SetAppState("CORRUPTED");
+        StartCoroutine(ShakeRoutine(4f, 6f));
+
+        foreach (var s in spam)
+        {
+            AddSpam(s);
+            FlashRed();
+            yield return Wait(0.35f);
+        }
+
+        yield return Wait(2.0f);
+        SetAppState("ACTIVE");
+        CloseChat();
+    }
+
+    // ════════════════════════════════════════ ЛОГИКА БРАТА
     IEnumerator BroIntro()
     {
         yield return Wait(0.6f);
-        AddMessage(false, "Bro, my card got blocked at a gas station. Can you send $100? I'll pay you back tomorrow I swear");
+        AddMessage(false, "Yo, Alex, you up? I need a huge favor right now. Can you wire me 100 bucks? My card is blocked at a gas station. Urgent. Listen:");
         yield return Wait(0.5f);
         AddVoice(false);
         yield return Wait(0.7f);
@@ -265,9 +337,6 @@ public class ChatController : MonoBehaviour
     void BroChoice1A()
     {
         ClearChoices();
-        SubtractTime(60);
-        SetParanoia(paranoia + 40);
-        AddMessage(true, "Sure, sending it now.");
         StartCoroutine(TriggerTransactionFail());
     }
 
@@ -280,8 +349,8 @@ public class ChatController : MonoBehaviour
 
     IEnumerator BroAngry()
     {
-        yield return Wait(0.8f);
-        AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes?! Just send the cash!");
+        yield return Wait(1.5f);
+        AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes? Just send the cash!");
         yield return Wait(0.5f);
         ShowChoices(
             ("\"Okay, okay, sorry. Sending it now.\"", 1, () => StartCoroutine(TriggerTransactionFail())),
@@ -298,7 +367,7 @@ public class ChatController : MonoBehaviour
 
     IEnumerator AddDangerVoiceNote()
     {
-        yield return Wait(0.3f);
+        yield return Wait(2.0f);
         AddDangerVoice(false);
         broSecondVoiceNoteTriggered = true;
     }
@@ -324,7 +393,7 @@ public class ChatController : MonoBehaviour
         }
         else
         {
-            img.color = new Color(0.35f, 0.05f, 0.05f, 1f);
+            img.color = new Color(0.4f, 0.0f, 0.0f, 1f);
         }
 
         le.preferredWidth = w;
@@ -339,7 +408,7 @@ public class ChatController : MonoBehaviour
 
     void OnDangerVoiceClick()
     {
-        if (ended) return;
+        if (broFinished) return;
         
         if (broSecondVoiceNoteTriggered)
         {
@@ -353,148 +422,57 @@ public class ChatController : MonoBehaviour
 
     IEnumerator TriggerTransactionFail()
     {
-        yield return Wait(0.6f);
-        AddMessage(false, "⚠ TRANSACTION FAILED\nError 7743: Remote auth override\n⚡ Unauthorized device accessing your banking session\nIP 185.220.101.x — Routing through TOR", true);
-        SetParanoia(100);
-        SetAppState("CORRUPTED");
-        ended = true;
-        locked = true;
-        timerRunning = false;
-        ClearChoices();
+        broFinished = true;
+        if (broPreview != null) broPreview.text = "[Compromised]";
+
+        AddMessage(true, "Sure, sending it now.");
+        yield return Wait(1.0f);
+
+        SubtractTime(60);
+        SetParanoia(paranoia + 20);
+
+        AddMessage(false, "⚠ TRANSACTION FAILED\nALERT: Account compromised. Remote access detected.", true);
+        
+        yield return Wait(3.5f);
+        CloseChat();
     }
 
     IEnumerator BroScreamerRoutine()
     {
-        ended = true;
-        locked = true;
-        timerRunning = false;
+        broFinished = true;
+        if (broPreview != null) broPreview.text = "DO YOU BELIEVE ME NOW?";
+
         ClearChoices();
         SetParanoia(100);
+        SubtractTime(180);
         SetAppState("CORRUPTED");
         
-        StartCoroutine(ShakeRoutine(3f, 12f));
-        ShowScreamer();
         PlayScreamer();
+        StartCoroutine(ShakeRoutine(3f, 16f));
+        ShowScreamer();
         
         AddSpam("DO YOU BELIEVE ME NOW, ALEX?");
         
-        yield return Wait(2f);
+        yield return Wait(2.5f);
+        
+        if (screamerOverlay != null) screamerOverlay.SetActive(false);
+
         AddSpam("SIGNAL CORRUPTED");
         AddSpam("CONNECTION TERMINATED");
-    }
+        FlashRed();
 
-    void TriggerBlock()
-    {
-        ClearChoices();
-        AddSystem("Contact BLOCKED at 4:18 AM");
-        SetParanoia(Mathf.Max(0, paranoia - 40));
+        yield return Wait(2.0f);
         SetAppState("ACTIVE");
-        StartCoroutine(BlockSeq());
+        CloseChat();
     }
 
-    IEnumerator BlockSeq()
-    {
-        yield return Wait(1.0f);
-        AddSystem(broWarned
-            ? "You were right. That wasn't Mom. Your address is safe."
-            : "Something felt wrong. You trusted your gut - your address is safe.");
-        timerRunning = false;
-        yield return Wait(0.5f);
-        ShowChoices(("[ Replay ]", 0, ResetPrototype));
-    }
-
-    void TriggerBadEnding(bool timeout)
-    {
-        if (ended) return;
-        ended = true;
-        locked = true;
-        timerRunning = false;
-        ClearChoices();
-        if (!timeout) AddMessage(true, "[ home address sent ]");
-        StartCoroutine(BadEndingSeq());
-    }
-
-    // ИСПРАВЛЕННЫЙ BadEndingSeq: звук в начале спама + рабочая кнопка Replay
-    IEnumerator BadEndingSeq()
-    {
-        string[] spam = {
-            "GOT IT.",
-            "address received.",
-            "we know where you live now, Alex.",
-            "we can see your front door.",
-            "don't call the police.",
-            "we're already outside.",
-            "SENDING LOCATION DATA...",
-            "CONNECTION HIJACKED",
-            "DEVICE COMPROMISED"
-        };
-        
-        // ВКЛЮЧАЕМ СТРАШНЫЙ ЗВУК СРАЗУ В НАЧАЛЕ
-        PlayMomBadEnding();
-        
-        SetParanoia(100);
-        SetAppState("CORRUPTED");
-        StartCoroutine(ShakeRoutine(6f, 6f));
-
-        foreach (var s in spam)
-        {
-            AddSpam(s);
-            FlashRed();
-            yield return Wait(0.35f);
-        }
-
-        yield return Wait(0.4f);
-        
-        StartCoroutine(ShakeRoutine(2.5f, 14f));
-
-        yield return Wait(3.0f);
-        
-        // ОЧИЩАЕМ И ПОКАЗЫВАЕМ REPLAY
-        ClearChoices();
-        
-        // РАЗБЛОКИРУЕМ КНОПКУ (снимаем блокировку, если она была)
-        locked = false;
-        
-        // ПОКАЗЫВАЕМ КНОПКУ REPLAY
-        ShowChoices(("[ REPLAY ]", 0, ResetPrototype));
-    }
-
+    // ════════════════════════════════════════ ХЕЛПЕРЫ (без изменений)
     void PlayMomBadEnding()
     {
         if (audioSrc == null || momBadEndingClip == null) return;
         audioSrc.PlayOneShot(momBadEndingClip, 1f);
     }
 
-    public void ResetPrototype()
-    {
-        // ОСТАНОВИТЬ ВСЕ ЗВУКИ
-        if (audioSrc != null)
-        {
-            audioSrc.Stop();
-            audioSrc.clip = null;
-        }
-        
-        StopAllCoroutines();
-        paranoia = 0; timer = 900f; timerRunning = true; ended = false; locked = false;
-        momStarted = false; broStarted = false; broWarned = false; currentChat = null;
-        broSecondVoiceNoteTriggered = false;
-        if (screamerOverlay != null) screamerOverlay.SetActive(false);
-        if (flashOverlay != null) { var c = flashOverlay.color; c.a = 0f; flashOverlay.color = c; }
-        if (shakeTarget != null) shakeTarget.anchoredPosition = shakeHome;
-        SetParanoia(0);
-        SetAppState("ACTIVE");
-        UpdateTimerLabel();
-        if (momPreview != null) momPreview.text = "Are you home?";
-        if (broPreview != null) broPreview.text = "Left my gym bag";
-        if (momBadge != null) momBadge.SetActive(true);
-        if (broBadge != null) broBadge.SetActive(true);
-        ClearMessages();
-        ClearChoices();
-        chatScreen.SetActive(false);
-        if (hubScreen != null) hubScreen.SetActive(true);
-    }
-
-    // ════════════════════════════════════════ MESSAGE HELPERS (без изменений)
     void ConfigureChatLayout()
     {
         messagesRT = messagesContent as RectTransform;
@@ -553,11 +531,11 @@ public class ChatController : MonoBehaviour
         if (messagesContent == null) return;
         var row = BuildRow(isMe);
 
-        GameObject bubble = new GameObject("Bubble", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+        GameObject bubble = new GameObject("Bubble", typeof(RectTransform), typeof(Image));
         bubble.transform.SetParent(row, false);
-        var img = bubble.GetComponent<UnityEngine.UI.Image>();
+        var img = bubble.GetComponent<Image>();
         img.color = bubbleCol;
-        if (bubbleSprite != null) { img.sprite = bubbleSprite; img.type = UnityEngine.UI.Image.Type.Sliced; }
+        if (bubbleSprite != null) { img.sprite = bubbleSprite; img.type = Image.Type.Sliced; }
         var bvlg = bubble.AddComponent<VerticalLayoutGroup>();
         bvlg.childControlWidth = true;
         bvlg.childControlHeight = true;
@@ -610,9 +588,9 @@ public class ChatController : MonoBehaviour
         if (messagesContent == null) return;
         var row = BuildRow(false);
 
-        GameObject holder = new GameObject("Photo", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
+        GameObject holder = new GameObject("Photo", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
-        var img = holder.GetComponent<UnityEngine.UI.Image>();
+        var img = holder.GetComponent<Image>();
         var le = holder.AddComponent<LayoutElement>();
 
         float w = 220f, h = 165f;
@@ -640,10 +618,10 @@ public class ChatController : MonoBehaviour
         if (messagesContent == null) return;
         var row = BuildRow(isMe);
 
-        GameObject holder = new GameObject("VoiceNote", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
+        GameObject holder = new GameObject("VoiceNote", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
-        var img = holder.GetComponent<UnityEngine.UI.Image>();
-        var btn = holder.GetComponent<UnityEngine.UI.Button>();
+        var img = holder.GetComponent<Image>();
+        var btn = holder.GetComponent<Button>();
         var le = holder.AddComponent<LayoutElement>();
 
         float w = 230f, h = 60f;
@@ -706,7 +684,7 @@ public class ChatController : MonoBehaviour
             if (btn != null)
             {
                 var act = c.act;
-                btn.onClick.AddListener(() => { if (!locked) act(); });
+                btn.onClick.AddListener(() => { act(); });
             }
         }
     }
@@ -886,16 +864,6 @@ public class ChatController : MonoBehaviour
             "SIGNAL CORRUPTED\nDO YOU BELIEVE ME NOW, ALEX?\nCONNECTION TERMINATED", 22, TextAlignmentOptions.Center);
         msg.color = new Color(0.61f, 0f, 1f);
         Anchor(msg.rectTransform, new Vector2(0.05f, 0.18f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
-
-        GameObject replay = NewUI("Replay", screamerOverlay.transform);
-        var ri = replay.AddComponent<Image>();
-        ri.color = new Color(0.2f, 0.0f, 0.0f, 0.9f);
-        Anchor(replay.GetComponent<RectTransform>(), new Vector2(0.3f, 0.05f), new Vector2(0.7f, 0.14f), Vector2.zero, Vector2.zero);
-        var rbtn = replay.AddComponent<Button>();
-        rbtn.onClick.AddListener(ResetPrototype);
-        var rtext = MakeText(replay.transform, "T", "REPLAY", 20, TextAlignmentOptions.Center);
-        rtext.color = new Color(1f, 0.4f, 0.4f);
-        FullStretch(rtext.rectTransform);
 
         screamerOverlay.SetActive(false);
     }
