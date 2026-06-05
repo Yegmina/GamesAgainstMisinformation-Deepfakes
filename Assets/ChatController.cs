@@ -23,21 +23,29 @@ public class ChatController : MonoBehaviour
     [Header("Avatars")]
     public Sprite momAvatar;
     public Sprite brotherAvatar;
+    public Sprite unknownAvatar;
+    public Sprite providerAvatar;
 
     [Header("Contact Rows (hub)")]
     public TMP_Text momPreview;
     public GameObject momBadge;
     public TMP_Text broPreview;
     public GameObject broBadge;
+    public TMP_Text unknownPreview;
+    public GameObject unknownBadge;
+    public TMP_Text providerPreview;
+    public GameObject providerBadge;
 
     [Header("Photo")]
     public Sprite photoSprite;
+    public Sprite screamerPhotoSprite;
 
     [Header("Voice Note")]
     public Sprite voiceNoteSprite;   
     public AudioClip voiceNoteClip;  
     public AudioClip screamerClip;
     public AudioClip momBadEndingClip;
+    public AudioClip virusSoundClip;
 
     static readonly Color themBubble = new Color(0.118f, 0.118f, 0.180f, 1f);
     static readonly Color meBubble   = new Color(0.102f, 0.227f, 0.431f, 1f);
@@ -62,12 +70,18 @@ public class ChatController : MonoBehaviour
     int paranoia = 0;
     float timer = 900f;
     bool timerRunning = true;
+    bool ended = false;
+    bool locked = false;
     string currentChat = null;
     bool momFinished = false;
     bool broFinished = false;
+    bool broWarned = false;
     bool momStarted = false;
     bool broStarted = false;
     bool broSecondVoiceNoteTriggered = false; 
+    bool unknownRead = false;
+    bool providerFinished = false;
+    bool providerLinkClicked = false;
 
     void Start()
     {
@@ -81,6 +95,8 @@ public class ChatController : MonoBehaviour
 
         if (momPreview != null) momPreview.text = "Are you home?";
         if (broPreview != null) broPreview.text = "Left my gym bag";
+        if (unknownPreview != null) unknownPreview.text = "Unknown number";
+        if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
 
         SetParanoia(0);
         SetAppState("ACTIVE");
@@ -101,8 +117,6 @@ public class ChatController : MonoBehaviour
             UpdateTimerLabel();
         }
     }
-
-    // ════════════════════════════════════════ НАВИГАЦИЯ
 
     public void OpenMomChat()
     {
@@ -162,9 +176,269 @@ public class ChatController : MonoBehaviour
         }
     }
 
+    public void OpenUnknownChat()
+    {
+        currentChat = "unknown";
+        if (hubScreen != null) hubScreen.SetActive(false);
+        chatScreen.SetActive(true);
+        if (unknownBadge != null) unknownBadge.SetActive(false);
+        if (unknownRead == false) unknownRead = true;
+        if (contactNameText != null)
+        {
+            contactNameText.text = "???";
+            contactNameText.fontSize = 16;
+        }
+        if (contactAvatar != null && unknownAvatar != null) contactAvatar.sprite = unknownAvatar;
+
+        ClearMessages();
+        ClearChoices();
+        
+        if (optionsPanel != null) optionsPanel.SetActive(false);
+        
+        AddMessage(false, "???: Alex...");
+        AddMessage(false, "???: I see you.");
+        AddMessage(false, "???: You don't know me. But I know you.");
+        AddMessage(false, "???: I've been watching.");
+        AddMessage(false, "???: Don't trust anyone. Especially not your family.");
+        AddMessage(false, "???: They are not who you think.");
+        AddMessage(false, "???: The video... it's real.");
+        AddMessage(false, "???: I'll find you.");
+        AddMessage(false, "???: Tick tock.");
+        AddMessage(false, "???: This conversation will self-destruct.");
+        
+        AddSystem("⚠ This number is no longer in service.");
+        
+        if (unknownPreview != null) unknownPreview.text = "[Read]";
+    }
+
+    public void OpenProviderChat()
+    {
+        currentChat = "provider";
+        if (hubScreen != null) hubScreen.SetActive(false);
+        chatScreen.SetActive(true);
+        if (providerBadge != null) providerBadge.SetActive(false);
+        if (contactNameText != null)
+        {
+            contactNameText.text = "Internet Provider";
+            contactNameText.fontSize = 16;
+        }
+        if (contactAvatar != null && providerAvatar != null) contactAvatar.sprite = providerAvatar;
+
+        ClearMessages();
+        ClearChoices();
+        
+        if (optionsPanel != null) optionsPanel.SetActive(false);
+        
+        AddMessage(false, "📡 Internet Provider: Important notice!");
+        AddMessage(false, "📡 Your connection has been unstable for 3 days.");
+        AddMessage(false, "📡 Click the link below to verify your IP address:");
+        
+        AddLinkMessage();
+        
+        AddMessage(false, "📡 If not verified within 24h, your service will be suspended.");
+        AddSystem("⚠ This looks suspicious... The link may be dangerous.");
+    }
+
+    void AddLinkMessage()
+    {
+        if (messagesContent == null) return;
+        var row = BuildRow(false);
+        
+        GameObject linkObj = new GameObject("LinkMessage", typeof(RectTransform), typeof(Image), typeof(Button));
+        linkObj.transform.SetParent(row, false);
+        var img = linkObj.GetComponent<Image>();
+        img.color = new Color(0.15f, 0.15f, 0.25f, 1f);
+        img.sprite = bubbleSprite;
+        img.type = Image.Type.Sliced;
+        
+        var btn = linkObj.GetComponent<Button>();
+        var le = linkObj.AddComponent<LayoutElement>();
+        le.preferredWidth = 280f;
+        le.preferredHeight = 50f;
+        
+        var textObj = new GameObject("Text", typeof(RectTransform));
+        textObj.transform.SetParent(linkObj.transform, false);
+        var tmp = textObj.AddComponent<TextMeshProUGUI>();
+        if (font != null) tmp.font = font;
+        
+        if (providerLinkClicked)
+        {
+            tmp.text = "🔗 [LINK EXPIRED]";
+            tmp.color = Color.gray;
+            btn.interactable = false;
+        }
+        else
+        {
+            tmp.text = "🔗 https://verify-ip.provider-secure.net/confirm";
+            tmp.color = new Color(0.3f, 0.7f, 1f);
+        }
+        
+        tmp.fontSize = 14;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableWordWrapping = true;
+        
+        var textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        if (!providerLinkClicked)
+        {
+            btn.onClick.AddListener(() => {
+                if (!providerFinished)
+                {
+                    providerLinkClicked = true;
+                    TriggerVirusAttack();
+                    btn.interactable = false;
+                    tmp.text = "🔗 [LINK EXPIRED]";
+                    tmp.color = Color.gray;
+                }
+            });
+        }
+        
+        PlayChime();
+        ScrollToBottom();
+    }
+
+    void TriggerVirusAttack()
+    {
+        if (providerFinished) return;
+        providerFinished = true;
+        ClearChoices();
+        
+        StartCoroutine(VirusRoutine());
+    }
+
+    IEnumerator VirusRoutine()
+    {
+        PlayVirusSound();
+        
+        yield return StartCoroutine(ShowQuickScreamerPhoto());
+        
+        AddMessage(false, "⚠ MALICIOUS LINK DETECTED", true);
+        AddMessage(false, "⚠ Downloading: virus_core.exe", true);
+        
+        SetParanoia(100);
+        SetAppState("CORRUPTED");
+        StartCoroutine(ShakeRoutine(5f, 20f));
+        
+        yield return Wait(0.5f);
+        AddSpam("DOWNLOADING... 25%");
+        FlashRed();
+        
+        yield return Wait(0.5f);
+        AddSpam("DOWNLOADING... 50%");
+        FlashRed();
+        
+        yield return Wait(0.5f);
+        AddSpam("DOWNLOADING... 75%");
+        FlashRed();
+        
+        yield return Wait(0.5f);
+        AddSpam("DOWNLOAD COMPLETE");
+        AddSpam("YOUR DEVICE IS COMPROMISED");
+        AddSpam("ALL DATA ENCRYPTED");
+        
+        yield return Wait(2.5f);
+        
+        AddSpam("⚠ RANSOMWARE ACTIVATED");
+        AddSpam("Contact: darkweb@onion.net");
+        
+        yield return Wait(2f);
+        
+        if (providerPreview != null) providerPreview.text = "[COMPROMISED]";
+        
+        yield return Wait(1f);
+        CloseChat();
+    }
+
+    IEnumerator ShowQuickScreamerPhoto()
+    {
+        if (screamerOverlay == null) yield break;
+        
+        var img = screamerOverlay.GetComponent<Image>();
+        Sprite originalSprite = null;
+        Color originalColor = img.color;
+        
+        if (img != null && screamerPhotoSprite != null)
+        {
+            originalSprite = img.sprite;
+            originalColor = img.color;
+            
+            img.sprite = screamerPhotoSprite;
+            img.color = Color.white;
+            img.type = Image.Type.Simple;
+            
+            if (chatScreen != null)
+            {
+                screamerOverlay.transform.SetParent(chatScreen.transform);
+                var rect = screamerOverlay.GetComponent<RectTransform>();
+                if (rect != null)
+                {
+                    rect.anchorMin = Vector2.zero;
+                    rect.anchorMax = Vector2.one;
+                    rect.sizeDelta = Vector2.zero;
+                    rect.offsetMin = Vector2.zero;
+                    rect.offsetMax = Vector2.zero;
+                }
+            }
+        }
+        
+        screamerOverlay.SetActive(true);
+        
+        StartCoroutine(ShakeRoutine(2f, 25f));
+        
+        yield return Wait(2.0f);
+        
+        screamerOverlay.SetActive(false);
+        
+        if (img != null && originalSprite != null)
+        {
+            img.sprite = originalSprite;
+            img.color = originalColor;
+        }
+    }
+
+    void PlayVirusSound()
+    {
+        if (audioSrc == null || virusSoundClip == null) return;
+        audioSrc.PlayOneShot(virusSoundClip, 1f);
+    }
+
+    void SafeCloseProvider()
+    {
+        ClearChoices();
+        providerFinished = true;
+        AddSystem("You blocked the contact. Your device is safe.");
+        if (providerPreview != null) providerPreview.text = "[Blocked]";
+        StartCoroutine(SafeCloseProviderRoutine());
+    }
+
+    IEnumerator SafeCloseProviderRoutine()
+    {
+        yield return Wait(1.5f);
+        CloseChat();
+    }
+
     public void CloseChat()
     {
-        // БЛОКИРУЕМ ВЫХОД, ПОКА ВЕТКА НЕ ЗАВЕРШЕНА
+        if (currentChat == "unknown")
+        {
+            chatScreen.SetActive(false);
+            if (hubScreen != null) hubScreen.SetActive(true);
+            currentChat = null;
+            return;
+        }
+        
+        if (currentChat == "provider")
+        {
+            chatScreen.SetActive(false);
+            if (hubScreen != null) hubScreen.SetActive(true);
+            currentChat = null;
+            return;
+        }
+        
         if ((currentChat == "mom" && !momFinished) || (currentChat == "bro" && !broFinished))
         {
             AddSystem("You can't leave now. The conversation isn't over.");
@@ -176,7 +450,33 @@ public class ChatController : MonoBehaviour
         currentChat = null;
     }
 
-    // ════════════════════════════════════════ ЛОГИКА МАМЫ
+    public void ResetPrototype()
+    {
+        StopAllCoroutines();
+        paranoia = 0; timer = 900f; timerRunning = true; ended = false; locked = false;
+        momFinished = false; broFinished = false; broWarned = false; currentChat = null;
+        momStarted = false; broStarted = false; broSecondVoiceNoteTriggered = false;
+        unknownRead = false; providerFinished = false; providerLinkClicked = false;
+        if (screamerOverlay != null) screamerOverlay.SetActive(false);
+        if (flashOverlay != null) { var c = flashOverlay.color; c.a = 0f; flashOverlay.color = c; }
+        if (shakeTarget != null) shakeTarget.anchoredPosition = shakeHome;
+        SetParanoia(0);
+        SetAppState("ACTIVE");
+        UpdateTimerLabel();
+        if (momPreview != null) momPreview.text = "Are you home?";
+        if (broPreview != null) broPreview.text = "Left my gym bag";
+        if (unknownPreview != null) unknownPreview.text = "Unknown number";
+        if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
+        if (momBadge != null) momBadge.SetActive(true);
+        if (broBadge != null) broBadge.SetActive(true);
+        if (unknownBadge != null) unknownBadge.SetActive(true);
+        if (providerBadge != null) providerBadge.SetActive(true);
+        ClearMessages();
+        ClearChoices();
+        chatScreen.SetActive(false);
+        if (hubScreen != null) hubScreen.SetActive(true);
+    }
+
     IEnumerator MomIntro()
     {
         yield return Wait(0.6f);
@@ -320,7 +620,6 @@ public class ChatController : MonoBehaviour
         CloseChat();
     }
 
-    // ════════════════════════════════════════ ЛОГИКА БРАТА
     IEnumerator BroIntro()
     {
         yield return Wait(0.6f);
@@ -466,7 +765,6 @@ public class ChatController : MonoBehaviour
         CloseChat();
     }
 
-    // ════════════════════════════════════════ ХЕЛПЕРЫ (без изменений)
     void PlayMomBadEnding()
     {
         if (audioSrc == null || momBadEndingClip == null) return;
@@ -772,7 +1070,17 @@ public class ChatController : MonoBehaviour
 
     void ShowScreamer()
     {
-        if (screamerOverlay != null) screamerOverlay.SetActive(true);
+        if (screamerOverlay != null) 
+        {
+            // УБИРАЕМ ЛЮБУЮ КАРТИНКУ, ЧТОБЫ ПОКАЗЫВАТЬ ТОЛЬКО ТЕКСТ
+            var img = screamerOverlay.GetComponent<Image>();
+            if (img != null)
+            {
+                img.sprite = null;
+                img.color = new Color(0f, 0f, 0f, 0.96f);
+            }
+            screamerOverlay.SetActive(true);
+        }
     }
 
     void SetupAudio()
@@ -851,10 +1159,18 @@ public class ChatController : MonoBehaviour
 
         if (chatScreen != null) { shakeTarget = chatScreen.GetComponent<RectTransform>(); shakeHome = shakeTarget.anchoredPosition; }
 
-        screamerOverlay = NewUI("Screamer", canvas.transform);
+        screamerOverlay = NewUI("Screamer", chatScreen != null ? chatScreen.transform : canvas.transform);
         var simg = screamerOverlay.AddComponent<Image>();
         simg.color = new Color(0f, 0f, 0f, 0.96f);
-        FullStretch(screamerOverlay.GetComponent<RectTransform>());
+        var rect = screamerOverlay.GetComponent<RectTransform>();
+        if (rect != null)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.sizeDelta = Vector2.zero;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
 
         var face = MakeText(screamerOverlay.transform, "Face", ">_<", 120, TextAlignmentOptions.Center);
         face.color = new Color(1f, 0.05f, 0.05f);
