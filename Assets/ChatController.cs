@@ -4,27 +4,19 @@ using TMPro;
 using System.Collections;
 using System.Collections.Generic;
 
-// ─────────────────────────────────────────────────────────────
-//  FAMILIAR STRANGERS - branching psychological-horror chat engine
-//  Port of the HTML prototype. Two contacts (Mom = impersonator,
-//  Brother = the clue). Paranoia meter, session timer, app-state,
-//  suspicious photo, good ending (block) and bad ending (screamer).
-//  Self-builds HUD + horror overlays + procedural audio at runtime,
-//  so it "just plays" with the existing phone UI.
-// ─────────────────────────────────────────────────────────────
 public class ChatController : MonoBehaviour
 {
     [Header("Screens")]
-    public GameObject chatScreen;   // Phone1MessagesChat
-    public GameObject hubScreen;    // PhoneMessages (contact list)
+    public GameObject chatScreen;
+    public GameObject hubScreen;
 
     [Header("Chat UI")]
     public Transform messagesContent;
-    public GameObject messagePrefabMy;     // my message (right)
-    public GameObject messagePrefabOther;  // their message (left)
+    public GameObject messagePrefabMy;
+    public GameObject messagePrefabOther;
     public GameObject optionsPanel;
     public Transform optionsContent;
-    public GameObject optionButtonPrefab;  // OptionButton1.prefab
+    public GameObject optionButtonPrefab;
     public TMP_Text contactNameText;
     public Image contactAvatar;
     public ScrollRect chatScrollRect;
@@ -43,19 +35,19 @@ public class ChatController : MonoBehaviour
     public Sprite photoSprite;
 
     [Header("Voice Note")]
-    public Sprite voiceNoteSprite;   // the voice-bubble PNG (looks like a voice note)
-    public AudioClip voiceNoteClip;  // replaceable audio - drop any clip here in the Inspector
+    public Sprite voiceNoteSprite;   
+    public AudioClip voiceNoteClip;  
+    public AudioClip screamerClip;
+    public AudioClip momBadEndingClip;
 
-    // ── bubble styling ──
-    static readonly Color themBubble = new Color(0.118f, 0.118f, 0.180f, 1f); // #1e1e2e
-    static readonly Color meBubble   = new Color(0.102f, 0.227f, 0.431f, 1f); // #1a3a6e
-    static readonly Color themText   = new Color(0.816f, 0.816f, 0.910f, 1f); // #d0d0e8
-    static readonly Color meText     = new Color(0.784f, 0.863f, 1.000f, 1f); // #c8dcff
-    const float maxBubbleFrac = 0.78f;   // bubbles cap at ~78% of chat width
-    Sprite bubbleSprite;                 // rounded sprite reused from the prefab
+    static readonly Color themBubble = new Color(0.118f, 0.118f, 0.180f, 1f);
+    static readonly Color meBubble   = new Color(0.102f, 0.227f, 0.431f, 1f);
+    static readonly Color themText   = new Color(0.816f, 0.816f, 0.910f, 1f);
+    static readonly Color meText     = new Color(0.784f, 0.863f, 1.000f, 1f);
+    const float maxBubbleFrac = 0.78f;   
+    Sprite bubbleSprite;                 
     RectTransform messagesRT;
 
-    // ── runtime-built UI ──
     Canvas canvas;
     TMP_FontAsset font;
     TMP_Text timerText, paranoiaText, stateText;
@@ -65,11 +57,9 @@ public class ChatController : MonoBehaviour
     RectTransform shakeTarget;
     Vector2 shakeHome;
 
-    // ── audio ──
     AudioSource audioSrc;
-    AudioClip chimeClip, screamerClip;
+    AudioClip chimeClip;
 
-    // ── state ──
     int paranoia = 0;
     float timer = 900f;
     bool timerRunning = true;
@@ -79,6 +69,7 @@ public class ChatController : MonoBehaviour
     bool momStarted = false;
     bool broStarted = false;
     bool broWarned = false;
+    bool broSecondVoiceNoteTriggered = false; 
 
     void Start()
     {
@@ -113,8 +104,6 @@ public class ChatController : MonoBehaviour
             UpdateTimerLabel();
         }
     }
-
-    // ════════════════════════════════════════ NAVIGATION
 
     public void OpenMomChat()
     {
@@ -165,8 +154,6 @@ public class ChatController : MonoBehaviour
         if (hubScreen != null) hubScreen.SetActive(true);
         currentChat = null;
     }
-
-    // ════════════════════════════════════════ MOM FLOW (impersonator)
 
     IEnumerator MomIntro()
     {
@@ -262,66 +249,139 @@ public class ChatController : MonoBehaviour
         );
     }
 
-    // ════════════════════════════════════════ BROTHER FLOW (the clue)
-
     IEnumerator BroIntro()
     {
         yield return Wait(0.6f);
-        AddMessage(false, "hold on, listen to this");
+        AddMessage(false, "Bro, my card got blocked at a gas station. Can you send $100? I'll pay you back tomorrow I swear");
         yield return Wait(0.5f);
-        AddVoice(false);                       // Brother sends a voice note (tap to play)
+        AddVoice(false);
         yield return Wait(0.7f);
-        AddMessage(false, "yo. did mom text you just now??");
-        yield return Wait(0.5f);
         ShowChoices(
-            ("\"Yeah, she wants the home address?\"", 0, BroChoiceA),
-            ("\"No. Why?\"", 0, BroChoiceB)
+            ("\"Sure, sending it now.\"", 1, BroChoice1A),
+            ("\"Send me another voice note just to be sure.\"", 0, BroChoice1B)
         );
     }
 
-    void BroChoiceA()
+    void BroChoice1A()
     {
         ClearChoices();
-        AddMessage(true, "Yeah, she wants the home address?");
-        StartCoroutine(BroReveal());
+        SubtractTime(60);
+        SetParanoia(paranoia + 40);
+        AddMessage(true, "Sure, sending it now.");
+        StartCoroutine(TriggerTransactionFail());
     }
 
-    void BroChoiceB()
+    void BroChoice1B()
     {
         ClearChoices();
-        AddMessage(true, "No. Why?");
-        StartCoroutine(BroReveal());
+        AddMessage(true, "Send me another voice note just to be sure.");
+        StartCoroutine(BroAngry());
     }
 
-    IEnumerator BroReveal()
-    {
-        yield return Wait(0.9f);
-        AddMessage(false, "her phone got stolen at the gym tonight.");
-        yield return Wait(0.9f);
-        AddMessage(false, "someone's been texting EVERYONE from her account. do NOT send them anything.");
-        broWarned = true;
-        SetParanoia(paranoia + 10);
-        yield return Wait(0.3f);
-        ShowChoices(
-            ("\"Oh my god. Okay.\"", 2, BroAck)
-        );
-    }
-
-    void BroAck()
-    {
-        ClearChoices();
-        AddMessage(true, "Oh my god. Okay.");
-        StartCoroutine(BroEnd());
-    }
-
-    IEnumerator BroEnd()
+    IEnumerator BroAngry()
     {
         yield return Wait(0.8f);
-        AddMessage(false, "block that number. i'll call the real mom. stay safe bro.");
-        if (broPreview != null) broPreview.text = "block that number...";
+        AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes?! Just send the cash!");
+        yield return Wait(0.5f);
+        ShowChoices(
+            ("\"Okay, okay, sorry. Sending it now.\"", 1, () => StartCoroutine(TriggerTransactionFail())),
+            ("\"Come on, just one more. Then I'll send it.\"", 0, BroChoiceDangerPath)
+        );
     }
 
-    // ════════════════════════════════════════ ENDINGS
+    void BroChoiceDangerPath()
+    {
+        ClearChoices();
+        AddMessage(true, "Come on, just one more. Then I'll send it.");
+        StartCoroutine(AddDangerVoiceNote());
+    }
+
+    IEnumerator AddDangerVoiceNote()
+    {
+        yield return Wait(0.3f);
+        AddDangerVoice(false);
+        broSecondVoiceNoteTriggered = true;
+    }
+
+    void AddDangerVoice(bool isMe)
+    {
+        if (messagesContent == null) return;
+        var row = BuildRow(isMe);
+
+        GameObject holder = new GameObject("DangerVoiceNote", typeof(RectTransform), typeof(Image), typeof(Button));
+        holder.transform.SetParent(row, false);
+        var img = holder.GetComponent<Image>();
+        var btn = holder.GetComponent<Button>();
+        var le = holder.AddComponent<LayoutElement>();
+
+        float w = 230f, h = 60f;
+        if (voiceNoteSprite != null)
+        {
+            img.sprite = voiceNoteSprite;
+            img.color = Color.white;
+            img.preserveAspect = true;
+            h = w * (voiceNoteSprite.rect.height / voiceNoteSprite.rect.width);
+        }
+        else
+        {
+            img.color = new Color(0.35f, 0.05f, 0.05f, 1f);
+        }
+
+        le.preferredWidth = w;
+        le.preferredHeight = h;
+
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(OnDangerVoiceClick);
+
+        PlayChime();
+        ScrollToBottom();
+    }
+
+    void OnDangerVoiceClick()
+    {
+        if (ended) return;
+        
+        if (broSecondVoiceNoteTriggered)
+        {
+            StartCoroutine(BroScreamerRoutine());
+        }
+        else
+        {
+            PlayVoiceNote();
+        }
+    }
+
+    IEnumerator TriggerTransactionFail()
+    {
+        yield return Wait(0.6f);
+        AddMessage(false, "⚠ TRANSACTION FAILED\nError 7743: Remote auth override\n⚡ Unauthorized device accessing your banking session\nIP 185.220.101.x — Routing through TOR", true);
+        SetParanoia(100);
+        SetAppState("CORRUPTED");
+        ended = true;
+        locked = true;
+        timerRunning = false;
+        ClearChoices();
+    }
+
+    IEnumerator BroScreamerRoutine()
+    {
+        ended = true;
+        locked = true;
+        timerRunning = false;
+        ClearChoices();
+        SetParanoia(100);
+        SetAppState("CORRUPTED");
+        
+        StartCoroutine(ShakeRoutine(3f, 12f));
+        ShowScreamer();
+        PlayScreamer();
+        
+        AddSpam("DO YOU BELIEVE ME NOW, ALEX?");
+        
+        yield return Wait(2f);
+        AddSpam("SIGNAL CORRUPTED");
+        AddSpam("CONNECTION TERMINATED");
+    }
 
     void TriggerBlock()
     {
@@ -354,6 +414,7 @@ public class ChatController : MonoBehaviour
         StartCoroutine(BadEndingSeq());
     }
 
+    // ИСПРАВЛЕННЫЙ BadEndingSeq: звук в начале спама + рабочая кнопка Replay
     IEnumerator BadEndingSeq()
     {
         string[] spam = {
@@ -367,6 +428,10 @@ public class ChatController : MonoBehaviour
             "CONNECTION HIJACKED",
             "DEVICE COMPROMISED"
         };
+        
+        // ВКЛЮЧАЕМ СТРАШНЫЙ ЗВУК СРАЗУ В НАЧАЛЕ
+        PlayMomBadEnding();
+        
         SetParanoia(100);
         SetAppState("CORRUPTED");
         StartCoroutine(ShakeRoutine(6f, 6f));
@@ -379,21 +444,40 @@ public class ChatController : MonoBehaviour
         }
 
         yield return Wait(0.4f);
-        ShowScreamer();
-        PlayScreamer();
+        
         StartCoroutine(ShakeRoutine(2.5f, 14f));
 
         yield return Wait(3.0f);
-        // leave the screamer up; allow replay
-        var t = screamerOverlay.transform.Find("Replay");
-        if (t != null) t.gameObject.SetActive(true);
+        
+        // ОЧИЩАЕМ И ПОКАЗЫВАЕМ REPLAY
+        ClearChoices();
+        
+        // РАЗБЛОКИРУЕМ КНОПКУ (снимаем блокировку, если она была)
+        locked = false;
+        
+        // ПОКАЗЫВАЕМ КНОПКУ REPLAY
+        ShowChoices(("[ REPLAY ]", 0, ResetPrototype));
+    }
+
+    void PlayMomBadEnding()
+    {
+        if (audioSrc == null || momBadEndingClip == null) return;
+        audioSrc.PlayOneShot(momBadEndingClip, 1f);
     }
 
     public void ResetPrototype()
     {
+        // ОСТАНОВИТЬ ВСЕ ЗВУКИ
+        if (audioSrc != null)
+        {
+            audioSrc.Stop();
+            audioSrc.clip = null;
+        }
+        
         StopAllCoroutines();
         paranoia = 0; timer = 900f; timerRunning = true; ended = false; locked = false;
         momStarted = false; broStarted = false; broWarned = false; currentChat = null;
+        broSecondVoiceNoteTriggered = false;
         if (screamerOverlay != null) screamerOverlay.SetActive(false);
         if (flashOverlay != null) { var c = flashOverlay.color; c.a = 0f; flashOverlay.color = c; }
         if (shakeTarget != null) shakeTarget.anchoredPosition = shakeHome;
@@ -410,10 +494,7 @@ public class ChatController : MonoBehaviour
         if (hubScreen != null) hubScreen.SetActive(true);
     }
 
-    // ════════════════════════════════════════ MESSAGE HELPERS
-
-    // Configure the Scroll View Content so message rows stack vertically,
-    // never overlap, and each row spans the full chat width.
+    // ════════════════════════════════════════ MESSAGE HELPERS (без изменений)
     void ConfigureChatLayout()
     {
         messagesRT = messagesContent as RectTransform;
@@ -423,7 +504,7 @@ public class ChatController : MonoBehaviour
         if (vlg == null) vlg = messagesContent.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
-        vlg.childForceExpandWidth = true;   // each row = full content width
+        vlg.childForceExpandWidth = true;   
         vlg.childForceExpandHeight = false;
         vlg.childAlignment = TextAnchor.UpperLeft;
         vlg.spacing = 8f;
@@ -434,7 +515,6 @@ public class ChatController : MonoBehaviour
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
-        // Reuse the rounded bubble sprite from the prefab so bubbles keep their look.
         if (messagePrefabOther != null)
         {
             var pi = messagePrefabOther.GetComponentInChildren<Image>(true);
@@ -448,7 +528,6 @@ public class ChatController : MonoBehaviour
         foreach (Transform child in messagesContent) Destroy(child.gameObject);
     }
 
-    // A full-width row that aligns its single child bubble left (them) or right (me).
     RectTransform BuildRow(bool isMe)
     {
         GameObject row = new GameObject(isMe ? "RowMe" : "RowThem", typeof(RectTransform));
@@ -466,7 +545,7 @@ public class ChatController : MonoBehaviour
     {
         float w = 360f;
         if (messagesRT != null && messagesRT.rect.width > 1f) w = messagesRT.rect.width;
-        return Mathf.Max(80f, w * maxBubbleFrac - 28f); // minus horizontal padding
+        return Mathf.Max(80f, w * maxBubbleFrac - 28f);
     }
 
     void AddBubble(bool isMe, string text, Color bubbleCol, Color textCol, FontStyles style = FontStyles.Normal)
@@ -498,7 +577,6 @@ public class ChatController : MonoBehaviour
         tmp.richText = true;
         tmp.text = text;
 
-        // Cap width so long messages wrap at ~78% of chat width, short ones shrink to fit.
         var le = t.AddComponent<LayoutElement>();
         float natural = tmp.GetPreferredValues(text).x;
         le.preferredWidth = Mathf.Min(natural, GetMaxTextWidth());
@@ -507,9 +585,13 @@ public class ChatController : MonoBehaviour
         ScrollToBottom();
     }
 
-    void AddMessage(bool isMe, string text)
+    void AddMessage(bool isMe, string text, bool isError = false)
     {
-        if (isMe) AddBubble(true, text, meBubble, meText);
+        if (isError)
+        {
+            AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold);
+        }
+        else if (isMe) AddBubble(true, text, meBubble, meText);
         else AddBubble(false, text, themBubble, themText);
     }
 
@@ -539,7 +621,7 @@ public class ChatController : MonoBehaviour
             img.sprite = photoSprite;
             img.color = Color.white;
             img.preserveAspect = true;
-            float ar = photoSprite.rect.width > 0 ? photoSprite.rect.height / photoSprite.rect.width : 0.75f;
+            float ar = photoSprite.rect.height / photoSprite.rect.width;
             h = w * ar;
         }
         else
@@ -553,7 +635,6 @@ public class ChatController : MonoBehaviour
         ScrollToBottom();
     }
 
-    // Voice note bubble: shows the voice-note PNG and plays a (replaceable) clip on click.
     void AddVoice(bool isMe)
     {
         if (messagesContent == null) return;
@@ -571,8 +652,7 @@ public class ChatController : MonoBehaviour
             img.sprite = voiceNoteSprite;
             img.color = Color.white;
             img.preserveAspect = true;
-            if (voiceNoteSprite.rect.width > 0)
-                h = w * (voiceNoteSprite.rect.height / voiceNoteSprite.rect.width);
+            h = w * (voiceNoteSprite.rect.height / voiceNoteSprite.rect.width);
         }
         else
         {
@@ -590,9 +670,14 @@ public class ChatController : MonoBehaviour
 
     void PlayVoiceNote()
     {
-        if (audioSrc == null) return;
-        if (voiceNoteClip != null) audioSrc.PlayOneShot(voiceNoteClip, 1f);
-        else PlayChime();
+        if (audioSrc == null || voiceNoteClip == null) return;
+        audioSrc.PlayOneShot(voiceNoteClip, 1f);
+    }
+
+    void PlayScreamer()
+    {
+        if (audioSrc == null || screamerClip == null) return;
+        audioSrc.PlayOneShot(screamerClip, 1f);
     }
 
     void ScrollToBottom()
@@ -601,8 +686,6 @@ public class ChatController : MonoBehaviour
         if (messagesRT != null) LayoutRebuilder.ForceRebuildLayoutImmediate(messagesRT);
         if (chatScrollRect != null) chatScrollRect.verticalNormalizedPosition = 0f;
     }
-
-    // ════════════════════════════════════════ CHOICES
 
     void ShowChoices(params (string label, int style, System.Action act)[] choices)
     {
@@ -615,10 +698,9 @@ public class ChatController : MonoBehaviour
             if (tmp != null)
             {
                 tmp.text = c.label;
-                // Buttons are white, so keep text dark/bold and readable.
-                if (c.style == 1) tmp.color = new Color(0.62f, 0.0f, 0.0f);     // danger - dark red
-                else if (c.style == 2) tmp.color = new Color(0.0f, 0.42f, 0.18f); // safe - dark green
-                else tmp.color = Color.black;                                    // normal - black
+                if (c.style == 1) tmp.color = new Color(0.62f, 0.0f, 0.0f);
+                else if (c.style == 2) tmp.color = new Color(0.0f, 0.42f, 0.18f);
+                else tmp.color = Color.black;
             }
             var btn = b.GetComponent<Button>();
             if (btn != null)
@@ -634,8 +716,6 @@ public class ChatController : MonoBehaviour
         if (optionsContent == null) return;
         foreach (Transform child in optionsContent) Destroy(child.gameObject);
     }
-
-    // ════════════════════════════════════════ STATE / HUD
 
     void SetParanoia(int val)
     {
@@ -675,8 +755,6 @@ public class ChatController : MonoBehaviour
         timerText.text = string.Format("{0:00}:{1:00}", m, s);
         timerText.color = timer < 120f ? new Color(1f, 0.13f, 0.13f) : new Color(0.88f, 0.88f, 1f);
     }
-
-    // ════════════════════════════════════════ EFFECTS
 
     void FlashRed()
     {
@@ -719,8 +797,6 @@ public class ChatController : MonoBehaviour
         if (screamerOverlay != null) screamerOverlay.SetActive(true);
     }
 
-    // ════════════════════════════════════════ AUDIO
-
     void SetupAudio()
     {
         audioSrc = gameObject.GetComponent<AudioSource>();
@@ -728,8 +804,6 @@ public class ChatController : MonoBehaviour
         audioSrc.playOnAwake = false;
 
         int sr = 44100;
-
-        // chime: short decaying sine
         int n = (int)(sr * 0.25f);
         var chime = new float[n];
         for (int i = 0; i < n; i++)
@@ -740,29 +814,9 @@ public class ChatController : MonoBehaviour
         }
         chimeClip = AudioClip.Create("chime", n, 1, sr, false);
         chimeClip.SetData(chime, 0);
-
-        // screamer: harsh noise + rising sawtooth
-        int sn = (int)(sr * 1.6f);
-        var scr = new float[sn];
-        float phase = 0f;
-        for (int i = 0; i < sn; i++)
-        {
-            float t = i / (float)sr;
-            float freq = Mathf.Lerp(90f, 1600f, t / 1.6f);
-            phase += (2f * Mathf.PI * freq) / sr;
-            float saw = (phase % (2f * Mathf.PI)) / Mathf.PI - 1f;
-            float noise = Random.Range(-1f, 1f);
-            float env = t < 0.02f ? t / 0.02f : Mathf.Clamp01(1f - (t - 0.02f) / 1.5f);
-            scr[i] = (noise * 0.6f + saw * 0.4f) * env * 0.85f;
-        }
-        screamerClip = AudioClip.Create("screamer", sn, 1, sr, false);
-        screamerClip.SetData(scr, 0);
     }
 
     void PlayChime() { if (audioSrc != null && chimeClip != null) audioSrc.PlayOneShot(chimeClip, 0.5f); }
-    void PlayScreamer() { if (audioSrc != null && screamerClip != null) audioSrc.PlayOneShot(screamerClip, 1f); }
-
-    // ════════════════════════════════════════ RUNTIME UI BUILD
 
     WaitForSeconds Wait(float s) { return new WaitForSeconds(s); }
 
@@ -787,7 +841,6 @@ public class ChatController : MonoBehaviour
         paranoiaText = MakeText(hud.transform, "Paranoia", "PARANOIA 0%", 14, TextAlignmentOptions.Center);
         Anchor(paranoiaText.rectTransform, new Vector2(0.27f, 0.45f), new Vector2(0.73f, 1f), Vector2.zero, Vector2.zero);
 
-        // paranoia bar
         GameObject barBg = NewUI("ParaBarBg", hud.transform);
         var pbg = barBg.AddComponent<Image>();
         pbg.color = new Color(1f, 1f, 1f, 0.08f);
@@ -812,17 +865,14 @@ public class ChatController : MonoBehaviour
     {
         if (canvas == null) return;
 
-        // red flash full-screen
         GameObject flash = NewUI("RedFlash", canvas.transform);
         flashOverlay = flash.AddComponent<Image>();
         flashOverlay.color = new Color(1f, 0f, 0f, 0f);
         flashOverlay.raycastTarget = false;
         FullStretch(flash.GetComponent<RectTransform>());
 
-        // shake target = phone chat screen
         if (chatScreen != null) { shakeTarget = chatScreen.GetComponent<RectTransform>(); shakeHome = shakeTarget.anchoredPosition; }
 
-        // screamer overlay
         screamerOverlay = NewUI("Screamer", canvas.transform);
         var simg = screamerOverlay.AddComponent<Image>();
         simg.color = new Color(0f, 0f, 0f, 0.96f);
@@ -850,7 +900,6 @@ public class ChatController : MonoBehaviour
         screamerOverlay.SetActive(false);
     }
 
-    // ── tiny UI factory ──
     GameObject NewUI(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));

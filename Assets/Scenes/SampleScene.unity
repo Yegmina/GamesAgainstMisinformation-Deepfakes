@@ -5965,9 +5965,11 @@ MonoBehaviour:
   momBadge: {fileID: 5427081813431168276}
   broPreview: {fileID: 601734197}
   broBadge: {fileID: 601734194}
-  photoSprite: {fileID: 21300000, guid: 60aeab6e6c0870e4488eacd0cee6c96f, type: 3}
+  photoSprite: {fileID: 21300000, guid: e551720a8215c644a82dd2ebfac36005, type: 3}
   voiceNoteSprite: {fileID: 21300000, guid: b9e783f36065e594e87b237ba0bdd200, type: 3}
   voiceNoteClip: {fileID: 0}
+  screamerClip: {fileID: 8300000, guid: 794040cf964075f4e94c9297e0d2535a, type: 3}
+  momBadEndingClip: {fileID: 8300000, guid: 64b19ff026197b447a928340b348fdd5, type: 3}
 --- !u!4 &1775429907
 Transform:
   m_ObjectHideFlags: 0
