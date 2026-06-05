@@ -85,7 +85,26 @@ public class ChatController : MonoBehaviour
 
     void Start()
     {
-        canvas = chatScreen != null ? chatScreen.GetComponentInParent<Canvas>(true) : FindFirstObjectByType<Canvas>();
+        if (chatScreen != null)
+        {
+            canvas = chatScreen.GetComponentInParent<Canvas>(true);
+        }
+        
+        if (canvas == null || canvas.gameObject.name == "GlobalCanvas")
+        {
+            Canvas[] allCanvases = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            foreach (var c in allCanvases)
+            {
+                if (c.gameObject.name != "GlobalCanvas")
+                {
+                    canvas = c;
+                    break;
+                }
+            }
+            
+            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
+        }
+
         if (contactNameText != null) font = contactNameText.font;
 
         SetupAudio();
