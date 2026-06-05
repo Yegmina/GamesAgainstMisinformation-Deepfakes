@@ -1981,7 +1981,6 @@ MonoBehaviour:
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
-  m_Version: 2
   m_TaaSettings:
     m_Quality: 3
     m_FrameInfluence: 0.1
@@ -1989,6 +1988,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!114 &330585548
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2046,7 +2046,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: -280, y: -120}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &401059315
 MonoBehaviour:
@@ -2075,16 +2075,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Padding:
-    m_Left: 20
-    m_Right: 20
-    m_Top: 20
-    m_Bottom: 20
+    m_Left: 14
+    m_Right: 14
+    m_Top: 14
+    m_Bottom: 14
   m_ChildAlignment: 4
   m_Spacing: 10
   m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
+  m_ChildForceExpandHeight: 0
+  m_ChildControlWidth: 1
+  m_ChildControlHeight: 1
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
@@ -2114,14 +2114,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 2
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
@@ -2198,17 +2198,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Version: 3
   m_UsePipelineSettings: 1
   m_AdditionalLightsShadowResolutionTier: 2
-  m_LightLayerMask: 1
-  m_RenderingLayers: 1
   m_CustomShadowLayers: 0
-  m_ShadowLayerMask: 1
-  m_ShadowRenderingLayers: 1
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 1
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &451600222 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
@@ -2274,13 +2280,13 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1995845831}
-        m_TargetAssemblyTypeName: PhoneUIManager, Assembly-CSharp
-        m_MethodName: OpenChat
-        m_Mode: 1
+      - m_Target: {fileID: 1775429906}
+        m_TargetAssemblyTypeName: ChatController, Assembly-CSharp
+        m_MethodName: OpenMomChat
+        m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
@@ -2639,7 +2645,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 652687560500964668, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_text
-      value: Josh
+      value: Brother
       objectReference: {fileID: 0}
     - target: {fileID: 652687560500964668, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_fontColor.b
@@ -2665,6 +2671,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2336801483251379036, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 6d6675cd23f875a4986fb07250758ef7, type: 3}
     - target: {fileID: 3590632746945948393, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -2775,7 +2785,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_Name
-      value: MessageEntry(Josh)
+      value: MessageEntry(Brother)
       objectReference: {fileID: 0}
     - target: {fileID: 9160812677087771940, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -2784,8 +2794,99 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 601734198}
   m_SourcePrefab: {fileID: 100100000, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+--- !u!1 &601734194 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8048438149219046766, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 601734193}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &601734195 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 601734193}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &601734196 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2232965202308151633, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 601734193}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 601734195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &601734197 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8425624222692231456, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 601734193}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &601734198
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 601734195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 1
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 601734196}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1775429906}
+        m_TargetAssemblyTypeName: ChatController, Assembly-CSharp
+        m_MethodName: OpenBrotherChat
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &617245656
 GameObject:
   m_ObjectHideFlags: 0
@@ -4735,6 +4836,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -5835,19 +5937,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   chatScreen: {fileID: 1389922418}
-  homeScreen: {fileID: 1313376209}
+  hubScreen: {fileID: 1313376209}
   messagesContent: {fileID: 172194853}
   messagePrefabMy: {fileID: 1590466606040487256, guid: b1f0c7e98708a4f4c97023cdc0054093, type: 3}
   messagePrefabOther: {fileID: 266452978177390469, guid: b8d7d76533b30a34ab383b428a63d539, type: 3}
   optionsPanel: {fileID: 454892835}
   optionsContent: {fileID: 401059314}
+  optionButtonPrefab: {fileID: 2565392716172004876, guid: aa49d5a6cf041624fb09eb423ed19f73, type: 3}
   contactNameText: {fileID: 1972856448}
   contactAvatar: {fileID: 1900551197}
-  momAvatar: {fileID: 21300000, guid: 56548a6372da3dc42b17625413da8240, type: 3}
-  dadAvatar: {fileID: 21300000, guid: 575e647fd73dee34ab244560631e7730, type: 3}
-  sarahAvatar: {fileID: 21300000, guid: 2597b195d37e7e1498877feaf2d9c3fa, type: 3}
-  brotherAvatar: {fileID: 21300000, guid: 7fde527a4a9d46148820db5da5a661dc, type: 3}
-  joshAvatar: {fileID: 21300000, guid: 14d2902760f871c48b833eb68baf527a, type: 3}
+  chatScrollRect: {fileID: 1948687857}
+  momAvatar: {fileID: 21300000, guid: 664641eba5e674d44bcf322a0d77d348, type: 3}
+  brotherAvatar: {fileID: 21300000, guid: 6d6675cd23f875a4986fb07250758ef7, type: 3}
+  momPreview: {fileID: 5427081813431168277}
+  momBadge: {fileID: 5427081813431168276}
+  broPreview: {fileID: 601734197}
+  broBadge: {fileID: 601734194}
+  photoSprite: {fileID: 21300000, guid: 60aeab6e6c0870e4488eacd0cee6c96f, type: 3}
+  voiceNoteSprite: {fileID: 21300000, guid: b9e783f36065e594e87b237ba0bdd200, type: 3}
+  voiceNoteClip: {fileID: 0}
 --- !u!4 &1775429907
 Transform:
   m_ObjectHideFlags: 0
@@ -6336,13 +6444,13 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1995845831}
-        m_TargetAssemblyTypeName: PhoneUIManager, Assembly-CSharp
+      - m_Target: {fileID: 1775429906}
+        m_TargetAssemblyTypeName: ChatController, Assembly-CSharp
         m_MethodName: CloseChat
-        m_Mode: 1
+        m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
@@ -6489,6 +6597,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -6872,6 +6981,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 218597896}
     m_Modifications:
     - target: {fileID: 652687560500964668, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+      propertyPath: m_text
+      value: Mom
+      objectReference: {fileID: 0}
+    - target: {fileID: 652687560500964668, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_fontColor.b
       value: 1
       objectReference: {fileID: 0}
@@ -6911,6 +7024,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2336801483251379036, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 664641eba5e674d44bcf322a0d77d348, type: 3}
     - target: {fileID: 3590632746945948393, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -7013,7 +7130,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_Name
-      value: MessageEntry(Dad)
+      value: MessageEntry(Mom)
       objectReference: {fileID: 0}
     - target: {fileID: 9160812677087771940, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -7027,6 +7144,22 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 451600226}
   m_SourcePrefab: {fileID: 100100000, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+--- !u!1 &5427081813431168276 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8048438149219046766, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 5427081813431168275}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5427081813431168277 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8425624222692231456, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 5427081813431168275}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
