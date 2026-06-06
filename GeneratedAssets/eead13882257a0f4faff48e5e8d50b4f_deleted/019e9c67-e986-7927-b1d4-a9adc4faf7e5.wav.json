@@ -1,0 +1,15 @@
+{
+    "asset": "eead13882257a0f4faff48e5e8d50b4f",
+    "fileName": "019e9c67-e986-7927-b1d4-a9adc4faf7e5.wav",
+    "prompt": "Classic smartphone marimba ringtone, bright cheerful melodic xylophone notes repeating, clean digital phone ringing tone, mobile phone incoming call ringtone, upbeat and clear",
+    "negativePrompt": "",
+    "model": "elevenlabs-sound-effects-v2",
+    "modelName": "ElevenLabs Sound Effects V2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "duration": 5.0,
+    "autoTrim": false,
+    "hasReference": false,
+    "voice": ""
+}
