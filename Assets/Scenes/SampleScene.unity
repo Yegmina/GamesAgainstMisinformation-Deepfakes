@@ -239,6 +239,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 12330410}
   m_CullTransparentMesh: 1
+--- !u!1 &24196557 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8048438149219046766, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 1752948830}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &29290526
 GameObject:
   m_ObjectHideFlags: 0
@@ -10636,7 +10641,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8425624222692231456, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_text
-      value: What u think about this?.....
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 9068722180849153331, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
       propertyPath: m_Name
@@ -10713,7 +10718,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1775197277}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1775429906}
+        m_TargetAssemblyTypeName: ChatController, Assembly-CSharp
+        m_MethodName: OpenSarahChat
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &1775429905
 GameObject:
   m_ObjectHideFlags: 0
@@ -10758,6 +10775,7 @@ MonoBehaviour:
   brotherAvatar: {fileID: 21300000, guid: 6d6675cd23f875a4986fb07250758ef7, type: 3}
   unknownAvatar: {fileID: 21300000, guid: 14d2902760f871c48b833eb68baf527a, type: 3}
   providerAvatar: {fileID: 21300000, guid: 14d2902760f871c48b833eb68baf527a, type: 3}
+  sarahAvatar: {fileID: 0}
   momPreview: {fileID: 5427081813431168277}
   momBadge: {fileID: 5427081813431168276}
   broPreview: {fileID: 601734197}
@@ -10766,6 +10784,8 @@ MonoBehaviour:
   unknownBadge: {fileID: 91774089}
   providerPreview: {fileID: 1265479648}
   providerBadge: {fileID: 733849884}
+  sarahPreview: {fileID: 2113301549}
+  sarahBadge: {fileID: 24196557}
   photoSprite: {fileID: 21300000, guid: e551720a8215c644a82dd2ebfac36005, type: 3}
   screamerPhotoSprite: {fileID: 21300000, guid: 0fd93bb180e4b134d940460fef78e9f0, type: 3}
   voiceNoteSprite: {fileID: 21300000, guid: b9e783f36065e594e87b237ba0bdd200, type: 3}
@@ -12119,7 +12139,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 50, y: 270}
+  m_AnchoredPosition: {x: 10.1, y: 270}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1972856447
@@ -12177,15 +12197,15 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 20
+  m_fontSizeBase: 20
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_fontStyle: 1
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -13143,6 +13163,17 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2097357505}
   m_CullTransparentMesh: 1
+--- !u!114 &2113301549 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8425624222692231456, guid: 433d4dae85ab8ed479ba7692dc1adac3, type: 3}
+  m_PrefabInstance: {fileID: 1752948830}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &5427081813431168275
 PrefabInstance:
   m_ObjectHideFlags: 0

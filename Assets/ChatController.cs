@@ -25,6 +25,7 @@ public class ChatController : MonoBehaviour
     public Sprite brotherAvatar;
     public Sprite unknownAvatar;
     public Sprite providerAvatar;
+    public Sprite sarahAvatar;
 
     [Header("Contact Rows (hub)")]
     public TMP_Text momPreview;
@@ -35,6 +36,8 @@ public class ChatController : MonoBehaviour
     public GameObject unknownBadge;
     public TMP_Text providerPreview;
     public GameObject providerBadge;
+    public TMP_Text sarahPreview;
+    public GameObject sarahBadge;
 
     [Header("Photo")]
     public Sprite photoSprite;
@@ -82,6 +85,9 @@ public class ChatController : MonoBehaviour
     bool unknownRead = false;
     bool providerFinished = false;
     bool providerLinkClicked = false;
+    bool sarahFinished = false;
+    bool sarahStarted = false;
+    bool sarahBadPath = false;
 
     void Start()
     {
@@ -116,6 +122,7 @@ public class ChatController : MonoBehaviour
         if (broPreview != null) broPreview.text = "Left my gym bag";
         if (unknownPreview != null) unknownPreview.text = "Unknown number";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
+        if (sarahPreview != null) sarahPreview.text = "My ex sent me a video... 😰";
 
         SetParanoia(0);
         SetAppState("ACTIVE");
@@ -143,7 +150,11 @@ public class ChatController : MonoBehaviour
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (momBadge != null) momBadge.SetActive(false);
-        if (contactNameText != null) contactNameText.text = "Mom";
+        if (contactNameText != null) 
+        {
+            contactNameText.text = "Mom";
+            contactNameText.fontSize = 20;
+        }
         if (contactAvatar != null && momAvatar != null) contactAvatar.sprite = momAvatar;
 
         ClearMessages();
@@ -172,7 +183,11 @@ public class ChatController : MonoBehaviour
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (broBadge != null) broBadge.SetActive(false);
-        if (contactNameText != null) contactNameText.text = "Brother";
+        if (contactNameText != null) 
+        {
+            contactNameText.text = "Brother";
+            contactNameText.fontSize = 20;
+        }
         if (contactAvatar != null && brotherAvatar != null) contactAvatar.sprite = brotherAvatar;
 
         ClearMessages();
@@ -205,7 +220,7 @@ public class ChatController : MonoBehaviour
         if (contactNameText != null)
         {
             contactNameText.text = "???";
-            contactNameText.fontSize = 16;
+            contactNameText.fontSize = 20;
         }
         if (contactAvatar != null && unknownAvatar != null) contactAvatar.sprite = unknownAvatar;
 
@@ -239,7 +254,7 @@ public class ChatController : MonoBehaviour
         if (contactNameText != null)
         {
             contactNameText.text = "Internet Provider";
-            contactNameText.fontSize = 16;
+            contactNameText.fontSize = 18;
         }
         if (contactAvatar != null && providerAvatar != null) contactAvatar.sprite = providerAvatar;
 
@@ -257,6 +272,44 @@ public class ChatController : MonoBehaviour
         AddMessage(false, "📡 If not verified within 24h, your service will be suspended.");
         AddSystem("⚠ This looks suspicious... The link may be dangerous.");
     }
+
+    public void OpenSarahChat()
+{
+    currentChat = "sarah";
+    if (hubScreen != null) hubScreen.SetActive(false);
+    chatScreen.SetActive(true);
+    if (sarahBadge != null) sarahBadge.SetActive(false);
+    if (contactNameText != null) 
+    {
+        contactNameText.text = "Sarah";
+        contactNameText.fontSize = 20;
+    }
+    if (contactAvatar != null && sarahAvatar != null) contactAvatar.sprite = sarahAvatar;
+
+    ClearMessages();
+    ClearChoices();
+    
+    // ЭТО СООБЩЕНИЕ БУДЕТ В ПРЕВЬЮ
+    AddMessage(false, "My ex sent me a video... 😰");
+
+    if (sarahFinished)
+    {
+        if (sarahBadPath)
+            AddSystem("Sarah stopped responding. You messed up.");
+        else
+            AddSystem("Sarah is okay now. You're a good friend.");
+        if (optionsPanel != null) optionsPanel.SetActive(false);
+        return;
+    }
+
+    if (optionsPanel != null) optionsPanel.SetActive(true);
+
+    if (!sarahStarted)
+    {
+        sarahStarted = true;
+        StartCoroutine(SarahIntro());
+    }
+}
 
     void AddLinkMessage()
     {
@@ -458,7 +511,7 @@ public class ChatController : MonoBehaviour
             return;
         }
         
-        if ((currentChat == "mom" && !momFinished) || (currentChat == "bro" && !broFinished))
+        if ((currentChat == "mom" && !momFinished) || (currentChat == "bro" && !broFinished) || (currentChat == "sarah" && !sarahFinished))
         {
             AddSystem("You can't leave now. The conversation isn't over.");
             return;
@@ -476,6 +529,7 @@ public class ChatController : MonoBehaviour
         momFinished = false; broFinished = false; broWarned = false; currentChat = null;
         momStarted = false; broStarted = false; broSecondVoiceNoteTriggered = false;
         unknownRead = false; providerFinished = false; providerLinkClicked = false;
+        sarahFinished = false; sarahStarted = false; sarahBadPath = false;
         if (screamerOverlay != null) screamerOverlay.SetActive(false);
         if (flashOverlay != null) { var c = flashOverlay.color; c.a = 0f; flashOverlay.color = c; }
         if (shakeTarget != null) shakeTarget.anchoredPosition = shakeHome;
@@ -486,16 +540,198 @@ public class ChatController : MonoBehaviour
         if (broPreview != null) broPreview.text = "Left my gym bag";
         if (unknownPreview != null) unknownPreview.text = "Unknown number";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
+        if (sarahPreview != null) sarahPreview.text = "My ex sent me a video... 😰";
         if (momBadge != null) momBadge.SetActive(true);
         if (broBadge != null) broBadge.SetActive(true);
         if (unknownBadge != null) unknownBadge.SetActive(true);
         if (providerBadge != null) providerBadge.SetActive(true);
+        if (sarahBadge != null) sarahBadge.SetActive(true);
         ClearMessages();
         ClearChoices();
         chatScreen.SetActive(false);
         if (hubScreen != null) hubScreen.SetActive(true);
     }
 
+    // ════════════════════════════════════════ VIDEO MESSAGE
+    void AddVideoMessage(bool isMe, string videoName, string duration)
+    {
+        if (messagesContent == null) return;
+        var row = BuildRow(isMe);
+        
+        GameObject videoObj = new GameObject("VideoMessage", typeof(RectTransform), typeof(Image), typeof(Button));
+        videoObj.transform.SetParent(row, false);
+        var img = videoObj.GetComponent<Image>();
+        img.color = new Color(0.10f, 0.10f, 0.16f, 1f);
+        img.sprite = bubbleSprite;
+        img.type = Image.Type.Sliced;
+        
+        var btn = videoObj.GetComponent<Button>();
+        var le = videoObj.AddComponent<LayoutElement>();
+        le.preferredWidth = 200f;
+        le.preferredHeight = 120f;
+        
+        var preview = new GameObject("Preview", typeof(RectTransform), typeof(Image));
+        preview.transform.SetParent(videoObj.transform, false);
+        var previewImg = preview.GetComponent<Image>();
+        previewImg.color = new Color(0.05f, 0.05f, 0.10f, 1f);
+        var previewRect = preview.GetComponent<RectTransform>();
+        previewRect.anchorMin = Vector2.zero;
+        previewRect.anchorMax = Vector2.one;
+        previewRect.offsetMin = Vector2.zero;
+        previewRect.offsetMax = Vector2.zero;
+        
+        var playIcon = new GameObject("PlayIcon", typeof(RectTransform), typeof(TextMeshProUGUI));
+        playIcon.transform.SetParent(preview.transform, false);
+        var playText = playIcon.GetComponent<TextMeshProUGUI>();
+        if (font != null) playText.font = font;
+        playText.text = "▶";
+        playText.color = Color.white;
+        playText.fontSize = 30;
+        playText.alignment = TextAlignmentOptions.Center;
+        var playRect = playIcon.GetComponent<RectTransform>();
+        playRect.anchorMin = Vector2.zero;
+        playRect.anchorMax = Vector2.one;
+        playRect.offsetMin = Vector2.zero;
+        playRect.offsetMax = Vector2.zero;
+        
+        var nameObj = new GameObject("FileName", typeof(RectTransform), typeof(TextMeshProUGUI));
+        nameObj.transform.SetParent(videoObj.transform, false);
+        var nameText = nameObj.GetComponent<TextMeshProUGUI>();
+        if (font != null) nameText.font = font;
+        nameText.text = videoName;
+        nameText.color = new Color(0.7f, 0.7f, 0.7f);
+        nameText.fontSize = 10;
+        nameText.alignment = TextAlignmentOptions.BottomLeft;
+        var nameRect = nameObj.GetComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0, 0);
+        nameRect.anchorMax = new Vector2(1, 0.2f);
+        nameRect.offsetMin = new Vector2(4, 4);
+        nameRect.offsetMax = new Vector2(-4, 0);
+        
+        var durationObj = new GameObject("Duration", typeof(RectTransform), typeof(TextMeshProUGUI));
+        durationObj.transform.SetParent(videoObj.transform, false);
+        var durationText = durationObj.GetComponent<TextMeshProUGUI>();
+        if (font != null) durationText.font = font;
+        durationText.text = duration;
+        durationText.color = new Color(0.9f, 0.9f, 0.9f);
+        durationText.fontSize = 10;
+        durationText.alignment = TextAlignmentOptions.BottomRight;
+        var durationRect = durationObj.GetComponent<RectTransform>();
+        durationRect.anchorMin = new Vector2(1, 0);
+        durationRect.anchorMax = new Vector2(1, 0.2f);
+        durationRect.anchoredPosition = new Vector2(-8, 4);
+        durationRect.sizeDelta = new Vector2(40, 15);
+        
+        btn.onClick.AddListener(() => {
+            AddSystem("📹 Video played: " + videoName);
+            PlayChime();
+        });
+        
+        PlayChime();
+        ScrollToBottom();
+    }
+
+    // ════════════════════════════════════════ SARAH DIALOG
+    IEnumerator SarahIntro()
+    {
+        yield return Wait(0.6f);
+        AddMessage(false, "Alex... something weird happened");
+        yield return Wait(0.5f);
+        AddMessage(true, "What's wrong?");
+        yield return Wait(0.5f);
+        AddMessage(false, "My ex sent me this video...");
+        
+        AddVideoMessage(false, "sarah_deepfake_video.mp4", "0:23");
+        
+        yield return Wait(0.8f);
+        AddMessage(false, "It looks like me but... I never filmed this 😭");
+        yield return Wait(0.5f);
+        ShowChoices(
+            ("\"Sarah, that's a deepfake. Don't panic.\"", 2, SarahGoodPath),
+            ("\"Are you sure it's not you? Maybe you forgot?\"", 1, SarahBadPath)
+        );
+    }
+
+    void SarahGoodPath()
+    {
+        ClearChoices();
+        AddMessage(true, "Sarah, that's a deepfake. Don't panic.");
+        StartCoroutine(SarahGoodPathContinue());
+    }
+
+    IEnumerator SarahGoodPathContinue()
+    {
+        yield return Wait(0.8f);
+        AddMessage(false, "What do I do?? I'm so scared 😰");
+        yield return Wait(0.5f);
+        ShowChoices(
+            ("\"Block him immediately. Don't respond.\"", 2, SarahBlockPath),
+            ("\"Save the video as evidence first.\"", 2, SarahEvidencePath)
+        );
+    }
+
+    void SarahBlockPath()
+    {
+        ClearChoices();
+        AddMessage(true, "Block him immediately. Don't respond.");
+        StartCoroutine(SarahEndGood());
+    }
+
+    void SarahEvidencePath()
+    {
+        ClearChoices();
+        AddMessage(true, "Save the video as evidence first. Then block him.");
+        StartCoroutine(SarahEndGood());
+    }
+
+    IEnumerator SarahEndGood()
+    {
+        yield return Wait(0.8f);
+        AddMessage(false, "Okay. I will...");
+        AddMessage(false, "This is so messed up...");
+        AddMessage(false, "Why would someone do this to me? 😢");
+        yield return Wait(0.6f);
+        AddMessage(true, "Some people are just evil.");
+        AddMessage(true, "Stay strong. I'm here for you.");
+        yield return Wait(0.6f);
+        AddMessage(false, "Thank you Alex 😢❤️");
+        AddMessage(false, "I'm lucky to have you as a friend.");
+        yield return Wait(0.5f);
+        AddMessage(true, "Always here for you.");
+        
+        SetParanoia(paranoia - 10);
+        sarahFinished = true;
+        if (sarahPreview != null) sarahPreview.text = "Thank you Alex ❤️";
+        
+        yield return Wait(1.0f);
+        CloseChat();
+    }
+
+    void SarahBadPath()
+    {
+        ClearChoices();
+        sarahBadPath = true;
+        AddMessage(true, "Are you sure it's not you? Maybe you forgot?");
+        StartCoroutine(SarahBadPathContinue());
+    }
+
+    IEnumerator SarahBadPathContinue()
+    {
+        yield return Wait(0.8f);
+        AddMessage(false, "Wow. Thanks for believing me.");
+        AddMessage(false, "I thought you were my friend... 😢");
+        yield return Wait(0.5f);
+        AddSystem("Sarah stopped responding.");
+        
+        SetParanoia(paranoia + 15);
+        sarahFinished = true;
+        if (sarahPreview != null) sarahPreview.text = "[Ignored you]";
+        
+        yield return Wait(1.0f);
+        CloseChat();
+    }
+
+    // ════════════════════════════════════════ MOM FLOW
     IEnumerator MomIntro()
     {
         yield return Wait(0.6f);
@@ -639,6 +875,7 @@ public class ChatController : MonoBehaviour
         CloseChat();
     }
 
+    // ════════════════════════════════════════ BROTHER FLOW
     IEnumerator BroIntro()
     {
         yield return Wait(0.6f);
@@ -1091,7 +1328,6 @@ public class ChatController : MonoBehaviour
     {
         if (screamerOverlay != null) 
         {
-            // УБИРАЕМ ЛЮБУЮ КАРТИНКУ, ЧТОБЫ ПОКАЗЫВАТЬ ТОЛЬКО ТЕКСТ
             var img = screamerOverlay.GetComponent<Image>();
             if (img != null)
             {
