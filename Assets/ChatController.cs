@@ -50,13 +50,17 @@ public class ChatController : MonoBehaviour
     public AudioClip momBadEndingClip;
     public AudioClip virusSoundClip;
 
+    [Header("Bubble Sprites")]
+    public Sprite bubbleMeSprite;
+    public Sprite bubbleThemSprite;
+
     static readonly Color themBubble = new Color(0.118f, 0.118f, 0.180f, 1f);
     static readonly Color meBubble   = new Color(0.102f, 0.227f, 0.431f, 1f);
     static readonly Color themText   = new Color(0.816f, 0.816f, 0.910f, 1f);
     static readonly Color meText     = new Color(0.784f, 0.863f, 1.000f, 1f);
     const float maxBubbleFrac = 0.78f;   
-    Sprite bubbleSprite;                 
     RectTransform messagesRT;
+    Sprite roundedBubbleSprite;
 
     Canvas canvas;
     TMP_FontAsset font;
@@ -122,7 +126,7 @@ public class ChatController : MonoBehaviour
         if (broPreview != null) broPreview.text = "Left my gym bag";
         if (unknownPreview != null) unknownPreview.text = "Unknown number";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
-        if (sarahPreview != null) sarahPreview.text = "My ex sent me a video... 😰";
+        if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
 
         SetParanoia(0);
         SetAppState("ACTIVE");
@@ -274,42 +278,41 @@ public class ChatController : MonoBehaviour
     }
 
     public void OpenSarahChat()
-{
-    currentChat = "sarah";
-    if (hubScreen != null) hubScreen.SetActive(false);
-    chatScreen.SetActive(true);
-    if (sarahBadge != null) sarahBadge.SetActive(false);
-    if (contactNameText != null) 
     {
-        contactNameText.text = "Sarah";
-        contactNameText.fontSize = 20;
+        currentChat = "sarah";
+        if (hubScreen != null) hubScreen.SetActive(false);
+        chatScreen.SetActive(true);
+        if (sarahBadge != null) sarahBadge.SetActive(false);
+        if (contactNameText != null) 
+        {
+            contactNameText.text = "Sarah";
+            contactNameText.fontSize = 20;
+        }
+        if (contactAvatar != null && sarahAvatar != null) contactAvatar.sprite = sarahAvatar;
+
+        ClearMessages();
+        ClearChoices();
+        
+        AddMessage(false, "Hey, you there? 💬");
+
+        if (sarahFinished)
+        {
+            if (sarahBadPath)
+                AddSystem("Sarah stopped responding. You messed up.");
+            else
+                AddSystem("Sarah is okay now. You're a good friend.");
+            if (optionsPanel != null) optionsPanel.SetActive(false);
+            return;
+        }
+
+        if (optionsPanel != null) optionsPanel.SetActive(true);
+
+        if (!sarahStarted)
+        {
+            sarahStarted = true;
+            StartCoroutine(SarahIntro());
+        }
     }
-    if (contactAvatar != null && sarahAvatar != null) contactAvatar.sprite = sarahAvatar;
-
-    ClearMessages();
-    ClearChoices();
-    
-    // ЭТО СООБЩЕНИЕ БУДЕТ В ПРЕВЬЮ
-    AddMessage(false, "My ex sent me a video... 😰");
-
-    if (sarahFinished)
-    {
-        if (sarahBadPath)
-            AddSystem("Sarah stopped responding. You messed up.");
-        else
-            AddSystem("Sarah is okay now. You're a good friend.");
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        return;
-    }
-
-    if (optionsPanel != null) optionsPanel.SetActive(true);
-
-    if (!sarahStarted)
-    {
-        sarahStarted = true;
-        StartCoroutine(SarahIntro());
-    }
-}
 
     void AddLinkMessage()
     {
@@ -320,9 +323,9 @@ public class ChatController : MonoBehaviour
         linkObj.transform.SetParent(row, false);
         var img = linkObj.GetComponent<Image>();
         img.color = new Color(0.15f, 0.15f, 0.25f, 1f);
-        img.sprite = bubbleSprite;
+        img.sprite = bubbleThemSprite != null ? bubbleThemSprite : roundedBubbleSprite;
         img.type = Image.Type.Sliced;
-        
+
         var btn = linkObj.GetComponent<Button>();
         var le = linkObj.AddComponent<LayoutElement>();
         le.preferredWidth = 280f;
@@ -540,7 +543,7 @@ public class ChatController : MonoBehaviour
         if (broPreview != null) broPreview.text = "Left my gym bag";
         if (unknownPreview != null) unknownPreview.text = "Unknown number";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
-        if (sarahPreview != null) sarahPreview.text = "My ex sent me a video... 😰";
+        if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
         if (momBadge != null) momBadge.SetActive(true);
         if (broBadge != null) broBadge.SetActive(true);
         if (unknownBadge != null) unknownBadge.SetActive(true);
@@ -562,9 +565,10 @@ public class ChatController : MonoBehaviour
         videoObj.transform.SetParent(row, false);
         var img = videoObj.GetComponent<Image>();
         img.color = new Color(0.10f, 0.10f, 0.16f, 1f);
-        img.sprite = bubbleSprite;
+        Sprite vbs = isMe ? bubbleMeSprite : bubbleThemSprite;
+        img.sprite = vbs != null ? vbs : roundedBubbleSprite;
         img.type = Image.Type.Sliced;
-        
+
         var btn = videoObj.GetComponent<Button>();
         var le = videoObj.AddComponent<LayoutElement>();
         le.preferredWidth = 200f;
@@ -1032,26 +1036,72 @@ public class ChatController : MonoBehaviour
         messagesRT = messagesContent as RectTransform;
         if (messagesContent == null) return;
 
+        // Content must be top-anchored (NOT vertically stretched) so the
+        // ContentSizeFitter can drive its height. A vertical stretch anchor
+        // conflicts with the fitter and breaks message sizing/overlap.
+        messagesRT.anchorMin = new Vector2(0f, 1f);
+        messagesRT.anchorMax = new Vector2(1f, 1f);
+        messagesRT.pivot = new Vector2(0.5f, 1f);
+        messagesRT.offsetMin = new Vector2(0f, messagesRT.offsetMin.y);
+        messagesRT.offsetMax = new Vector2(0f, messagesRT.offsetMax.y);
+        var ap = messagesRT.anchoredPosition; ap.x = 0f; ap.y = 0f; messagesRT.anchoredPosition = ap;
+
         var vlg = messagesContent.GetComponent<VerticalLayoutGroup>();
         if (vlg == null) vlg = messagesContent.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
-        vlg.childForceExpandWidth = true;   
+        vlg.childForceExpandWidth = true;   // rows span full width so L/R alignment works
         vlg.childForceExpandHeight = false;
         vlg.childAlignment = TextAnchor.UpperLeft;
-        vlg.spacing = 8f;
-        vlg.padding = new RectOffset(10, 10, 10, 10);
+        vlg.spacing = 10f;
+        vlg.padding = new RectOffset(10, 10, 12, 12);
 
         var csf = messagesContent.GetComponent<ContentSizeFitter>();
         if (csf == null) csf = messagesContent.gameObject.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
-        if (messagePrefabOther != null)
+        // Chat scrolls vertically only.
+        if (chatScrollRect != null)
         {
-            var pi = messagePrefabOther.GetComponentInChildren<Image>(true);
-            if (pi != null) bubbleSprite = pi.sprite;
+            chatScrollRect.horizontal = false;
+            chatScrollRect.vertical = true;
         }
+
+        if (roundedBubbleSprite == null) roundedBubbleSprite = MakeRoundedSprite(28);
+    }
+
+    // Generates an anti-aliased, 9-sliced rounded-rectangle sprite used for
+    // messenger-style chat bubbles. Cached and reused for every bubble.
+    Sprite MakeRoundedSprite(int radius)
+    {
+        int size = radius * 2 + 4;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        var cols = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float px = x + 0.5f;
+                float py = y + 0.5f;
+                float cx = Mathf.Clamp(px, radius, size - radius);
+                float cy = Mathf.Clamp(py, radius, size - radius);
+                float dx = px - cx;
+                float dy = py - cy;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                float a = Mathf.Clamp01(radius - dist + 0.5f); // 1px anti-aliased edge
+                cols[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+            }
+        }
+        tex.SetPixels32(cols);
+        tex.Apply();
+
+        var border = new Vector4(radius, radius, radius, radius);
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
+            100f, 0, SpriteMeshType.FullRect, border);
     }
 
     void ClearMessages()
@@ -1064,12 +1114,21 @@ public class ChatController : MonoBehaviour
     {
         GameObject row = new GameObject(isMe ? "RowMe" : "RowThem", typeof(RectTransform));
         row.transform.SetParent(messagesContent, false);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+
+        // Row spans the full content width (parent VLG forces expand). The HLG
+        // aligns the single bubble to the left or right and sizes it to its
+        // preferred size. No ContentSizeFitter here: the parent VLG already
+        // controls the row's size, and adding a fitter would conflict and
+        // cause overlapping messages.
+        var hlg = row.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
         hlg.childControlWidth = true;
         hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = false;
-        hlg.childAlignment = isMe ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+        hlg.childAlignment = isMe ? TextAnchor.UpperRight : TextAnchor.UpperLeft;
+        hlg.spacing = 0;
+        hlg.padding = new RectOffset(2, 2, 0, 0);
+
         return row.GetComponent<RectTransform>();
     }
 
@@ -1077,7 +1136,7 @@ public class ChatController : MonoBehaviour
     {
         float w = 360f;
         if (messagesRT != null && messagesRT.rect.width > 1f) w = messagesRT.rect.width;
-        return Mathf.Max(80f, w * maxBubbleFrac - 28f);
+        return Mathf.Max(100f, w * 0.75f - 40f);
     }
 
     void AddBubble(bool isMe, string text, Color bubbleCol, Color textCol, FontStyles style = FontStyles.Normal)
@@ -1085,36 +1144,100 @@ public class ChatController : MonoBehaviour
         if (messagesContent == null) return;
         var row = BuildRow(isMe);
 
-        GameObject bubble = new GameObject("Bubble", typeof(RectTransform), typeof(Image));
-        bubble.transform.SetParent(row, false);
-        var img = bubble.GetComponent<Image>();
+        // --- Bubble container ---
+        // VerticalLayoutGroup reports the bubble's preferred size up to the row's
+        // HorizontalLayoutGroup (which controls the bubble's actual size). NO
+        // ContentSizeFitter here, because the parent HLG already controls size —
+        // having both causes the layout conflict that made bubbles overlap.
+        GameObject bubbleObj = new GameObject("Bubble",
+            typeof(RectTransform),
+            typeof(CanvasGroup),
+            typeof(UnityEngine.UI.Image),
+            typeof(UnityEngine.UI.VerticalLayoutGroup));
+        bubbleObj.transform.SetParent(row, false);
+
+        var img = bubbleObj.GetComponent<UnityEngine.UI.Image>();
         img.color = bubbleCol;
-        if (bubbleSprite != null) { img.sprite = bubbleSprite; img.type = Image.Type.Sliced; }
-        var bvlg = bubble.AddComponent<VerticalLayoutGroup>();
+        Sprite s = isMe ? bubbleMeSprite : bubbleThemSprite;
+        if (s == null) s = roundedBubbleSprite;
+        if (s != null) { img.sprite = s; img.type = UnityEngine.UI.Image.Type.Sliced; }
+
+        var bvlg = bubbleObj.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+        bvlg.padding = new RectOffset(16, 16, 10, 10);
         bvlg.childControlWidth = true;
         bvlg.childControlHeight = true;
         bvlg.childForceExpandWidth = false;
         bvlg.childForceExpandHeight = false;
-        bvlg.padding = new RectOffset(14, 14, 9, 9);
+        bvlg.childAlignment = TextAnchor.UpperLeft;
 
-        GameObject t = new GameObject("Text", typeof(RectTransform));
-        t.transform.SetParent(bubble.transform, false);
-        var tmp = t.AddComponent<TextMeshProUGUI>();
+        // --- Text ---
+        GameObject tGO = new GameObject("Text",
+            typeof(RectTransform),
+            typeof(TMPro.TextMeshProUGUI),
+            typeof(UnityEngine.UI.LayoutElement));
+        tGO.transform.SetParent(bubbleObj.transform, false);
+
+        var tmp = tGO.GetComponent<TMPro.TextMeshProUGUI>();
         if (font != null) tmp.font = font;
         tmp.fontSize = 18;
         tmp.color = textCol;
         tmp.fontStyle = style;
-        tmp.alignment = TextAlignmentOptions.TopLeft;
+        tmp.alignment = TMPro.TextAlignmentOptions.TopLeft;
         tmp.enableWordWrapping = true;
         tmp.richText = true;
+        tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
         tmp.text = text;
 
-        var le = t.AddComponent<LayoutElement>();
-        float natural = tmp.GetPreferredValues(text).x;
-        le.preferredWidth = Mathf.Min(natural, GetMaxTextWidth());
+        // Constrain the text width to the messenger max, then measure the wrapped
+        // height at that width. Setting BOTH preferred dimensions explicitly makes
+        // the bubble size deterministic (no chicken-and-egg width/height ambiguity).
+        var le = tGO.GetComponent<UnityEngine.UI.LayoutElement>();
+        float maxWidth = GetMaxTextWidth();
+        float naturalWidth = tmp.GetPreferredValues(text, 100000f, 0f).x;
+        float w = Mathf.Min(naturalWidth, maxWidth);
+        float h = tmp.GetPreferredValues(text, w, 0f).y;
+        le.preferredWidth = w;
+        le.preferredHeight = h;
+        le.flexibleWidth = 0f;
+        le.flexibleHeight = 0f;
+
+        // Single rebuild from the content root is enough now that the layout
+        // chain is conflict-free (Content VLG -> Row HLG -> Bubble VLG -> Text).
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(messagesRT);
+
+        StartCoroutine(AnimateBubble(bubbleObj));
 
         PlayChime();
         ScrollToBottom();
+    }
+
+    IEnumerator AnimateBubble(GameObject bubble)
+    {
+        CanvasGroup cg = bubble.GetComponent<CanvasGroup>();
+        if (cg == null) cg = bubble.AddComponent<CanvasGroup>();
+        
+        RectTransform rt = bubble.GetComponent<RectTransform>();
+        Vector3 startScale = new Vector3(0.8f, 0.8f, 1f);
+        
+        cg.alpha = 0f;
+        rt.localScale = startScale;
+        
+        float duration = 0.2f;
+        float elapsed = 0f;
+        
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float p = elapsed / duration;
+            float curve = -p * (p - 2); 
+            cg.alpha = p;
+            rt.localScale = Vector3.Lerp(startScale, Vector3.one, curve);
+            yield return null;
+        }
+        
+        cg.alpha = 1f;
+        rt.localScale = Vector3.one;
     }
 
     void AddMessage(bool isMe, string text, bool isError = false)

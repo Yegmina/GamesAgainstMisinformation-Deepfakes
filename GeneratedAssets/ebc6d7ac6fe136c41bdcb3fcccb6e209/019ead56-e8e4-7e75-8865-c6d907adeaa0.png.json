@@ -1,0 +1,28 @@
+{
+    "asset": "ebc6d7ac6fe136c41bdcb3fcccb6e209",
+    "fileName": "019ead56-e8e4-7e75-8865-c6d907adeaa0.png",
+    "prompt": "A clean digital illustration representing an audio deepfake / AI voice cloning. A glowing cyan and blue sound waveform and an audio spectrogram overlaid on a stylized human head silhouette in profile, dark navy background, modern flat infographic style, subtle tech grid, no text, no words, centered composition.",
+    "negativePrompt": "",
+    "model": "gemini-3.0-pro",
+    "modelName": "Gemini 3.0 Pro",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

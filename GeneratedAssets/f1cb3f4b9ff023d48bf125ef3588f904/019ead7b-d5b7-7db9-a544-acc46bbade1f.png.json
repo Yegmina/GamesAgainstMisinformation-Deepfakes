@@ -1,0 +1,28 @@
+{
+    "asset": "f1cb3f4b9ff023d48bf125ef3588f904",
+    "fileName": "019ead7b-d5b7-7db9-a544-acc46bbade1f.png",
+    "prompt": "A casual smartphone selfie of a friendly young woman with brown hair, soft natural daylight, slightly blurred cozy home background, realistic amateur phone photo, centered composition",
+    "negativePrompt": "",
+    "model": "gemini-3.0-pro",
+    "modelName": "Gemini 3.0 Pro",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

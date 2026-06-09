@@ -1,0 +1,15 @@
+{
+    "asset": "20fd6d8ce607b2f49bf21352bc54553a",
+    "fileName": "019ea28b-c1e5-770d-990a-77f27c385964.wav",
+    "prompt": "soft UI click, short, clean, modern, subtle",
+    "negativePrompt": "",
+    "model": "elevenlabs-sound-effects-v2",
+    "modelName": "ElevenLabs Sound Effects V2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "duration": 10.0,
+    "autoTrim": false,
+    "hasReference": false,
+    "voice": ""
+}
