@@ -1353,9 +1353,9 @@ public class ChatController : MonoBehaviour
             if (tmp != null)
             {
                 tmp.text = c.label;
-                if (c.style == 1) tmp.color = new Color(0.62f, 0.0f, 0.0f);
-                else if (c.style == 2) tmp.color = new Color(0.0f, 0.42f, 0.18f);
-                else tmp.color = Color.black;
+                tmp.color = Color.black;
+                tmp.enableAutoSizing = false;
+                tmp.fontSize = 16;
             }
             var btn = b.GetComponent<Button>();
             if (btn != null)
