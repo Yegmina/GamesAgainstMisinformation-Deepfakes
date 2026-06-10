@@ -1,0 +1,28 @@
+{
+    "asset": "118be413017f25e4e9cb6f7a83bf52b8",
+    "fileName": "019eb25e-c99d-77b5-9aca-0be31a94fd63.png",
+    "prompt": "Flat modern messaging emoji icon, clean vector style, vibrant colors, centered, simple, plain solid white background, no text: a round yellow emoji face looking anxious and worried with one big blue sweat drop on forehead",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

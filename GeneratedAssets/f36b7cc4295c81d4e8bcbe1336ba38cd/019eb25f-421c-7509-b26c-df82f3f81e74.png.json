@@ -1,0 +1,28 @@
+{
+    "asset": "f36b7cc4295c81d4e8bcbe1336ba38cd",
+    "fileName": "019eb25f-421c-7509-b26c-df82f3f81e74.png",
+    "prompt": "Flat modern messaging emoji icon, clean vector style, vibrant colors, centered, simple, plain solid white background, no text: a glossy red love heart",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}
