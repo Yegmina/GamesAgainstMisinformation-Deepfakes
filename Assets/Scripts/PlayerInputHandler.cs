@@ -12,19 +12,25 @@ public class PlayerInputHandler : MonoBehaviour
     [Header("Action Name References")]
     [SerializeField] private string movement = "Movement";
     [SerializeField] private string rotation = "Rotation";
+    [SerializeField] private string interact = "Interact";
 
     private InputAction movementAction;
     private InputAction rotationAction;
+    private InputAction interactAction;
 
     public Vector2 MovementInput { get; private set; }
     public Vector2 RotationInput { get; private set; }
+    public bool InteractPressed { get; private set; }
 
-    private void Awake()
+    public event System.Action OnInteract;
+
+    private void Start()
     {
         InputActionMap mapReference = playerControls.FindActionMap(actionNameMap);
 
         movementAction = mapReference.FindAction(movement);
         rotationAction = mapReference.FindAction(rotation);
+        interactAction = mapReference.FindAction(interact);
 
         SubscribeActionValuesToINputEvents();
     }
@@ -36,6 +42,12 @@ public class PlayerInputHandler : MonoBehaviour
 
         rotationAction.performed += inputInfo => RotationInput = inputInfo.ReadValue<Vector2>();
         rotationAction.canceled += inputInfo => RotationInput = Vector2.zero;
+
+        interactAction.performed += _ =>
+        {
+            Debug.Log("Input System: Button pressed!");
+            OnInteract?.Invoke();
+        };
     }
 
     private void OnEnable()
