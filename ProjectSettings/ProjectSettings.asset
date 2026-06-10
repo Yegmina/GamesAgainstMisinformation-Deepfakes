@@ -907,7 +907,13 @@ PlayerSettings:
   XboxOneOverrideIdentityName: 
   XboxOneOverrideIdentityPublisher: 
   vrEditorSettings: {}
-  cloudServicesEnabled: {}
+  cloudServicesEnabled:
+    Build: 0
+    Game Performance: 0
+    Legacy Analytics: 0
+    Purchasing: 0
+    UDP: 0
+    Unity Ads: 0
   luminIcon:
     m_Name: 
     m_ModelFolderPath: 
@@ -929,11 +935,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 08eabd78-d7c5-4f9c-bafa-086e45a86229
+  cloudProjectId: 314fcbb9-6640-467d-a802-cd83a3fd11e5
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
   projectName: Horror
-  organizationId: unity_0cb432b2fa4684e6fefe
+  organizationId: deepdetect
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

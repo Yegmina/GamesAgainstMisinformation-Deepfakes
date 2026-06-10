@@ -1,0 +1,107 @@
+[33mcommit bc8b163ce6c683dfb69ffd253b043a2a2a49a238[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mapartment[m[33m, [m[1;31morigin/apartment[m[33m)[m
+Author: Nadia Hajdash <haidashnadia@gmail.com>
+Date:   Wed Jun 10 14:42:24 2026 +0300
+
+    char interactions
+
+[33mcommit 6cbc46c0102dbe17a51b5e0843c635b686f9da97[m
+Author: Nadia Hajdash <haidashnadia@gmail.com>
+Date:   Tue Jun 9 20:46:58 2026 +0300
+
+    player controls
+
+[33mcommit 1c099ef484dbae7c85309151ed12d63f6ca9263d[m
+Author: Nadia Hajdash <haidashnadia@gmail.com>
+Date:   Tue Jun 9 19:20:37 2026 +0300
+
+    Apartment model
+
+[33mcommit 87d2ab0dddb517a8d97562af8d7719e7c5aa4856[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: Agnessa Tund <agnessa.tund@gmail.com>
+Date:   Sat Jun 6 22:52:31 2026 +0300
+
+    feat: add collapsible mission sidebar with random mission sets and progress tracking
+
+[33mcommit a9eec5619890e97de561af607b76d9ce13c12566[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Sat Jun 6 15:35:19 2026 +0300
+
+    feat(chat): add Sarah conversation with deepfake video message
+
+[33mcommit fc256f9984783f27d69b83bc1cb4d030feb57d4c[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Sat Jun 6 14:39:46 2026 +0300
+
+    feat(calls): add ringtone sound for outgoing calls
+
+[33mcommit 0d1ac760132efc7a0eecb3431635a2df3717869b[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Sat Jun 6 14:16:05 2026 +0300
+
+    feat(ui): add status bar icons to all screens; move audio to Assets/Audio
+
+[33mcommit 320db81d2626cd806f98a4a109c742787a54c09f[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Sat Jun 6 13:21:01 2026 +0300
+
+    feat(calls): add scheduled incoming call from unknown number
+
+[33mcommit 3a6329a955cd155ca3bdb69ed18148448fa6da4f[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Sat Jun 6 12:16:28 2026 +0300
+
+    feat(social): updated static content for SocialMedia feed with posts
+
+[33mcommit cc70d7e45e6f0b982815030eb2417af2db08398d[m
+Author: Agnessa Tund <agnessa.tund@gmail.com>
+Date:   Fri Jun 5 23:15:39 2026 +0300
+
+    feat: add guide popup
+
+[33mcommit be8dda4d995fd858e740b25d648b8d238aaced75[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Fri Jun 5 17:26:11 2026 +0300
+
+    feat(chats): add Unknown and Provider chats with horror effects
+
+[33mcommit 4638ca29d365e42dc1b4016613ef77f47feb9495[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Fri Jun 5 16:06:00 2026 +0300
+
+    feat(chat): lock exit until conversation ends, remove replay mechanic
+
+[33mcommit 166a756baaf8f8e12de2df5c2f3d6552380de4d0[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Fri Jun 5 15:40:46 2026 +0300
+
+    feat(chats): add horror sounds and fix endings
+
+[33mcommit ecdc6ab87fc8aead3805664d7e809b0bcae2cf4d[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Fri Jun 5 14:37:50 2026 +0300
+
+    feat(chat): update avatars and profile photos
+
+[33mcommit 2a461279e6087adb3ea2da90156f733136e5c71c[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Fri Jun 5 14:24:30 2026 +0300
+
+    feat(chat): implement chat logic for brother and mom chats
+
+[33mcommit c9d2517baea28d94aecfad154128bb5c66dab5b3[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Wed Jun 3 20:41:21 2026 +0300
+
+    chore: upgrade Unity from 6000.0.47f1 to 6000.3.16f1
+
+[33mcommit 1648dcad4073a326ef256eb7506460c29397fe8a[m[33m ([m[1;31morigin/SCRUM-1-computer-design[m[33m)[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Mon May 25 01:00:10 2026 +0300
+
+    chore(gitignore): add Unity gitignore file
+
+[33mcommit 402709713a40903e271bee6674113d2d86acdb7c[m
+Author: Aleksandra Gluhhova <gluhhova@tlu.ee>
+Date:   Mon May 25 00:48:39 2026 +0300
+
+    feat(project): initialize Unity project with phone UI system

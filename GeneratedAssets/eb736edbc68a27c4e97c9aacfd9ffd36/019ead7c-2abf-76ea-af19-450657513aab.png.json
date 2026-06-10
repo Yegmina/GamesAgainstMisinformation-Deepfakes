@@ -1,0 +1,28 @@
+{
+    "asset": "eb736edbc68a27c4e97c9aacfd9ffd36",
+    "fileName": "019ead7c-2abf-76ea-af19-450657513aab.png",
+    "prompt": "A phone screenshot of a \"How to spot a deepfake\" checklist infographic, dark modern UI, white text bullet points such as unnatural blinking, blurry edges, weird lighting, each with a small yellow warning icon, clean readable layout",
+    "negativePrompt": "",
+    "model": "gemini-3.0-pro",
+    "modelName": "Gemini 3.0 Pro",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

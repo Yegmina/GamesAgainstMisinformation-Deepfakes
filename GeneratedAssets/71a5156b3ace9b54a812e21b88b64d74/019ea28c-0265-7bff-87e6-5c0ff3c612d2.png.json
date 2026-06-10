@@ -1,0 +1,28 @@
+{
+    "asset": "71a5156b3ace9b54a812e21b88b64d74",
+    "fileName": "019ea28c-0265-7bff-87e6-5c0ff3c612d2.png",
+    "prompt": "A clean, flat, minimalist chat bubble shape, solid light gray color. Rounded corners: top-left, top-right, and bottom-right are highly rounded (18px radius style), while the bottom-left corner is only slightly rounded (4px radius style). No border, no gradient, isolated on white background.",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}
