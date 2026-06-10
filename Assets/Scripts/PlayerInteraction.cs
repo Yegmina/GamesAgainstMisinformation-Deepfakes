@@ -6,7 +6,9 @@ public class PlayerInteraction : MonoBehaviour
     [SerializeField] private UIController uiController;
 
     private PlayerInputHandler playerInputHandler;
+
     private Interactable currentInteractable;
+    private Interactable activeInteraction;
 
     private void Awake()
     {
@@ -16,20 +18,39 @@ public class PlayerInteraction : MonoBehaviour
     private void OnEnable()
     {
         if (playerInputHandler != null)
+        {
             playerInputHandler.OnInteract += HandleInteraction;
+            playerInputHandler.OnExit += HandleExit;
+        }
     }
 
     private void OnDisable()
     {
-        if (playerInputHandler != null)
-            playerInputHandler.OnInteract -= HandleInteraction;
+        playerInputHandler.OnInteract -= HandleInteraction;
+        playerInputHandler.OnExit -= HandleExit;
     }
 
     private void HandleInteraction()
     {
         if (currentInteractable == null) return;
 
-        currentInteractable.Interact();
+        activeInteraction = currentInteractable;
+        activeInteraction.Interact();
+
+        GetComponent<PlayerController>().enabled = false; // Disable character controller to prevent movement while interacting
+        transform.position = activeInteraction.SitPoint.position;
+        transform.rotation = activeInteraction.SitPoint.rotation;
+
+    }
+
+    private void HandleExit()
+    {
+        if (activeInteraction == null)
+            return;
+
+        activeInteraction.ExitInteraction();
+        activeInteraction = null;
+        GetComponent<PlayerController>().enabled = true;
     }
 
     private void OnTriggerEnter(Collider other)
