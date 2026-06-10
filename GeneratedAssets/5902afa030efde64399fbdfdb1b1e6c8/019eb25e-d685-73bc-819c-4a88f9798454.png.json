@@ -1,0 +1,28 @@
+{
+    "asset": "5902afa030efde64399fbdfdb1b1e6c8",
+    "fileName": "019eb25e-d685-73bc-819c-4a88f9798454.png",
+    "prompt": "Flat modern messaging emoji icon, clean vector style, vibrant colors, centered, simple, plain solid white background, no text: a round yellow emoji face crying loudly, eyes closed, wide open mouth, two big streams of blue tears",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

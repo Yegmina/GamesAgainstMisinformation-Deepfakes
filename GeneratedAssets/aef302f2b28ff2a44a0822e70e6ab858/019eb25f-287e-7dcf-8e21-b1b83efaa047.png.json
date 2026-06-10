@@ -1,0 +1,28 @@
+{
+    "asset": "aef302f2b28ff2a44a0822e70e6ab858",
+    "fileName": "019eb25f-287e-7dcf-8e21-b1b83efaa047.png",
+    "prompt": "Flat modern messaging emoji icon, clean vector style, vibrant colors, centered, simple, plain solid white background, no text: a round yellow emoji face that is sad with a single blue tear drop under one eye",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

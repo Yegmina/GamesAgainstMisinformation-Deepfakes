@@ -1,0 +1,28 @@
+{
+    "asset": "9d98932337cf60b40851c264c6c88a56",
+    "fileName": "019eb25f-51e8-7985-a041-c255730c9b4d.png",
+    "prompt": "Flat modern messaging emoji icon, clean vector style, vibrant colors, centered, simple, plain solid white background, no text: a satellite dish antenna with signal waves",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}

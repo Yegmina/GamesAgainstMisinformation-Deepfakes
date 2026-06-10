@@ -82,6 +82,8 @@ public class ChatController : MonoBehaviour
     TMP_Text videoLoadingText;
     RenderTexture videoRT;
     AspectRatioFitter videoAspectFitter;
+    Coroutine videoWatchdog;
+    int videoPrepareAttempts;
     GameObject playIconGO;
     Sprite triangleSprite;
     RectTransform shakeTarget;
@@ -113,6 +115,8 @@ public class ChatController : MonoBehaviour
     bool momStarted = false;
     bool broStarted = false;
     bool broSecondVoiceNoteTriggered = false; 
+    bool isBroSecondVoice = false;
+    AudioClip currentVoiceClip;
     bool unknownRead = false;
     bool providerFinished = false;
     bool providerLinkClicked = false;
@@ -422,7 +426,6 @@ public class ChatController : MonoBehaviour
         AddMessage(false, "⚠ Downloading: virus_core.exe", true);
         
         SetParanoia(100);
-        SetAppState("CORRUPTED");
         StartCoroutine(ShakeRoutine(5f, 20f));
         
         yield return Wait(0.5f);
@@ -668,11 +671,12 @@ public class ChatController : MonoBehaviour
             PlayChime();
         });
 
-        // NOTE: We deliberately do NOT pre-prepare the clip in the background here.
-        // Reusing a VideoPlayer that was Prepare()d earlier and then calling Play()
-        // races with the decoder and intermittently leaves playback frozen on the
-        // first frame (isPlaying == true but the media clock never advances).
-        // Instead OpenVideoViewer always runs a clean Prepare() -> Play() cycle.
+        // Pre-prepare the clip in the background the moment the video bubble
+        // appears, so tapping it starts playback almost instantly instead of
+        // sitting on a black "Loading…" screen while the decoder spins up.
+        // (The clip is properly H.264-transcoded on import, so the old
+        // frozen-first-frame race no longer happens.)
+        PreloadVideo(sarahVideoClip);
 
         PlayChime();
         ScrollToBottom();
@@ -907,7 +911,6 @@ public class ChatController : MonoBehaviour
         PlayMomBadEnding();
         SetParanoia(100);
         SubtractTime(120);
-        SetAppState("CORRUPTED");
         StartCoroutine(ShakeRoutine(4f, 6f));
 
         foreach (var s in spam)
@@ -918,7 +921,6 @@ public class ChatController : MonoBehaviour
         }
 
         yield return Wait(2.0f);
-        SetAppState("ACTIVE");
         CloseChat();
     }
 
@@ -928,7 +930,7 @@ public class ChatController : MonoBehaviour
         yield return Wait(0.6f);
         AddMessage(false, "Yo, Alex, you up? I need a huge favor right now. Can you wire me 100 bucks? My card is blocked at a gas station. Urgent. Listen:");
         yield return Wait(0.5f);
-        AddVoice(false);
+        AddVoice(false, voiceNoteClip);
         yield return Wait(0.7f);
         ShowChoices(
             ("\"Sure, sending it now.\"", 1, BroChoice1A),
@@ -970,57 +972,11 @@ public class ChatController : MonoBehaviour
     IEnumerator AddDangerVoiceNote()
     {
         yield return Wait(2.0f);
-        AddDangerVoice(false);
+        AddVoice(false, screamerClip, true);
         broSecondVoiceNoteTriggered = true;
     }
 
-    void AddDangerVoice(bool isMe)
-    {
-        if (messagesContent == null) return;
-        var row = BuildRow(isMe);
-
-        GameObject holder = new GameObject("DangerVoiceNote", typeof(RectTransform), typeof(Image), typeof(Button));
-        holder.transform.SetParent(row, false);
-        var img = holder.GetComponent<Image>();
-        var btn = holder.GetComponent<Button>();
-        var le = holder.AddComponent<LayoutElement>();
-
-        float w = 230f, h = 60f;
-        if (voiceNoteSprite != null)
-        {
-            img.sprite = voiceNoteSprite;
-            img.color = Color.white;
-            img.preserveAspect = true;
-            h = w * (voiceNoteSprite.rect.height / voiceNoteSprite.rect.width);
-        }
-        else
-        {
-            img.color = new Color(0.4f, 0.0f, 0.0f, 1f);
-        }
-
-        le.preferredWidth = w;
-        le.preferredHeight = h;
-
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(OnDangerVoiceClick);
-
-        PlayChime();
-        ScrollToBottom();
-    }
-
-    void OnDangerVoiceClick()
-    {
-        if (broFinished) return;
-        
-        if (broSecondVoiceNoteTriggered)
-        {
-            StartCoroutine(BroScreamerRoutine());
-        }
-        else
-        {
-            PlayVoiceNote();
-        }
-    }
+    // Removed AddDangerVoice and OnDangerVoiceClick as they are replaced by AddVoice logic
 
     IEnumerator TriggerTransactionFail()
     {
@@ -1039,32 +995,21 @@ public class ChatController : MonoBehaviour
         CloseChat();
     }
 
-    IEnumerator BroScreamerRoutine()
+    IEnumerator BroFinalSpamRoutine()
     {
         broFinished = true;
         if (broPreview != null) broPreview.text = "DO YOU BELIEVE ME NOW?";
 
         ClearChoices();
-        SetParanoia(100);
-        SubtractTime(180);
-        SetAppState("CORRUPTED");
-        
-        PlayScreamer();
-        StartCoroutine(ShakeRoutine(3f, 16f));
-        ShowScreamer();
         
         AddSpam("DO YOU BELIEVE ME NOW, ALEX?");
-        
-        yield return Wait(2.5f);
-        
-        if (screamerOverlay != null) screamerOverlay.SetActive(false);
+        yield return Wait(1.0f);
 
         AddSpam("SIGNAL CORRUPTED");
         AddSpam("CONNECTION TERMINATED");
         FlashRed();
 
         yield return Wait(2.0f);
-        SetAppState("ACTIVE");
         CloseChat();
     }
 
@@ -1366,7 +1311,7 @@ public class ChatController : MonoBehaviour
         ScrollToBottom();
     }
 
-    void AddVoice(bool isMe)
+    void AddVoice(bool isMe, AudioClip clip = null, bool isDanger = false)
     {
         if (messagesContent == null) return;
         var row = BuildRow(isMe);
@@ -1460,7 +1405,11 @@ public class ChatController : MonoBehaviour
         broVoiceIcon = iconImg;
         broVoiceFill = fillRT;
         broVoiceTimer = timeTmp;
-        broVoiceDuration = (voiceNoteClip != null && voiceNoteClip.length > 0.1f) ? voiceNoteClip.length : 5f;
+        
+        currentVoiceClip = (clip != null) ? clip : voiceNoteClip;
+        isBroSecondVoice = isDanger;
+        
+        broVoiceDuration = (currentVoiceClip != null && currentVoiceClip.length > 0.1f) ? currentVoiceClip.length : 5f;
         broVoiceElapsed = 0f;
         broVoicePlaying = false;
         if (broVoiceRoutine != null) { StopCoroutine(broVoiceRoutine); broVoiceRoutine = null; }
@@ -1482,6 +1431,8 @@ public class ChatController : MonoBehaviour
 
         if (broVoicePlaying)
         {
+            if (isBroSecondVoice) return; // Cannot turn off
+
             broVoicePlaying = false;
             if (voiceSrc != null && voiceSrc.isPlaying) voiceSrc.Pause();
             UpdateBroVoiceVisual(false); // keep elapsed, switch back to play icon
@@ -1493,9 +1444,9 @@ public class ChatController : MonoBehaviour
 
         broVoicePlaying = true;
 
-        if (voiceSrc != null && voiceNoteClip != null)
+        if (voiceSrc != null && currentVoiceClip != null)
         {
-            voiceSrc.clip = voiceNoteClip;
+            voiceSrc.clip = currentVoiceClip;
             if (broVoiceElapsed <= 0.001f)
             {
                 voiceSrc.time = 0f;
@@ -1522,7 +1473,7 @@ public class ChatController : MonoBehaviour
         while (broVoicePlaying && broVoiceElapsed < broVoiceDuration)
         {
             // Use real audio time when a clip is actually playing for accuracy.
-            if (voiceSrc != null && voiceNoteClip != null && voiceSrc.isPlaying)
+            if (voiceSrc != null && currentVoiceClip != null && voiceSrc.isPlaying)
                 broVoiceElapsed = voiceSrc.time;
             else
                 broVoiceElapsed += Time.deltaTime;
@@ -1539,6 +1490,11 @@ public class ChatController : MonoBehaviour
             broVoiceElapsed = 0f;
             if (voiceSrc != null) voiceSrc.Stop();
             UpdateBroVoiceVisual(true);
+
+            if (isBroSecondVoice)
+            {
+                StartCoroutine(BroFinalSpamRoutine());
+            }
         }
         broVoiceRoutine = null;
     }
@@ -1839,15 +1795,6 @@ public class ChatController : MonoBehaviour
             rect.offsetMax = Vector2.zero;
         }
 
-        var face = MakeText(screamerOverlay.transform, "Face", ">_<", 120, TextAlignmentOptions.Center);
-        face.color = new Color(1f, 0.05f, 0.05f);
-        Anchor(face.rectTransform, new Vector2(0f, 0.45f), new Vector2(1f, 0.85f), Vector2.zero, Vector2.zero);
-
-        var msg = MakeText(screamerOverlay.transform, "Msg",
-            "SIGNAL CORRUPTED\nDO YOU BELIEVE ME NOW, ALEX?\nCONNECTION TERMINATED", 22, TextAlignmentOptions.Center);
-        msg.color = new Color(0.61f, 0f, 1f);
-        Anchor(msg.rectTransform, new Vector2(0.05f, 0.18f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
-
         screamerOverlay.SetActive(false);
 
         BuildPhotoViewer();
@@ -2051,10 +1998,11 @@ public class ChatController : MonoBehaviour
         // Round close button in the video's top-right corner.
         BuildRoundCloseButton(frame.transform, CloseVideoViewer);
 
-        // "Loading…" hint shown while the clip is still preparing.
-        videoLoadingText = MakeText(frame.transform, "VideoLoading", "Loading…", 20, TextAlignmentOptions.Center);
+        // "Loading…" hint shown while the clip is still preparing. Centered so
+        // the (now rare) loading moment reads as intentional, not a dead screen.
+        videoLoadingText = MakeText(frame.transform, "VideoLoading", "Loading…", 24, TextAlignmentOptions.Center);
         videoLoadingText.color = Color.white;
-        Anchor(videoLoadingText.rectTransform, new Vector2(0f, 0.03f), new Vector2(1f, 0.15f), Vector2.zero, Vector2.zero);
+        Anchor(videoLoadingText.rectTransform, new Vector2(0f, 0.42f), new Vector2(1f, 0.58f), Vector2.zero, Vector2.zero);
         videoLoadingText.gameObject.SetActive(false);
 
         videoViewerOverlay.SetActive(false);
@@ -2086,6 +2034,18 @@ public class ChatController : MonoBehaviour
     void BeginVideoPlayback(UnityEngine.Video.VideoClip clip)
     {
         if (clip == null || videoPlayer == null) return;
+        videoPrepareAttempts = 0;
+        StartPreparePass(clip);
+    }
+
+    // Issues a single Prepare() pass and arms a watchdog that recovers if the
+    // decoder stalls (the intermittent "stuck on black Loading…" bug). If Prepare
+    // never completes within the timeout, the watchdog rebuilds the VideoPlayer
+    // from scratch and tries again, then ultimately forces playback so the viewer
+    // never sits on a dead black screen.
+    void StartPreparePass(UnityEngine.Video.VideoClip clip)
+    {
+        if (clip == null || videoPlayer == null) return;
         ConfigureVideoTexture(clip);
         SetVideoLoading(true);
         SetVideoPaused(false);
@@ -2094,6 +2054,93 @@ public class ChatController : MonoBehaviour
         // track. Using Direct audio mode on a clip with 0 audio tracks makes
         // VideoPlayer.Prepare() hang forever with no error (the bug that left the
         // viewer stuck on a black "Loading…" screen).
+        videoPlayer.audioOutputMode = clip.audioTrackCount > 0
+            ? UnityEngine.Video.VideoAudioOutputMode.Direct
+            : UnityEngine.Video.VideoAudioOutputMode.None;
+        videoPlayer.skipOnDrop = true;
+        videoPreparing = true;
+        videoPlayer.Prepare();
+
+        if (videoWatchdog != null) StopCoroutine(videoWatchdog);
+        videoWatchdog = StartCoroutine(VideoPrepareWatchdog(clip));
+    }
+
+    IEnumerator VideoPrepareWatchdog(UnityEngine.Video.VideoClip clip)
+    {
+        // Give the decoder a generous window to become ready.
+        float timeout = 3f;
+        float t = 0f;
+        while (t < timeout)
+        {
+            if (videoPlayer == null) yield break;
+            if (videoPlayer.isPrepared) { videoWatchdog = null; yield break; }
+            t += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        // Still not prepared — the decoder stalled.
+        videoPrepareAttempts++;
+        if (videoPrepareAttempts <= 2 && videoViewerOverlay != null && videoViewerOverlay.activeSelf)
+        {
+            Debug.LogWarning("[VideoViewer] Prepare stalled; rebuilding player (attempt " + videoPrepareAttempts + ").");
+            RebuildVideoPlayer();
+            StartPreparePass(clip);
+            yield break;
+        }
+
+        // Last resort: force Play so we never sit on a dead black "Loading…".
+        Debug.LogWarning("[VideoViewer] Prepare never completed; forcing playback.");
+        videoPreparing = false;
+        SetVideoLoading(false);
+        if (videoPlayer != null)
+        {
+            videoPlayer.playbackSpeed = 1f;
+            videoPlayer.Play();
+            SetVideoPaused(false);
+        }
+        videoWatchdog = null;
+    }
+
+    // Destroys and recreates the VideoPlayer component. A VideoPlayer whose
+    // Prepare() has wedged cannot always be recovered in place, so rebuilding it
+    // gives a clean decoder for the retry.
+    void RebuildVideoPlayer()
+    {
+        if (videoPlayer != null)
+        {
+            videoPlayer.loopPointReached -= OnVideoFinished;
+            videoPlayer.prepareCompleted -= OnVideoPrepared;
+            videoPlayer.errorReceived -= OnVideoError;
+            Destroy(videoPlayer);
+        }
+        if (videoPlayerHost == null)
+        {
+            videoPlayerHost = new GameObject("SarahVideoPlayerHost");
+            videoPlayerHost.transform.SetParent(transform, false);
+        }
+        videoPlayer = videoPlayerHost.AddComponent<UnityEngine.Video.VideoPlayer>();
+        videoPlayer.playOnAwake = false;
+        videoPlayer.waitForFirstFrame = true;
+        videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture;
+        videoPlayer.isLooping = false;
+        videoPlayer.loopPointReached += OnVideoFinished;
+        videoPlayer.prepareCompleted += OnVideoPrepared;
+        videoPlayer.errorReceived += OnVideoError;
+    }
+
+    // Prepares the clip in the background ahead of time (called when the video
+    // bubble first appears). This moves the slow decoder warm-up off the moment
+    // the user taps, so opening the viewer is near-instant. OnVideoPrepared
+    // leaves the player prepared (it only auto-plays while the viewer is open).
+    void PreloadVideo(UnityEngine.Video.VideoClip clip)
+    {
+        if (clip == null || videoPlayer == null) return;
+
+        // Already prepared (or currently preparing) for this clip — nothing to do.
+        if (videoPlayer.clip == clip && (videoPlayer.isPrepared || videoPreparing)) return;
+
+        ConfigureVideoTexture(clip);
+        videoPlayer.clip = clip;
         videoPlayer.audioOutputMode = clip.audioTrackCount > 0
             ? UnityEngine.Video.VideoAudioOutputMode.Direct
             : UnityEngine.Video.VideoAudioOutputMode.None;
@@ -2116,7 +2163,21 @@ public class ChatController : MonoBehaviour
             return;
         }
 
-        // Always run a fresh, clean Prepare() -> Play() cycle. OnVideoPrepared
+        // Fast path: the clip was pre-prepared in the background (see
+        // PreloadVideo), so we can start playing immediately with no black
+        // "Loading…" wait.
+        if (videoPlayer != null && videoPlayer.clip == clip && videoPlayer.isPrepared)
+        {
+            ConfigureVideoTexture(clip); // make sure the display is wired up
+            SetVideoLoading(false);
+            videoPlayer.frame = 0;
+            videoPlayer.playbackSpeed = 1f;
+            videoPlayer.Play();
+            SetVideoPaused(false);
+            return;
+        }
+
+        // Not ready yet — run a clean Prepare() -> Play() cycle. OnVideoPrepared
         // starts playback once the decoder is ready.
         BeginVideoPlayback(clip);
     }
@@ -2124,6 +2185,8 @@ public class ChatController : MonoBehaviour
     void OnVideoPrepared(UnityEngine.Video.VideoPlayer vp)
     {
         videoPreparing = false;
+        videoPrepareAttempts = 0;
+        if (videoWatchdog != null) { StopCoroutine(videoWatchdog); videoWatchdog = null; }
         SetVideoLoading(false);
         // Start playback only while the viewer is open.
         if (videoViewerOverlay != null && videoViewerOverlay.activeSelf)
@@ -2154,6 +2217,11 @@ public class ChatController : MonoBehaviour
             return;
         }
 
+        // If playback has reached (or passed) the end, a tap should replay from
+        // the start rather than doing nothing on a frozen last frame.
+        bool atEnd = videoPlayer.frameCount > 0 &&
+                     (ulong)videoPlayer.frame >= videoPlayer.frameCount - 1;
+
         // Pause via playbackSpeed = 0 instead of VideoPlayer.Pause(). Calling
         // Play() after Pause() intermittently leaves the media clock frozen even
         // though isPlaying reports true. Freezing playbackSpeed keeps the player
@@ -2166,6 +2234,7 @@ public class ChatController : MonoBehaviour
         }
         else
         {
+            if (atEnd) videoPlayer.frame = 0; // restart on replay
             videoPlayer.playbackSpeed = 1f;
             if (!videoPlayer.isPlaying) videoPlayer.Play();
             SetVideoPaused(false);
@@ -2191,6 +2260,8 @@ public class ChatController : MonoBehaviour
 
     void CloseVideoViewer()
     {
+        if (videoWatchdog != null) { StopCoroutine(videoWatchdog); videoWatchdog = null; }
+        videoPreparing = false;
         if (videoPlayer != null) videoPlayer.Stop();
         if (videoViewerOverlay != null) videoViewerOverlay.SetActive(false);
     }
