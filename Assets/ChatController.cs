@@ -43,6 +43,9 @@ public class ChatController : MonoBehaviour
     public Sprite photoSprite;
     public Sprite screamerPhotoSprite;
 
+    [Header("Sarah Video")]
+    public UnityEngine.Video.VideoClip sarahVideoClip;
+
     [Header("Voice Note")]
     public Sprite voiceNoteSprite;   
     public AudioClip voiceNoteClip;  
@@ -61,6 +64,7 @@ public class ChatController : MonoBehaviour
     const float maxBubbleFrac = 0.78f;   
     RectTransform messagesRT;
     Sprite roundedBubbleSprite;
+    Sprite circleSprite;
 
     Canvas canvas;
     TMP_FontAsset font;
@@ -68,11 +72,34 @@ public class ChatController : MonoBehaviour
     Image paranoiaFill;
     Image flashOverlay;
     GameObject screamerOverlay;
+    GameObject photoViewerOverlay;
+    Image photoViewerImage;
+    GameObject videoViewerOverlay;
+    RawImage videoViewerDisplay;
+    UnityEngine.Video.VideoPlayer videoPlayer;
+    GameObject videoPlayerHost;
+    bool videoPreparing;
+    TMP_Text videoLoadingText;
+    RenderTexture videoRT;
+    AspectRatioFitter videoAspectFitter;
+    GameObject playIconGO;
+    Sprite triangleSprite;
     RectTransform shakeTarget;
     Vector2 shakeHome;
 
     AudioSource audioSrc;
     AudioClip chimeClip;
+
+    // Brother's first voice note (controllable play/pause + running timer)
+    AudioSource voiceSrc;
+    Sprite pauseSprite;
+    Image broVoiceIcon;
+    RectTransform broVoiceFill;
+    TMP_Text broVoiceTimer;
+    bool broVoicePlaying;
+    float broVoiceElapsed;
+    float broVoiceDuration;
+    Coroutine broVoiceRoutine;
 
     int paranoia = 0;
     float timer = 900f;
@@ -528,6 +555,9 @@ public class ChatController : MonoBehaviour
     public void ResetPrototype()
     {
         StopAllCoroutines();
+        if (voiceSrc != null) voiceSrc.Stop();
+        broVoicePlaying = false; broVoiceElapsed = 0f; broVoiceRoutine = null;
+        broVoiceIcon = null; broVoiceFill = null; broVoiceTimer = null;
         paranoia = 0; timer = 900f; timerRunning = true; ended = false; locked = false;
         momFinished = false; broFinished = false; broWarned = false; currentChat = null;
         momStarted = false; broStarted = false; broSecondVoiceNoteTriggered = false;
@@ -570,6 +600,7 @@ public class ChatController : MonoBehaviour
         img.type = Image.Type.Sliced;
 
         var btn = videoObj.GetComponent<Button>();
+        btn.targetGraphic = img;
         var le = videoObj.AddComponent<LayoutElement>();
         le.preferredWidth = 200f;
         le.preferredHeight = 120f;
@@ -578,25 +609,29 @@ public class ChatController : MonoBehaviour
         preview.transform.SetParent(videoObj.transform, false);
         var previewImg = preview.GetComponent<Image>();
         previewImg.color = new Color(0.05f, 0.05f, 0.10f, 1f);
+        // Only the bubble's own Image (with the Button) is a raycast target, so a
+        // tap always lands on the Button directly — exactly like the photo/voice
+        // bubbles, which work reliably. Child graphics must not intercept clicks.
+        previewImg.raycastTarget = false;
         var previewRect = preview.GetComponent<RectTransform>();
         previewRect.anchorMin = Vector2.zero;
         previewRect.anchorMax = Vector2.one;
         previewRect.offsetMin = Vector2.zero;
         previewRect.offsetMax = Vector2.zero;
         
-        var playIcon = new GameObject("PlayIcon", typeof(RectTransform), typeof(TextMeshProUGUI));
+        var playIcon = new GameObject("PlayIcon", typeof(RectTransform), typeof(Image));
         playIcon.transform.SetParent(preview.transform, false);
-        var playText = playIcon.GetComponent<TextMeshProUGUI>();
-        if (font != null) playText.font = font;
-        playText.text = "▶";
-        playText.color = Color.white;
-        playText.fontSize = 30;
-        playText.alignment = TextAlignmentOptions.Center;
+        var playImg = playIcon.GetComponent<Image>();
+        playImg.color = Color.white;
+        playImg.raycastTarget = false;
+        if (triangleSprite == null) triangleSprite = MakeTriangleSprite(64);
+        playImg.sprite = triangleSprite;
         var playRect = playIcon.GetComponent<RectTransform>();
-        playRect.anchorMin = Vector2.zero;
-        playRect.anchorMax = Vector2.one;
-        playRect.offsetMin = Vector2.zero;
-        playRect.offsetMax = Vector2.zero;
+        playRect.anchorMin = new Vector2(0.5f, 0.5f);
+        playRect.anchorMax = new Vector2(0.5f, 0.5f);
+        playRect.pivot = new Vector2(0.5f, 0.5f);
+        playRect.anchoredPosition = new Vector2(2f, 0f);
+        playRect.sizeDelta = new Vector2(30f, 32f);
         
         var nameObj = new GameObject("FileName", typeof(RectTransform), typeof(TextMeshProUGUI));
         nameObj.transform.SetParent(videoObj.transform, false);
@@ -605,6 +640,7 @@ public class ChatController : MonoBehaviour
         nameText.text = videoName;
         nameText.color = new Color(0.7f, 0.7f, 0.7f);
         nameText.fontSize = 10;
+        nameText.raycastTarget = false;
         nameText.alignment = TextAlignmentOptions.BottomLeft;
         var nameRect = nameObj.GetComponent<RectTransform>();
         nameRect.anchorMin = new Vector2(0, 0);
@@ -619,6 +655,7 @@ public class ChatController : MonoBehaviour
         durationText.text = duration;
         durationText.color = new Color(0.9f, 0.9f, 0.9f);
         durationText.fontSize = 10;
+        durationText.raycastTarget = false;
         durationText.alignment = TextAlignmentOptions.BottomRight;
         var durationRect = durationObj.GetComponent<RectTransform>();
         durationRect.anchorMin = new Vector2(1, 0);
@@ -627,10 +664,16 @@ public class ChatController : MonoBehaviour
         durationRect.sizeDelta = new Vector2(40, 15);
         
         btn.onClick.AddListener(() => {
-            AddSystem("📹 Video played: " + videoName);
+            OpenVideoViewer(sarahVideoClip);
             PlayChime();
         });
-        
+
+        // NOTE: We deliberately do NOT pre-prepare the clip in the background here.
+        // Reusing a VideoPlayer that was Prepare()d earlier and then calling Play()
+        // races with the decoder and intermittently leaves playback frozen on the
+        // first frame (isPlaying == true but the media clock never advances).
+        // Instead OpenVideoViewer always runs a clean Prepare() -> Play() cycle.
+
         PlayChime();
         ScrollToBottom();
     }
@@ -1104,6 +1147,33 @@ public class ChatController : MonoBehaviour
             100f, 0, SpriteMeshType.FullRect, border);
     }
 
+    // Generates an anti-aliased solid white circle sprite (used for the round
+    // close button on the photo viewer). Cached and reused.
+    Sprite MakeCircleSprite(int diameter)
+    {
+        int size = diameter;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        var cols = new Color32[size * size];
+        float r = size / 2f;
+        Vector2 c = new Vector2(r, r);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), c);
+                float a = Mathf.Clamp01(r - dist); // 1px anti-aliased edge
+                cols[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+            }
+        }
+        tex.SetPixels32(cols);
+        tex.Apply();
+
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
     void ClearMessages()
     {
         if (messagesContent == null) return;
@@ -1268,6 +1338,7 @@ public class ChatController : MonoBehaviour
         GameObject holder = new GameObject("Photo", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
         var img = holder.GetComponent<Image>();
+        var btn = holder.GetComponent<Button>();
         var le = holder.AddComponent<LayoutElement>();
 
         float w = 220f, h = 165f;
@@ -1286,6 +1357,11 @@ public class ChatController : MonoBehaviour
         le.preferredWidth = w;
         le.preferredHeight = h;
 
+        // Tap the photo to view it enlarged (gallery-style), tap again to close.
+        var tappedSprite = photoSprite;
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(() => OpenPhotoViewer(tappedSprite));
+
         PlayChime();
         ScrollToBottom();
     }
@@ -1295,38 +1371,245 @@ public class ChatController : MonoBehaviour
         if (messagesContent == null) return;
         var row = BuildRow(isMe);
 
+        // Custom, fully controllable voice-note bubble (messenger style): a
+        // play/pause button on the left, a progress bar, and an elapsed-time
+        // label that counts seconds while the note plays — just like a real app.
         GameObject holder = new GameObject("VoiceNote", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
         var img = holder.GetComponent<Image>();
-        var btn = holder.GetComponent<Button>();
+        img.color = new Color(0.93f, 0.93f, 0.96f, 1f); // light pill
+        if (roundedBubbleSprite == null) roundedBubbleSprite = MakeRoundedSprite(28);
+        img.sprite = roundedBubbleSprite;
+        img.type = Image.Type.Sliced;
+
         var le = holder.AddComponent<LayoutElement>();
+        le.preferredWidth = 230f;
+        le.preferredHeight = 56f;
 
-        float w = 230f, h = 60f;
-        if (voiceNoteSprite != null)
-        {
-            img.sprite = voiceNoteSprite;
-            img.color = Color.white;
-            img.preserveAspect = true;
-            h = w * (voiceNoteSprite.rect.height / voiceNoteSprite.rect.width);
-        }
-        else
-        {
-            img.color = new Color(0.10f, 0.10f, 0.16f, 1f);
-        }
-        le.preferredWidth = w;
-        le.preferredHeight = h;
+        // --- Play / pause button (purple circle + white icon) ---
+        GameObject circle = new GameObject("PlayButton", typeof(RectTransform), typeof(Image));
+        circle.transform.SetParent(holder.transform, false);
+        var circleImg = circle.GetComponent<Image>();
+        if (circleSprite == null) circleSprite = MakeCircleSprite(64);
+        circleImg.sprite = circleSprite;
+        circleImg.color = new Color(0.42f, 0.36f, 0.93f, 1f); // purple
+        circleImg.raycastTarget = false;
+        var circleRT = circle.GetComponent<RectTransform>();
+        circleRT.anchorMin = new Vector2(0f, 0.5f);
+        circleRT.anchorMax = new Vector2(0f, 0.5f);
+        circleRT.pivot = new Vector2(0.5f, 0.5f);
+        circleRT.anchoredPosition = new Vector2(28f, 0f);
+        circleRT.sizeDelta = new Vector2(36f, 36f);
 
+        GameObject icon = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+        icon.transform.SetParent(circle.transform, false);
+        var iconImg = icon.GetComponent<Image>();
+        iconImg.color = Color.white;
+        iconImg.raycastTarget = false;
+        if (triangleSprite == null) triangleSprite = MakeTriangleSprite(64);
+        iconImg.sprite = triangleSprite; // play by default
+        var iconRT = icon.GetComponent<RectTransform>();
+        iconRT.anchorMin = new Vector2(0.5f, 0.5f);
+        iconRT.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRT.pivot = new Vector2(0.5f, 0.5f);
+        iconRT.anchoredPosition = new Vector2(2f, 0f);
+        iconRT.sizeDelta = new Vector2(14f, 15f);
+
+        // --- Progress track + fill ---
+        GameObject track = new GameObject("Track", typeof(RectTransform), typeof(Image));
+        track.transform.SetParent(holder.transform, false);
+        var trackImg = track.GetComponent<Image>();
+        trackImg.color = new Color(0f, 0f, 0f, 0.18f);
+        trackImg.raycastTarget = false;
+        var trackRT = track.GetComponent<RectTransform>();
+        trackRT.anchorMin = new Vector2(0f, 0.5f);
+        trackRT.anchorMax = new Vector2(1f, 0.5f);
+        trackRT.pivot = new Vector2(0.5f, 0.5f);
+        trackRT.offsetMin = new Vector2(54f, -2f);
+        trackRT.offsetMax = new Vector2(-52f, 2f);
+
+        GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fill.transform.SetParent(track.transform, false);
+        var fillImg = fill.GetComponent<Image>();
+        fillImg.color = new Color(0.42f, 0.36f, 0.93f, 1f);
+        fillImg.raycastTarget = false;
+        var fillRT = fill.GetComponent<RectTransform>();
+        fillRT.anchorMin = new Vector2(0f, 0f);
+        fillRT.anchorMax = new Vector2(0f, 1f);
+        fillRT.offsetMin = Vector2.zero;
+        fillRT.offsetMax = Vector2.zero;
+
+        // --- Elapsed-time label ---
+        GameObject timeGO = new GameObject("Time", typeof(RectTransform), typeof(TextMeshProUGUI));
+        timeGO.transform.SetParent(holder.transform, false);
+        var timeTmp = timeGO.GetComponent<TextMeshProUGUI>();
+        if (font != null) timeTmp.font = font;
+        timeTmp.fontSize = 13;
+        timeTmp.color = new Color(0.2f, 0.2f, 0.25f, 1f);
+        timeTmp.raycastTarget = false;
+        timeTmp.alignment = TextAlignmentOptions.MidlineRight;
+        var timeRT = timeGO.GetComponent<RectTransform>();
+        timeRT.anchorMin = new Vector2(1f, 0.5f);
+        timeRT.anchorMax = new Vector2(1f, 0.5f);
+        timeRT.pivot = new Vector2(1f, 0.5f);
+        timeRT.anchoredPosition = new Vector2(-12f, 0f);
+        timeRT.sizeDelta = new Vector2(44f, 20f);
+
+        // Wire up state. Duration follows the real clip if assigned, otherwise
+        // defaults to 5s (matches the 0:05 on the original voice-note artwork).
+        broVoiceIcon = iconImg;
+        broVoiceFill = fillRT;
+        broVoiceTimer = timeTmp;
+        broVoiceDuration = (voiceNoteClip != null && voiceNoteClip.length > 0.1f) ? voiceNoteClip.length : 5f;
+        broVoiceElapsed = 0f;
+        broVoicePlaying = false;
+        if (broVoiceRoutine != null) { StopCoroutine(broVoiceRoutine); broVoiceRoutine = null; }
+        UpdateBroVoiceVisual(true); // idle: total duration, play icon, empty bar
+
+        var btn = holder.GetComponent<Button>();
         btn.targetGraphic = img;
-        btn.onClick.AddListener(PlayVoiceNote);
+        btn.onClick.AddListener(ToggleBroVoice);
 
         PlayChime();
         ScrollToBottom();
+    }
+
+    // Tap toggles play/pause. Plays the real clip when one is assigned; otherwise
+    // it just runs the visual playback (icon + counting timer + progress bar).
+    void ToggleBroVoice()
+    {
+        if (broVoiceIcon == null) return;
+
+        if (broVoicePlaying)
+        {
+            broVoicePlaying = false;
+            if (voiceSrc != null && voiceSrc.isPlaying) voiceSrc.Pause();
+            UpdateBroVoiceVisual(false); // keep elapsed, switch back to play icon
+            return;
+        }
+
+        // Restart from the beginning if the previous playback finished.
+        if (broVoiceElapsed >= broVoiceDuration - 0.01f) broVoiceElapsed = 0f;
+
+        broVoicePlaying = true;
+
+        if (voiceSrc != null && voiceNoteClip != null)
+        {
+            voiceSrc.clip = voiceNoteClip;
+            if (broVoiceElapsed <= 0.001f)
+            {
+                voiceSrc.time = 0f;
+                voiceSrc.Play();
+            }
+            else
+            {
+                voiceSrc.UnPause();
+                if (!voiceSrc.isPlaying)
+                {
+                    voiceSrc.time = Mathf.Min(broVoiceElapsed, broVoiceDuration - 0.05f);
+                    voiceSrc.Play();
+                }
+            }
+        }
+
+        UpdateBroVoiceVisual(false);
+        if (broVoiceRoutine != null) StopCoroutine(broVoiceRoutine);
+        broVoiceRoutine = StartCoroutine(BroVoiceProgress());
+    }
+
+    IEnumerator BroVoiceProgress()
+    {
+        while (broVoicePlaying && broVoiceElapsed < broVoiceDuration)
+        {
+            // Use real audio time when a clip is actually playing for accuracy.
+            if (voiceSrc != null && voiceNoteClip != null && voiceSrc.isPlaying)
+                broVoiceElapsed = voiceSrc.time;
+            else
+                broVoiceElapsed += Time.deltaTime;
+
+            if (broVoiceElapsed > broVoiceDuration) broVoiceElapsed = broVoiceDuration;
+            UpdateBroVoiceVisual(false);
+            yield return null;
+        }
+
+        if (broVoicePlaying && broVoiceElapsed >= broVoiceDuration)
+        {
+            // Finished: reset to idle (total duration, play icon, empty bar).
+            broVoicePlaying = false;
+            broVoiceElapsed = 0f;
+            if (voiceSrc != null) voiceSrc.Stop();
+            UpdateBroVoiceVisual(true);
+        }
+        broVoiceRoutine = null;
+    }
+
+    // Refreshes the voice note's icon, progress bar and timer label.
+    // idle = true shows the full duration with an empty bar and play icon.
+    void UpdateBroVoiceVisual(bool idle)
+    {
+        float shown = idle ? broVoiceDuration : broVoiceElapsed;
+        if (broVoiceTimer != null)
+        {
+            int total = Mathf.FloorToInt(shown);
+            broVoiceTimer.text = string.Format("{0}:{1:00}", total / 60, total % 60);
+        }
+        if (broVoiceFill != null)
+        {
+            float frac = (idle || broVoiceDuration <= 0f) ? 0f : Mathf.Clamp01(broVoiceElapsed / broVoiceDuration);
+            broVoiceFill.anchorMax = new Vector2(frac, 1f);
+        }
+        if (broVoiceIcon != null)
+        {
+            if (broVoicePlaying)
+            {
+                if (pauseSprite == null) pauseSprite = MakePauseSprite(64);
+                broVoiceIcon.sprite = pauseSprite;
+                broVoiceIcon.rectTransform.anchoredPosition = Vector2.zero;
+            }
+            else
+            {
+                if (triangleSprite == null) triangleSprite = MakeTriangleSprite(64);
+                broVoiceIcon.sprite = triangleSprite;
+                broVoiceIcon.rectTransform.anchoredPosition = new Vector2(2f, 0f);
+            }
+            broVoiceIcon.rectTransform.sizeDelta = new Vector2(14f, 15f);
+        }
     }
 
     void PlayVoiceNote()
     {
         if (audioSrc == null || voiceNoteClip == null) return;
         audioSrc.PlayOneShot(voiceNoteClip, 1f);
+    }
+
+    // Solid white "pause" icon: two vertical bars (font-independent).
+    Sprite MakePauseSprite(int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        var cols = new Color32[size * size];
+        float barW = size * 0.26f;
+        float gap = size * 0.18f;
+        float leftStart = size * 0.5f - gap * 0.5f - barW;
+        float leftEnd = size * 0.5f - gap * 0.5f;
+        float rightStart = size * 0.5f + gap * 0.5f;
+        float rightEnd = size * 0.5f + gap * 0.5f + barW;
+        float top = size * 0.85f;
+        float bottom = size * 0.15f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float px = x + 0.5f, py = y + 0.5f;
+                bool inBar = (py >= bottom && py <= top) &&
+                             ((px >= leftStart && px <= leftEnd) || (px >= rightStart && px <= rightEnd));
+                cols[y * size + x] = inBar ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+            }
+        }
+        tex.SetPixels32(cols);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 
     void PlayScreamer()
@@ -1467,6 +1750,12 @@ public class ChatController : MonoBehaviour
         if (audioSrc == null) audioSrc = gameObject.AddComponent<AudioSource>();
         audioSrc.playOnAwake = false;
 
+        // Separate source so the voice note can be paused/resumed and have its
+        // playback time read, without interfering with one-shot chimes/SFX.
+        voiceSrc = gameObject.AddComponent<AudioSource>();
+        voiceSrc.playOnAwake = false;
+        voiceSrc.loop = false;
+
         int sr = 44100;
         int n = (int)(sr * 0.25f);
         var chime = new float[n];
@@ -1560,6 +1849,373 @@ public class ChatController : MonoBehaviour
         Anchor(msg.rectTransform, new Vector2(0.05f, 0.18f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
 
         screamerOverlay.SetActive(false);
+
+        BuildPhotoViewer();
+        BuildVideoViewer();
+    }
+
+    // Fullscreen (within the phone screen) photo viewer. Tap anywhere to close.
+    void BuildPhotoViewer()
+    {
+        Transform parent = chatScreen != null ? chatScreen.transform : canvas.transform;
+
+        photoViewerOverlay = NewUI("PhotoViewerOverlay", parent);
+        var bg = photoViewerOverlay.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.92f);
+        var bgRect = photoViewerOverlay.GetComponent<RectTransform>();
+        bgRect.anchorMin = Vector2.zero;
+        bgRect.anchorMax = Vector2.one;
+        bgRect.offsetMin = Vector2.zero;
+        bgRect.offsetMax = Vector2.zero;
+
+        // Whole overlay is a button: tapping anywhere closes it.
+        var closeBtn = photoViewerOverlay.AddComponent<Button>();
+        closeBtn.targetGraphic = bg;
+        closeBtn.onClick.AddListener(ClosePhotoViewer);
+
+        // Enlarged photo, centered with margins, preserving aspect.
+        GameObject bigPhoto = NewUI("BigPhoto", photoViewerOverlay.transform);
+        photoViewerImage = bigPhoto.AddComponent<Image>();
+        photoViewerImage.preserveAspect = true;
+        photoViewerImage.raycastTarget = false;
+        var bpRect = bigPhoto.GetComponent<RectTransform>();
+        bpRect.anchorMin = new Vector2(0.06f, 0.12f);
+        bpRect.anchorMax = new Vector2(0.94f, 0.88f);
+        bpRect.offsetMin = Vector2.zero;
+        bpRect.offsetMax = Vector2.zero;
+
+        // Round close button (white X) anchored to the photo's top-right corner.
+        GameObject closeGO = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        closeGO.transform.SetParent(bigPhoto.transform, false);
+        var closeImg = closeGO.GetComponent<Image>();
+        closeImg.color = new Color(0f, 0f, 0f, 0.55f);
+        if (circleSprite == null) circleSprite = MakeCircleSprite(64);
+        closeImg.sprite = circleSprite;
+        closeImg.type = Image.Type.Simple;
+        var closeRT = closeGO.GetComponent<RectTransform>();
+        closeRT.anchorMin = new Vector2(1f, 1f);
+        closeRT.anchorMax = new Vector2(1f, 1f);
+        closeRT.pivot = new Vector2(1f, 1f);
+        closeRT.anchoredPosition = new Vector2(-8f, -8f);
+        closeRT.sizeDelta = new Vector2(40f, 40f);
+        var closeButton = closeGO.GetComponent<Button>();
+        closeButton.targetGraphic = closeImg;
+        closeButton.onClick.AddListener(ClosePhotoViewer);
+
+        // Draw the X with two crossing bars (font-independent — the "✕" glyph
+        // is missing from the font and rendered as an empty box otherwise).
+        MakeCrossBar(closeGO.transform, 45f);
+        MakeCrossBar(closeGO.transform, -45f);
+
+        photoViewerOverlay.SetActive(false);
+    }
+
+    // One white rotated bar; two of them (45 and -45) form an X.
+    void MakeCrossBar(Transform parent, float angle)
+    {
+        GameObject bar = new GameObject("CrossBar", typeof(RectTransform), typeof(Image));
+        bar.transform.SetParent(parent, false);
+        var img = bar.GetComponent<Image>();
+        img.color = Color.white;
+        img.raycastTarget = false;
+        var rt = bar.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(20f, 3f); // length x thickness
+        rt.localRotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
+    void OpenPhotoViewer(Sprite photo)
+    {
+        if (photoViewerOverlay == null || photo == null) return;
+        if (photoViewerImage != null)
+        {
+            photoViewerImage.sprite = photo;
+            photoViewerImage.color = Color.white;
+        }
+        photoViewerOverlay.transform.SetAsLastSibling(); // render on top
+        photoViewerOverlay.SetActive(true);
+    }
+
+    void ClosePhotoViewer()
+    {
+        if (photoViewerOverlay != null) photoViewerOverlay.SetActive(false);
+    }
+
+    // Reusable round close button (dark circle + white X). Returns the GameObject.
+    GameObject BuildRoundCloseButton(Transform parent, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject closeGO = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        closeGO.transform.SetParent(parent, false);
+        var closeImg = closeGO.GetComponent<Image>();
+        closeImg.color = new Color(0f, 0f, 0f, 0.55f);
+        if (circleSprite == null) circleSprite = MakeCircleSprite(64);
+        closeImg.sprite = circleSprite;
+        closeImg.type = Image.Type.Simple;
+        var closeRT = closeGO.GetComponent<RectTransform>();
+        closeRT.anchorMin = new Vector2(1f, 1f);
+        closeRT.anchorMax = new Vector2(1f, 1f);
+        closeRT.pivot = new Vector2(1f, 1f);
+        closeRT.anchoredPosition = new Vector2(-8f, -8f);
+        closeRT.sizeDelta = new Vector2(40f, 40f);
+        var closeButton = closeGO.GetComponent<Button>();
+        closeButton.targetGraphic = closeImg;
+        closeButton.onClick.AddListener(onClick);
+        MakeCrossBar(closeGO.transform, 45f);
+        MakeCrossBar(closeGO.transform, -45f);
+        return closeGO;
+    }
+
+    // Fullscreen (within the phone screen) video viewer using a real VideoPlayer.
+    // Tap the video to play/pause; tap the dark background or the X to close.
+    void BuildVideoViewer()
+    {
+        Transform parent = chatScreen != null ? chatScreen.transform : canvas.transform;
+
+        videoViewerOverlay = NewUI("VideoViewerOverlay", parent);
+        var bg = videoViewerOverlay.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.95f);
+        FullStretch(videoViewerOverlay.GetComponent<RectTransform>());
+        var bgBtn = videoViewerOverlay.AddComponent<Button>();
+        bgBtn.targetGraphic = bg;
+        bgBtn.transition = Selectable.Transition.None;
+        bgBtn.onClick.AddListener(CloseVideoViewer);
+
+        // Framed area that the video fits inside (keeps margins from screen edges).
+        GameObject frame = NewUI("VideoFrame", videoViewerOverlay.transform);
+        var frameRT = frame.GetComponent<RectTransform>();
+        frameRT.anchorMin = new Vector2(0.04f, 0.12f);
+        frameRT.anchorMax = new Vector2(0.96f, 0.88f);
+        frameRT.offsetMin = Vector2.zero;
+        frameRT.offsetMax = Vector2.zero;
+
+        // The video display (RawImage shows the VideoPlayer's RenderTexture).
+        GameObject display = NewUI("VideoDisplay", frame.transform);
+        videoViewerDisplay = display.AddComponent<RawImage>();
+        videoViewerDisplay.color = Color.white;
+        var dispRT = display.GetComponent<RectTransform>();
+        dispRT.anchorMin = new Vector2(0.5f, 0.5f);
+        dispRT.anchorMax = new Vector2(0.5f, 0.5f);
+        dispRT.pivot = new Vector2(0.5f, 0.5f);
+        videoAspectFitter = display.AddComponent<AspectRatioFitter>();
+        videoAspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        videoAspectFitter.aspectRatio = 9f / 16f;
+        var dispBtn = display.AddComponent<Button>();
+        dispBtn.transition = Selectable.Transition.None;
+        dispBtn.onClick.AddListener(ToggleVideoPlayPause);
+
+        // The VideoPlayer lives on an always-active host object so the clip can be
+        // prepared in advance (a VideoPlayer on a disabled GameObject cannot
+        // Prepare). It renders into a RenderTexture shown by the RawImage above.
+        videoPlayerHost = new GameObject("SarahVideoPlayerHost");
+        videoPlayerHost.transform.SetParent(transform, false);
+        videoPlayer = videoPlayerHost.AddComponent<UnityEngine.Video.VideoPlayer>();
+        videoPlayer.playOnAwake = false;
+        videoPlayer.waitForFirstFrame = true;
+        videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture;
+        videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.Direct;
+        videoPlayer.isLooping = false;
+        videoPlayer.loopPointReached += OnVideoFinished;
+        videoPlayer.prepareCompleted += OnVideoPrepared;
+        videoPlayer.errorReceived += OnVideoError;
+
+        // Big play/pause indicator (circle + white triangle), centered on the video.
+        playIconGO = NewUI("PlayIcon", frame.transform);
+        var piImg = playIconGO.AddComponent<Image>();
+        piImg.color = new Color(0f, 0f, 0f, 0.5f);
+        if (circleSprite == null) circleSprite = MakeCircleSprite(64);
+        piImg.sprite = circleSprite;
+        piImg.raycastTarget = false;
+        var piRT = playIconGO.GetComponent<RectTransform>();
+        piRT.anchorMin = new Vector2(0.5f, 0.5f);
+        piRT.anchorMax = new Vector2(0.5f, 0.5f);
+        piRT.pivot = new Vector2(0.5f, 0.5f);
+        piRT.anchoredPosition = Vector2.zero;
+        piRT.sizeDelta = new Vector2(90f, 90f);
+
+        GameObject tri = NewUI("Tri", playIconGO.transform);
+        var triImg = tri.AddComponent<Image>();
+        triImg.color = Color.white;
+        triImg.raycastTarget = false;
+        if (triangleSprite == null) triangleSprite = MakeTriangleSprite(64);
+        triImg.sprite = triangleSprite;
+        var triRT = tri.GetComponent<RectTransform>();
+        triRT.anchorMin = new Vector2(0.5f, 0.5f);
+        triRT.anchorMax = new Vector2(0.5f, 0.5f);
+        triRT.pivot = new Vector2(0.5f, 0.5f);
+        triRT.anchoredPosition = new Vector2(4f, 0f); // optical centering of triangle
+        triRT.sizeDelta = new Vector2(38f, 40f);
+
+        // Round close button in the video's top-right corner.
+        BuildRoundCloseButton(frame.transform, CloseVideoViewer);
+
+        // "Loading…" hint shown while the clip is still preparing.
+        videoLoadingText = MakeText(frame.transform, "VideoLoading", "Loading…", 20, TextAlignmentOptions.Center);
+        videoLoadingText.color = Color.white;
+        Anchor(videoLoadingText.rectTransform, new Vector2(0f, 0.03f), new Vector2(1f, 0.15f), Vector2.zero, Vector2.zero);
+        videoLoadingText.gameObject.SetActive(false);
+
+        videoViewerOverlay.SetActive(false);
+    }
+
+    // Creates/assigns the RenderTexture the VideoPlayer renders into and wires it
+    // to the RawImage display. Does NOT call Prepare() — preparation/playback is
+    // driven by BeginVideoPlayback so every open is a clean, deterministic cycle.
+    void ConfigureVideoTexture(UnityEngine.Video.VideoClip clip)
+    {
+        if (clip == null || videoPlayer == null) return;
+
+        int w = clip.width > 0 ? (int)clip.width : 720;
+        int h = clip.height > 0 ? (int)clip.height : 1280;
+        if (videoRT == null || videoRT.width != w || videoRT.height != h)
+        {
+            if (videoRT != null) videoRT.Release();
+            videoRT = new RenderTexture(w, h, 0);
+            videoRT.Create();
+        }
+        videoPlayer.targetTexture = videoRT;
+        if (videoViewerDisplay != null) videoViewerDisplay.texture = videoRT;
+        if (videoAspectFitter != null) videoAspectFitter.aspectRatio = (float)w / h;
+    }
+
+    // Runs a clean Prepare() -> Play() cycle. OnVideoPrepared starts playback once
+    // the decoder is ready. This avoids the frozen-first-frame race that happens
+    // when Play() is called on a player prepared earlier in the background.
+    void BeginVideoPlayback(UnityEngine.Video.VideoClip clip)
+    {
+        if (clip == null || videoPlayer == null) return;
+        ConfigureVideoTexture(clip);
+        SetVideoLoading(true);
+        SetVideoPaused(false);
+        videoPlayer.clip = clip;
+        // CRITICAL: only enable audio output when the clip actually has an audio
+        // track. Using Direct audio mode on a clip with 0 audio tracks makes
+        // VideoPlayer.Prepare() hang forever with no error (the bug that left the
+        // viewer stuck on a black "Loading…" screen).
+        videoPlayer.audioOutputMode = clip.audioTrackCount > 0
+            ? UnityEngine.Video.VideoAudioOutputMode.Direct
+            : UnityEngine.Video.VideoAudioOutputMode.None;
+        videoPlayer.skipOnDrop = true;
+        videoPreparing = true;
+        videoPlayer.Prepare();
+    }
+
+    void OpenVideoViewer(UnityEngine.Video.VideoClip clip)
+    {
+        if (videoViewerOverlay == null) return;
+        videoViewerOverlay.transform.SetAsLastSibling(); // render on top
+        videoViewerOverlay.SetActive(true);
+
+        if (clip == null)
+        {
+            // No clip assigned — show the play icon as a placeholder.
+            SetVideoLoading(false);
+            SetVideoPaused(true);
+            return;
+        }
+
+        // Always run a fresh, clean Prepare() -> Play() cycle. OnVideoPrepared
+        // starts playback once the decoder is ready.
+        BeginVideoPlayback(clip);
+    }
+
+    void OnVideoPrepared(UnityEngine.Video.VideoPlayer vp)
+    {
+        videoPreparing = false;
+        SetVideoLoading(false);
+        // Start playback only while the viewer is open.
+        if (videoViewerOverlay != null && videoViewerOverlay.activeSelf)
+        {
+            vp.frame = 0;
+            vp.playbackSpeed = 1f;
+            vp.Play();
+            SetVideoPaused(false);
+        }
+    }
+
+    void OnVideoError(UnityEngine.Video.VideoPlayer vp, string message)
+    {
+        Debug.LogError("[VideoViewer] Playback error: " + message);
+        videoPreparing = false;
+        SetVideoLoading(false);
+        SetVideoPaused(true);
+    }
+
+    void ToggleVideoPlayPause()
+    {
+        if (videoPlayer == null || videoPlayer.clip == null) return;
+
+        // Not ready yet — run a clean prepare/play cycle.
+        if (!videoPlayer.isPrepared)
+        {
+            BeginVideoPlayback(videoPlayer.clip);
+            return;
+        }
+
+        // Pause via playbackSpeed = 0 instead of VideoPlayer.Pause(). Calling
+        // Play() after Pause() intermittently leaves the media clock frozen even
+        // though isPlaying reports true. Freezing playbackSpeed keeps the player
+        // in the Playing state so resuming (speed = 1) is always reliable.
+        bool effectivelyPlaying = videoPlayer.isPlaying && videoPlayer.playbackSpeed > 0f;
+        if (effectivelyPlaying)
+        {
+            videoPlayer.playbackSpeed = 0f;   // freeze on the current frame
+            SetVideoPaused(true);
+        }
+        else
+        {
+            videoPlayer.playbackSpeed = 1f;
+            if (!videoPlayer.isPlaying) videoPlayer.Play();
+            SetVideoPaused(false);
+        }
+    }
+
+    void OnVideoFinished(UnityEngine.Video.VideoPlayer vp)
+    {
+        // Show the play icon again so the player can replay.
+        SetVideoPaused(true);
+    }
+
+    void SetVideoPaused(bool paused)
+    {
+        if (playIconGO != null) playIconGO.SetActive(paused);
+    }
+
+    void SetVideoLoading(bool loading)
+    {
+        if (videoLoadingText != null) videoLoadingText.gameObject.SetActive(loading);
+        if (loading && playIconGO != null) playIconGO.SetActive(false);
+    }
+
+    void CloseVideoViewer()
+    {
+        if (videoPlayer != null) videoPlayer.Stop();
+        if (videoViewerOverlay != null) videoViewerOverlay.SetActive(false);
+    }
+
+    // Solid white right-pointing triangle sprite (play icon, font-independent).
+    Sprite MakeTriangleSprite(int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        var cols = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float fx = (x + 0.5f) / size;
+                float fy = (y + 0.5f) / size;
+                // Triangle: full-height left edge, tip at right-middle.
+                bool inside = fx <= 1f && fy <= (1f - 0.5f * fx) && fy >= (0.5f * fx);
+                cols[y * size + x] = inside ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+            }
+        }
+        tex.SetPixels32(cols);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 
     GameObject NewUI(string name, Transform parent)
