@@ -1,0 +1,28 @@
+{
+    "asset": "c87719e87dffbea42a7c4f7db825bb9a",
+    "fileName": "019ead7c-4e63-7da8-a317-ffe2c85d35ce.png",
+    "prompt": "A smartphone photo of a smiling middle-aged mother and her young adult daughter taking a selfie together outdoors on a sunny day, realistic amateur phone photo",
+    "negativePrompt": "",
+    "model": "gemini-3.0-pro",
+    "modelName": "Gemini 3.0 Pro",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": []
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0
+}
