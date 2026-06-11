@@ -329,13 +329,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 168970056}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0.2089, y: 0.0501, z: -0.143}
+  m_LocalRotation: {x: 0.010642829, y: 0.9959085, z: 0.025202388, w: 0.08612713}
+  m_LocalPosition: {x: 0.20889999, y: 0.05009999, z: -0.14300002}
   m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7044878420365234069}
-  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+  m_LocalEulerAnglesHint: {x: -2.772, y: 170.079, z: 1.465}
 --- !u!1 &256603409
 GameObject:
   m_ObjectHideFlags: 0
@@ -1000,6 +1000,87 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.05702463, y: 0.03989258, z: 0.050424248}
   m_Center: {x: -0.010132717, y: 0.01994629, z: -0.21994594}
+--- !u!1 &1382169354
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1382169355}
+  - component: {fileID: 1382169356}
+  m_Layer: 0
+  m_Name: phonePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1382169355
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382169354}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.078097336, y: 0.9209028, z: -0.24675523, w: -0.29146314}
+  m_LocalPosition: {x: 0.173842, y: 0.0681, z: -0.17130561}
+  m_LocalScale: {x: 0.005786716, y: 0.005184301, z: 0.005786715}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 500548797574199727}
+  m_LocalEulerAnglesHint: {x: 30, y: 182.988, z: 0}
+--- !u!23 &1382169356
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382169354}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1001 &1382721182
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1420,7 +1501,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 15
-  mouseSensitivity: 0.3
+  mouseSensitivity: 0.45
   upDownLookRange: 80
   characterController: {fileID: 1737554286}
   mainCamera: {fileID: 783471347}
@@ -1906,13 +1987,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9009634188669593687}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000003774895, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -24.53, y: -10.82, z: 18.06}
+  m_LocalRotation: {x: -0.00000003627417, y: -0.27678522, z: 0.0000000104483515, w: 0.9609318}
+  m_LocalPosition: {x: -38.17, y: -10.82, z: -2.87}
   m_LocalScale: {x: 172.80957, y: 192.89003, z: 172.80957}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1382169355}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -32.137, z: 0}
 --- !u!4 &524629704841337713
 Transform:
   m_ObjectHideFlags: 0
@@ -4574,7 +4656,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Interactable
   interactionText: Press E to use the phone
-  sitPoint: {fileID: 0}
+  sitPoint: {fileID: 1382169355}
 --- !u!33 &9018230162227093340
 MeshFilter:
   m_ObjectHideFlags: 0

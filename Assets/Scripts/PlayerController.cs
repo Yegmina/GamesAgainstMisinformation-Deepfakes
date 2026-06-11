@@ -23,11 +23,11 @@ public class PlayerController : MonoBehaviour
     private float currentSpeed => moveSpeed;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    /*void Start()
     {
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-    }
+    }*/
 
     // Update is called once per frame
     void Update()
@@ -79,5 +79,15 @@ public class PlayerController : MonoBehaviour
 
         ApplyHorizontalRotation(mouseXRotation);
         ApplyVerticalRotation(mouseYRotation);
+    }
+
+    public void InteractionPoint(Transform point)
+    {
+        transform.position = point.position;
+        transform.rotation = Quaternion.Euler(0, point.eulerAngles.y, 0);
+
+        verticalRotation = point.eulerAngles.x;
+        mainCamera.transform.localRotation =
+            Quaternion.Euler(verticalRotation, 0, 0);
     }
 }
