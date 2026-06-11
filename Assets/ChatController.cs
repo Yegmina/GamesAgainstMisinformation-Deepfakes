@@ -83,7 +83,12 @@ TMP_FontAsset font;
     UnityEngine.Video.VideoPlayer videoPlayer;
     GameObject videoPlayerHost;
     bool videoPreparing;
+    Coroutine preloadCoroutine;
+    Coroutine openCoroutine;
     TMP_Text videoLoadingText;
+    GameObject videoLoadingContainer;
+    RectTransform videoProgressBarFill;
+    Coroutine loadingBarCoroutine;
     RenderTexture videoRT;
     AspectRatioFitter videoAspectFitter;
     Coroutine videoWatchdog;
@@ -155,6 +160,10 @@ TMP_FontAsset font;
         SetupAudio();
         BuildHud();
         BuildOverlays();
+        if (sarahVideoClip != null)
+        {
+            PreloadVideo(sarahVideoClip);
+        }
         
         templateMessagesContent = messagesContent;
         if (templateMessagesContent != null)
@@ -674,6 +683,9 @@ linkObj.transform.SetParent(row, false);
         ClearChoices();
         chatScreen.SetActive(false);
         if (hubScreen != null) hubScreen.SetActive(true);
+        if (videoPlayer != null) videoPlayer.Stop();
+        if (videoViewerOverlay != null) videoViewerOverlay.SetActive(false);
+        if (sarahVideoClip != null) PreloadVideo(sarahVideoClip);
     }
 
     // ════════════════════════════════════════ VIDEO MESSAGE
@@ -2178,9 +2190,10 @@ videoObj.transform.SetParent(row, false);
         videoPlayer = videoPlayerHost.AddComponent<UnityEngine.Video.VideoPlayer>();
         videoPlayer.playOnAwake = false;
         videoPlayer.waitForFirstFrame = true;
+        videoPlayer.timeUpdateMode = UnityEngine.Video.VideoTimeUpdateMode.GameTime;
         videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture;
-        videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.Direct;
-        videoPlayer.isLooping = false;
+        videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.None;
+        videoPlayer.isLooping = true;
         videoPlayer.loopPointReached += OnVideoFinished;
         videoPlayer.prepareCompleted += OnVideoPrepared;
         videoPlayer.errorReceived += OnVideoError;
@@ -2215,12 +2228,34 @@ videoObj.transform.SetParent(row, false);
         // Round close button in the video's top-right corner.
         BuildRoundCloseButton(frame.transform, CloseVideoViewer);
 
-        // "Loading…" hint shown while the clip is still preparing. Centered so
-        // the (now rare) loading moment reads as intentional, not a dead screen.
-        videoLoadingText = MakeText(frame.transform, "VideoLoading", "Loading…", 24, TextAlignmentOptions.Center);
+        // Loading container to group the text and the progress bar
+        videoLoadingContainer = NewUI("VideoLoadingContainer", frame.transform);
+        var loadRT = videoLoadingContainer.GetComponent<RectTransform>();
+        Anchor(loadRT, new Vector2(0f, 0.35f), new Vector2(1f, 0.65f), Vector2.zero, Vector2.zero);
+
+        // "Loading…" hint inside the container
+        videoLoadingText = MakeText(videoLoadingContainer.transform, "VideoLoading", "Loading…", 24, TextAlignmentOptions.Center);
         videoLoadingText.color = Color.white;
-        Anchor(videoLoadingText.rectTransform, new Vector2(0f, 0.42f), new Vector2(1f, 0.58f), Vector2.zero, Vector2.zero);
-        videoLoadingText.gameObject.SetActive(false);
+        Anchor(videoLoadingText.rectTransform, new Vector2(0f, 0.55f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
+
+        // Progress bar background (faint semi-transparent white)
+        GameObject barBg = NewUI("ProgressBarBg", videoLoadingContainer.transform);
+        var bgImg = barBg.AddComponent<UnityEngine.UI.Image>();
+        bgImg.color = new Color(1f, 1f, 1f, 0.15f);
+        var barBgRT = barBg.GetComponent<RectTransform>();
+        Anchor(barBgRT, new Vector2(0.2f, 0.35f), new Vector2(0.8f, 0.42f), Vector2.zero, Vector2.zero);
+
+        // Progress bar fill (solid white)
+        GameObject barFill = NewUI("ProgressBarFill", barBg.transform);
+        var fillImg = barFill.AddComponent<UnityEngine.UI.Image>();
+        fillImg.color = Color.white;
+        videoProgressBarFill = barFill.GetComponent<RectTransform>();
+        videoProgressBarFill.anchorMin = new Vector2(0f, 0f);
+        videoProgressBarFill.anchorMax = new Vector2(0f, 1f); // starts at 0%
+        videoProgressBarFill.offsetMin = Vector2.zero;
+        videoProgressBarFill.offsetMax = Vector2.zero;
+
+        videoLoadingContainer.SetActive(false);
 
         videoViewerOverlay.SetActive(false);
     }
@@ -2240,115 +2275,24 @@ videoObj.transform.SetParent(row, false);
             videoRT = new RenderTexture(w, h, 0);
             videoRT.Create();
         }
-        videoPlayer.targetTexture = videoRT;
-        if (videoViewerDisplay != null) videoViewerDisplay.texture = videoRT;
-        if (videoAspectFitter != null) videoAspectFitter.aspectRatio = (float)w / h;
-    }
-
-    // Runs a clean Prepare() -> Play() cycle. OnVideoPrepared starts playback once
-    // the decoder is ready. This avoids the frozen-first-frame race that happens
-    // when Play() is called on a player prepared earlier in the background.
-    void BeginVideoPlayback(UnityEngine.Video.VideoClip clip)
-    {
-        if (clip == null || videoPlayer == null) return;
-        videoPrepareAttempts = 0;
-        StartPreparePass(clip);
-    }
-
-    // Issues a single Prepare() pass and arms a watchdog that recovers if the
-    // decoder stalls (the intermittent "stuck on black Loading…" bug). If Prepare
-    // never completes within the timeout, the watchdog rebuilds the VideoPlayer
-    // from scratch and tries again, then ultimately forces playback so the viewer
-    // never sits on a dead black screen.
-    void StartPreparePass(UnityEngine.Video.VideoClip clip)
-    {
-        if (clip == null || videoPlayer == null) return;
-        ConfigureVideoTexture(clip);
-        SetVideoLoading(true);
-        SetVideoPaused(false);
-        videoPlayer.clip = clip;
-        // CRITICAL: only enable audio output when the clip actually has an audio
-        // track. Using Direct audio mode on a clip with 0 audio tracks makes
-        // VideoPlayer.Prepare() hang forever with no error (the bug that left the
-        // viewer stuck on a black "Loading…" screen).
-        videoPlayer.audioOutputMode = clip.audioTrackCount > 0
-            ? UnityEngine.Video.VideoAudioOutputMode.Direct
-            : UnityEngine.Video.VideoAudioOutputMode.None;
-        videoPlayer.skipOnDrop = true;
-        videoPreparing = true;
-        videoPlayer.Prepare();
-
-        if (videoWatchdog != null) StopCoroutine(videoWatchdog);
-        videoWatchdog = StartCoroutine(VideoPrepareWatchdog(clip));
-    }
-
-    IEnumerator VideoPrepareWatchdog(UnityEngine.Video.VideoClip clip)
-    {
-        // Give the decoder a generous window to become ready.
-        float timeout = 3f;
-        float t = 0f;
-        while (t < timeout)
+        
+        if (videoPlayer.targetTexture != videoRT)
         {
-            if (videoPlayer == null) yield break;
-            if (videoPlayer.isPrepared) { videoWatchdog = null; yield break; }
-            t += Time.unscaledDeltaTime;
-            yield return null;
+            videoPlayer.targetTexture = videoRT;
         }
-
-        // Still not prepared — the decoder stalled.
-        videoPrepareAttempts++;
-        if (videoPrepareAttempts <= 2 && videoViewerOverlay != null && videoViewerOverlay.activeSelf)
+        if (videoViewerDisplay != null && videoViewerDisplay.texture != videoRT)
         {
-            Debug.LogWarning("[VideoViewer] Prepare stalled; rebuilding player (attempt " + videoPrepareAttempts + ").");
-            RebuildVideoPlayer();
-            StartPreparePass(clip);
-            yield break;
+            videoViewerDisplay.texture = videoRT;
         }
-
-        // Last resort: force Play so we never sit on a dead black "Loading…".
-        Debug.LogWarning("[VideoViewer] Prepare never completed; forcing playback.");
-        videoPreparing = false;
-        SetVideoLoading(false);
-        if (videoPlayer != null)
+        if (videoAspectFitter != null)
         {
-            videoPlayer.playbackSpeed = 1f;
-            videoPlayer.Play();
-            SetVideoPaused(false);
+            videoAspectFitter.aspectRatio = (float)w / h;
         }
-        videoWatchdog = null;
-    }
-
-    // Destroys and recreates the VideoPlayer component. A VideoPlayer whose
-    // Prepare() has wedged cannot always be recovered in place, so rebuilding it
-    // gives a clean decoder for the retry.
-    void RebuildVideoPlayer()
-    {
-        if (videoPlayer != null)
-        {
-            videoPlayer.loopPointReached -= OnVideoFinished;
-            videoPlayer.prepareCompleted -= OnVideoPrepared;
-            videoPlayer.errorReceived -= OnVideoError;
-            Destroy(videoPlayer);
-        }
-        if (videoPlayerHost == null)
-        {
-            videoPlayerHost = new GameObject("SarahVideoPlayerHost");
-            videoPlayerHost.transform.SetParent(transform, false);
-        }
-        videoPlayer = videoPlayerHost.AddComponent<UnityEngine.Video.VideoPlayer>();
-        videoPlayer.playOnAwake = false;
-        videoPlayer.waitForFirstFrame = true;
-        videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture;
-        videoPlayer.isLooping = false;
-        videoPlayer.loopPointReached += OnVideoFinished;
-        videoPlayer.prepareCompleted += OnVideoPrepared;
-        videoPlayer.errorReceived += OnVideoError;
     }
 
     // Prepares the clip in the background ahead of time (called when the video
     // bubble first appears). This moves the slow decoder warm-up off the moment
-    // the user taps, so opening the viewer is near-instant. OnVideoPrepared
-    // leaves the player prepared (it only auto-plays while the viewer is open).
+    // the user taps, so opening the viewer is near-instant.
     void PreloadVideo(UnityEngine.Video.VideoClip clip)
     {
         if (clip == null || videoPlayer == null) return;
@@ -2356,14 +2300,35 @@ videoObj.transform.SetParent(row, false);
         // Already prepared (or currently preparing) for this clip — nothing to do.
         if (videoPlayer.clip == clip && (videoPlayer.isPrepared || videoPreparing)) return;
 
+        if (preloadCoroutine != null) StopCoroutine(preloadCoroutine);
+        preloadCoroutine = StartCoroutine(PreloadVideoCoroutine(clip));
+    }
+
+    IEnumerator PreloadVideoCoroutine(UnityEngine.Video.VideoClip clip)
+    {
         ConfigureVideoTexture(clip);
         videoPlayer.clip = clip;
-        videoPlayer.audioOutputMode = clip.audioTrackCount > 0
-            ? UnityEngine.Video.VideoAudioOutputMode.Direct
-            : UnityEngine.Video.VideoAudioOutputMode.None;
+        videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.None;
         videoPlayer.skipOnDrop = true;
         videoPreparing = true;
+        
+        videoPlayer.playbackSpeed = 1f;
         videoPlayer.Prepare();
+
+        while (!videoPlayer.isPrepared)
+        {
+            yield return null;
+        }
+
+        // Mute/disable all audio tracks immediately to prevent Windows Media Foundation from stalling
+        for (ushort i = 0; i < videoPlayer.audioTrackCount; i++)
+        {
+            videoPlayer.EnableAudioTrack(i, false);
+        }
+
+        videoPreparing = false;
+        preloadCoroutine = null;
+        Debug.Log("[VideoViewer] Background preload completed and audio tracks disabled for: " + clip.name);
     }
 
     void OpenVideoViewer(UnityEngine.Video.VideoClip clip)
@@ -2374,41 +2339,121 @@ videoObj.transform.SetParent(row, false);
 
         if (clip == null)
         {
-            // No clip assigned — show the play icon as a placeholder.
             SetVideoLoading(false);
             SetVideoPaused(true);
             return;
         }
 
-        // Fast path: the clip was pre-prepared in the background (see
-        // PreloadVideo), so we can start playing immediately with no black
-        // "Loading…" wait.
+        // Fast path: the clip was pre-prepared in the background, so we can play instantly
         if (videoPlayer != null && videoPlayer.clip == clip && videoPlayer.isPrepared)
         {
-            ConfigureVideoTexture(clip); // make sure the display is wired up
-            SetVideoLoading(false);
-            videoPlayer.frame = 0;
+            ConfigureVideoTexture(clip);
+            SetVideoLoading(true); // Run the smart loading bar
+            
+            // Disable all audio tracks before playing to prevent Windows Media Foundation latency
+            for (ushort i = 0; i < videoPlayer.audioTrackCount; i++)
+            {
+                videoPlayer.EnableAudioTrack(i, false);
+            }
+
             videoPlayer.playbackSpeed = 1f;
             videoPlayer.Play();
-            SetVideoPaused(false);
+            SetVideoPaused(false); // Starts playing immediately!
+            Debug.Log("[VideoViewer] Opened instantly and started playing preloaded video!");
             return;
         }
 
-        // Not ready yet — run a clean Prepare() -> Play() cycle. OnVideoPrepared
-        // starts playback once the decoder is ready.
-        BeginVideoPlayback(clip);
+        // Mid path: already preparing in background. Wait for it to finish and then play.
+        if (videoPlayer != null && videoPlayer.clip == clip && videoPreparing)
+        {
+            ConfigureVideoTexture(clip);
+            SetVideoLoading(true); // Run the smart loading bar
+            if (openCoroutine != null) StopCoroutine(openCoroutine);
+            openCoroutine = StartCoroutine(WaitForPrepareAndPlay());
+            return;
+        }
+
+        // Slow path: Not prepared yet (fallback). Start clean preparation and play.
+        ConfigureVideoTexture(clip);
+        videoPlayer.clip = clip;
+        videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.None;
+        videoPlayer.skipOnDrop = true;
+        
+        SetVideoLoading(true); // Run the smart loading bar
+        videoPreparing = true;
+
+        if (openCoroutine != null) StopCoroutine(openCoroutine);
+        openCoroutine = StartCoroutine(PrepareAndPlayCoroutine());
+    }
+
+    IEnumerator WaitForPrepareAndPlay()
+    {
+        while (videoPreparing && videoPlayer != null && !videoPlayer.isPrepared)
+        {
+            yield return null;
+        }
+
+        if (videoPlayer != null && videoPlayer.isPrepared && videoViewerOverlay != null && videoViewerOverlay.activeSelf)
+        {
+            videoPlayer.playbackSpeed = 1f;
+            for (ushort i = 0; i < videoPlayer.audioTrackCount; i++)
+            {
+                videoPlayer.EnableAudioTrack(i, false);
+            }
+            videoPlayer.Play();
+            SetVideoPaused(false);
+        }
+        else
+        {
+            SetVideoLoading(false);
+            SetVideoPaused(true);
+        }
+        openCoroutine = null;
+    }
+
+    IEnumerator PrepareAndPlayCoroutine()
+    {
+        videoPlayer.playbackSpeed = 1f;
+        videoPlayer.Prepare();
+        
+        float timeout = 4.0f;
+        float elapsed = 0f;
+        while (!videoPlayer.isPrepared && elapsed < timeout)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        videoPreparing = false;
+
+        if (videoPlayer.isPrepared && videoViewerOverlay != null && videoViewerOverlay.activeSelf)
+        {
+            for (ushort i = 0; i < videoPlayer.audioTrackCount; i++)
+            {
+                videoPlayer.EnableAudioTrack(i, false);
+            }
+            videoPlayer.Play();
+            SetVideoPaused(false);
+        }
+        else
+        {
+            SetVideoLoading(false);
+            SetVideoPaused(true);
+        }
+        openCoroutine = null;
     }
 
     void OnVideoPrepared(UnityEngine.Video.VideoPlayer vp)
     {
         videoPreparing = false;
         videoPrepareAttempts = 0;
-        if (videoWatchdog != null) { StopCoroutine(videoWatchdog); videoWatchdog = null; }
-        SetVideoLoading(false);
-        // Start playback only while the viewer is open.
         if (videoViewerOverlay != null && videoViewerOverlay.activeSelf)
         {
-            vp.frame = 0;
+            // Mute/disable all audio tracks immediately to prevent Windows Media Foundation from stalling
+            for (ushort i = 0; i < vp.audioTrackCount; i++)
+            {
+                vp.EnableAudioTrack(i, false);
+            }
             vp.playbackSpeed = 1f;
             vp.Play();
             SetVideoPaused(false);
@@ -2427,41 +2472,42 @@ videoObj.transform.SetParent(row, false);
     {
         if (videoPlayer == null || videoPlayer.clip == null) return;
 
-        // Not ready yet — run a clean prepare/play cycle.
         if (!videoPlayer.isPrepared)
         {
-            BeginVideoPlayback(videoPlayer.clip);
+            SetVideoLoading(true);
+            videoPreparing = true;
+            videoPlayer.Play();
             return;
         }
 
-        // If playback has reached (or passed) the end, a tap should replay from
-        // the start rather than doing nothing on a frozen last frame.
         bool atEnd = videoPlayer.frameCount > 0 &&
                      (ulong)videoPlayer.frame >= videoPlayer.frameCount - 1;
 
-        // Pause via playbackSpeed = 0 instead of VideoPlayer.Pause(). Calling
-        // Play() after Pause() intermittently leaves the media clock frozen even
-        // though isPlaying reports true. Freezing playbackSpeed keeps the player
-        // in the Playing state so resuming (speed = 1) is always reliable.
-        bool effectivelyPlaying = videoPlayer.isPlaying && videoPlayer.playbackSpeed > 0f;
+        bool effectivelyPlaying = videoPlayer.isPlaying;
         if (effectivelyPlaying)
         {
-            videoPlayer.playbackSpeed = 0f;   // freeze on the current frame
+            videoPlayer.Pause();
             SetVideoPaused(true);
         }
         else
         {
-            if (atEnd) videoPlayer.frame = 0; // restart on replay
+            if (atEnd) videoPlayer.frame = 0;
             videoPlayer.playbackSpeed = 1f;
-            if (!videoPlayer.isPlaying) videoPlayer.Play();
+            for (ushort i = 0; i < videoPlayer.audioTrackCount; i++)
+            {
+                videoPlayer.EnableAudioTrack(i, false);
+            }
+            videoPlayer.Play();
             SetVideoPaused(false);
         }
     }
 
     void OnVideoFinished(UnityEngine.Video.VideoPlayer vp)
     {
-        // Show the play icon again so the player can replay.
-        SetVideoPaused(true);
+        if (!vp.isLooping)
+        {
+            SetVideoPaused(true);
+        }
     }
 
     void SetVideoPaused(bool paused)
@@ -2471,15 +2517,85 @@ videoObj.transform.SetParent(row, false);
 
     void SetVideoLoading(bool loading)
     {
-        if (videoLoadingText != null) videoLoadingText.gameObject.SetActive(loading);
-        if (loading && playIconGO != null) playIconGO.SetActive(false);
+        if (loading)
+        {
+            if (videoLoadingContainer != null) videoLoadingContainer.SetActive(true);
+            if (playIconGO != null) playIconGO.SetActive(false);
+            if (loadingBarCoroutine != null) StopCoroutine(loadingBarCoroutine);
+            loadingBarCoroutine = StartCoroutine(AnimateProgressBar());
+        }
+        else
+        {
+            if (loadingBarCoroutine != null)
+            {
+                StopCoroutine(loadingBarCoroutine);
+                loadingBarCoroutine = null;
+            }
+            if (videoLoadingContainer != null) videoLoadingContainer.SetActive(false);
+        }
+    }
+
+    IEnumerator AnimateProgressBar()
+    {
+        if (videoLoadingContainer == null || videoProgressBarFill == null) yield break;
+
+        float progress = 0f;
+        videoProgressBarFill.anchorMax = new Vector2(0f, 1f);
+
+        // Phase 1: Wait for preparation (or skip if already prepared).
+        // If not prepared, we rise to 50% smoothly over up to 4 seconds.
+        float prepTime = 0f;
+        while (videoPlayer != null && !videoPlayer.isPrepared && prepTime < 4.0f)
+        {
+            prepTime += Time.unscaledDeltaTime;
+            progress = Mathf.Lerp(0f, 0.5f, prepTime / 4.0f);
+            videoProgressBarFill.anchorMax = new Vector2(progress, 1f);
+            yield return null;
+        }
+
+        // If it's prepared, we should be at least at 50%
+        progress = Mathf.Max(progress, 0.5f);
+        videoProgressBarFill.anchorMax = new Vector2(progress, 1f);
+
+        // Phase 2: Wait for playback to actually begin (time > 0.05s).
+        // Since play initialization can take several seconds on Windows, we slowly fill from 50% to 95% over 7 seconds.
+        float playTime = 0f;
+        const float maxPlayInitTime = 7.0f; // expect up to 6-7 seconds delay
+        
+        while (videoPlayer != null && videoPlayer.time < 0.05f && playTime < maxPlayInitTime)
+        {
+            playTime += Time.unscaledDeltaTime;
+            progress = Mathf.Lerp(0.5f, 0.95f, playTime / maxPlayInitTime);
+            videoProgressBarFill.anchorMax = new Vector2(progress, 1f);
+            yield return null;
+        }
+
+        // Phase 3: Fill to 100% and hide smoothly!
+        float finishTime = 0f;
+        float startProgress = progress;
+        while (finishTime < 0.2f)
+        {
+            finishTime += Time.unscaledDeltaTime;
+            progress = Mathf.Lerp(startProgress, 1f, finishTime / 0.2f);
+            videoProgressBarFill.anchorMax = new Vector2(progress, 1f);
+            yield return null;
+        }
+
+        videoLoadingContainer.SetActive(false);
+        loadingBarCoroutine = null;
     }
 
     void CloseVideoViewer()
     {
-        if (videoWatchdog != null) { StopCoroutine(videoWatchdog); videoWatchdog = null; }
         videoPreparing = false;
-        if (videoPlayer != null) videoPlayer.Stop();
+        if (preloadCoroutine != null) { StopCoroutine(preloadCoroutine); preloadCoroutine = null; }
+        if (openCoroutine != null) { StopCoroutine(openCoroutine); openCoroutine = null; }
+        SetVideoLoading(false);
+        if (videoPlayer != null)
+        {
+            videoPlayer.Pause();
+            videoPlayer.frame = 0;
+        }
         if (videoViewerOverlay != null) videoViewerOverlay.SetActive(false);
     }
 
