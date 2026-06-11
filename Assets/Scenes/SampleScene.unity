@@ -677,7 +677,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 43fb5b8ff7e81864fbc91120084371e9, type: 3}
+  m_Sprite: {fileID: 21300000, guid: efe5e8de95fa3f44cae6b452910f8574, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1017,7 +1017,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: f1cb3f4b9ff023d48bf125ef3588f904, type: 3}
+  m_Sprite: {fileID: 21300000, guid: fc27ca83f8ac842448f05e82c150fdea, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1830,7 +1830,7 @@ GameObject:
   - component: {fileID: 144365109}
   - component: {fileID: 144365108}
   m_Layer: 5
-  m_Name: Thumb_Shot_SpotTips
+  m_Name: Thumb_Screenshot_Camera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1868,7 +1868,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: eb736edbc68a27c4e97c9aacfd9ffd36, type: 3}
+  fullPhoto: {fileID: 21300000, guid: 97709b413274d224c8b7a5462824b4fc, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &144365109
 MonoBehaviour:
@@ -3570,7 +3570,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: e0550fa520d22294795286152bebbb13, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 9895dbaa8b4cbbb468cf15f315ceccee, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4091,7 +4091,7 @@ GameObject:
   - component: {fileID: 248508399}
   - component: {fileID: 248508398}
   m_Layer: 5
-  m_Name: Thumb_Photo_Family
+  m_Name: Thumb_MomAndCat
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4129,7 +4129,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: 468ddbee5eeed52468ede0da18561f61, type: 3}
+  fullPhoto: {fileID: 21300000, guid: 4c762389e80aa8042a0800e737dc3090, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &248508399
 MonoBehaviour:
@@ -4703,7 +4703,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: eb736edbc68a27c4e97c9aacfd9ffd36, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 97709b413274d224c8b7a5462824b4fc, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -5498,7 +5498,7 @@ GameObject:
   - component: {fileID: 380706912}
   - component: {fileID: 380706911}
   m_Layer: 5
-  m_Name: Thumb_Photo_Selfie
+  m_Name: Thumb_Alex
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5536,7 +5536,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: f1cb3f4b9ff023d48bf125ef3588f904, type: 3}
+  fullPhoto: {fileID: 21300000, guid: fc27ca83f8ac842448f05e82c150fdea, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &380706912
 MonoBehaviour:
@@ -7503,7 +7503,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: b72f1efa4ef5836478cf4b1e1ff50d92, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 6305b9eea490d404496a8dc61cedd588, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -9307,7 +9307,7 @@ GameObject:
   - component: {fileID: 695704954}
   - component: {fileID: 695704953}
   m_Layer: 5
-  m_Name: Thumb_Photo_MomDaughter
+  m_Name: Thumb_MomAndDad
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -9345,7 +9345,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: c87719e87dffbea42a7c4f7db825bb9a, type: 3}
+  fullPhoto: {fileID: 21300000, guid: ef6605f1e42eae74b96aa5bd0d76f6cd, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &695704954
 MonoBehaviour:
@@ -10828,7 +10828,7 @@ GameObject:
   - component: {fileID: 834939213}
   - component: {fileID: 834939212}
   m_Layer: 5
-  m_Name: Thumb_Photo_Cafe
+  m_Name: Thumb_AlexWithSarah
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10866,7 +10866,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: e0550fa520d22294795286152bebbb13, type: 3}
+  fullPhoto: {fileID: 21300000, guid: 9895dbaa8b4cbbb468cf15f315ceccee, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &834939213
 MonoBehaviour:
@@ -11749,7 +11749,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: c87719e87dffbea42a7c4f7db825bb9a, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ef6605f1e42eae74b96aa5bd0d76f6cd, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -13471,7 +13471,7 @@ GameObject:
   - component: {fileID: 1143265020}
   - component: {fileID: 1143265019}
   m_Layer: 5
-  m_Name: Thumb_Photo_Sunset
+  m_Name: Thumb_Sunrise
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13509,7 +13509,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: 43fb5b8ff7e81864fbc91120084371e9, type: 3}
+  fullPhoto: {fileID: 21300000, guid: efe5e8de95fa3f44cae6b452910f8574, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &1143265020
 MonoBehaviour:
@@ -14989,7 +14989,7 @@ GameObject:
   - component: {fileID: 1344942826}
   - component: {fileID: 1344942825}
   m_Layer: 5
-  m_Name: Thumb_Shot_FakeNews
+  m_Name: Thumb_Screenshot_2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15027,7 +15027,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: b72f1efa4ef5836478cf4b1e1ff50d92, type: 3}
+  fullPhoto: {fileID: 21300000, guid: 6305b9eea490d404496a8dc61cedd588, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &1344942826
 MonoBehaviour:
@@ -16032,7 +16032,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: a625f25aab1fed541a3640b042a03580, type: 3}
+  m_Sprite: {fileID: 21300000, guid: deb40e7ff3afea24582b636a9fb8e074, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -20518,7 +20518,7 @@ GameObject:
   - component: {fileID: 1809049229}
   - component: {fileID: 1809049228}
   m_Layer: 5
-  m_Name: Thumb_Photo_Dad
+  m_Name: Thumb_All_Family
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -20556,7 +20556,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: a625f25aab1fed541a3640b042a03580, type: 3}
+  fullPhoto: {fileID: 21300000, guid: deb40e7ff3afea24582b636a9fb8e074, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &1809049229
 MonoBehaviour:
@@ -21393,7 +21393,7 @@ GameObject:
   - component: {fileID: 1887013135}
   - component: {fileID: 1887013134}
   m_Layer: 5
-  m_Name: Thumb_Shot_DeepfakeCompare
+  m_Name: Thumb_Screenshot_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -21431,7 +21431,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 132c2823e9d464a46b74736d097ac43a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GalleryThumbnail
-  fullPhoto: {fileID: 21300000, guid: c7a6b496c095b7142ab42f63c643c484, type: 3}
+  fullPhoto: {fileID: 21300000, guid: c3e19bf847d4a8f4391066594f5a5a32, type: 3}
   viewer: {fileID: 1126939154}
 --- !u!114 &1887013135
 MonoBehaviour:
@@ -21672,7 +21672,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: c7a6b496c095b7142ab42f63c643c484, type: 3}
+  m_Sprite: {fileID: 21300000, guid: c3e19bf847d4a8f4391066594f5a5a32, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -23740,7 +23740,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 468ddbee5eeed52468ede0da18561f61, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 4c762389e80aa8042a0800e737dc3090, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1

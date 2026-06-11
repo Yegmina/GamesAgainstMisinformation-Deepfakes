@@ -1,7 +1,5 @@
 fileFormatVersion: 2
-guid: c87719e87dffbea42a7c4f7db825bb9a
-labels:
-- UnityAI
+guid: fc27ca83f8ac842448f05e82c150fdea
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -41,7 +39,7 @@ TextureImporter:
     mipBias: 0
     wrapU: 1
     wrapV: 1
-    wrapW: 1
+    wrapW: 0
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
@@ -50,7 +48,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 1024
+  spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
