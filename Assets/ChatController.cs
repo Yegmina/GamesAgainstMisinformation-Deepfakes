@@ -2,11 +2,12 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 
 public class ChatController : MonoBehaviour
 {
     [Header("Screens")]
-    public GameObject chatScreen;
+public GameObject chatScreen;
     public GameObject hubScreen;
 
     [Header("Chat UI")]
@@ -66,8 +67,11 @@ public class ChatController : MonoBehaviour
     Sprite roundedBubbleSprite;
     Sprite circleSprite;
 
+    private Dictionary<string, Transform> chatContainers = new Dictionary<string, Transform>();
+    private Transform templateMessagesContent;
+
     Canvas canvas;
-    TMP_FontAsset font;
+TMP_FontAsset font;
     TMP_Text timerText, paranoiaText, stateText;
     Image paranoiaFill;
     Image flashOverlay;
@@ -151,10 +155,16 @@ public class ChatController : MonoBehaviour
         SetupAudio();
         BuildHud();
         BuildOverlays();
-        ConfigureChatLayout();
+        
+        templateMessagesContent = messagesContent;
+        if (templateMessagesContent != null)
+        {
+            templateMessagesContent.gameObject.SetActive(false);
+            ConfigureChatLayout(templateMessagesContent);
+        }
 
         if (momPreview != null) momPreview.text = "Are you home?";
-        if (broPreview != null) broPreview.text = "Left my gym bag";
+if (broPreview != null) broPreview.text = "Left my gym bag";
         if (unknownPreview != null) unknownPreview.text = "Unknown number";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
         if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
@@ -162,6 +172,41 @@ public class ChatController : MonoBehaviour
         SetParanoia(0);
         SetAppState("ACTIVE");
         UpdateTimerLabel();
+
+        FixLayout();
+    }
+
+    void FixLayout()
+    {
+        if (chatScrollRect == null || optionsPanel == null) return;
+        RectTransform scrollRT = chatScrollRect.GetComponent<RectTransform>();
+        RectTransform optionsRT = optionsPanel.GetComponent<RectTransform>();
+
+        // Calculate the top Y position of the options panel in the chatScreen space.
+        // The log showed it is anchored to bottom (0.5, 0).
+        // offsetMax.y is the top edge relative to the bottom anchor.
+        float optionsTop = optionsRT.offsetMax.y;
+
+        // Adjust the ScrollRect to fill the space exactly down to the options panel.
+        // The scroll view is currently anchored to the center (0.5, 0.5).
+        // We'll change it to stretch horizontally and anchor bottom/top correctly.
+        scrollRT.anchorMin = new Vector2(0f, 0f);
+        scrollRT.anchorMax = new Vector2(1f, 1f);
+
+        // HUD height is 34, plus some margin for the 'Mom' title area (approx 150 total).
+        // We'll keep the current top position but fix the bottom.
+        // Current top was at 649 out of 800. Offset from top is 800 - 649 = 151.
+        scrollRT.offsetMin = new Vector2(10f, optionsTop);
+        scrollRT.offsetMax = new Vector2(-10f, -151f);
+
+        // Ensure the viewport also fills the space
+        if (chatScrollRect.viewport != null)
+        {
+            chatScrollRect.viewport.anchorMin = Vector2.zero;
+            chatScrollRect.viewport.anchorMax = Vector2.one;
+            chatScrollRect.viewport.offsetMin = Vector2.zero;
+            chatScrollRect.viewport.offsetMax = Vector2.zero;
+        }
     }
 
     void Update()
@@ -181,7 +226,9 @@ public class ChatController : MonoBehaviour
 
     public void OpenMomChat()
     {
-        currentChat = "mom";
+        bool firstTime = !chatContainers.ContainsKey("mom");
+        SwitchToChat("mom");
+
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (momBadge != null) momBadge.SetActive(false);
@@ -192,29 +239,38 @@ public class ChatController : MonoBehaviour
         }
         if (contactAvatar != null && momAvatar != null) contactAvatar.sprite = momAvatar;
 
-        ClearMessages();
-        ClearChoices();
-        AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left. 🍕");
-
-        if (momFinished)
+        if (firstTime)
         {
-            AddSystem("This conversation has ended. Connection locked.");
-            if (optionsPanel != null) optionsPanel.SetActive(false);
-            return;
+            ClearChoices();
+            AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left. 🍕", false, "mom");
+
+            if (momFinished)
+            {
+                AddSystem("This conversation has ended. Connection locked.", "mom");
+                return;
+            }
+
+            if (optionsPanel != null) optionsPanel.SetActive(true);
+
+            if (!momStarted)
+            {
+                momStarted = true;
+                StartCoroutine(MomIntro());
+            }
         }
-
-        if (optionsPanel != null) optionsPanel.SetActive(true);
-
-        if (!momStarted)
+        else
         {
-            momStarted = true;
-            StartCoroutine(MomIntro());
+            if (optionsPanel != null) optionsPanel.SetActive(true);
         }
+        
+        ScrollToBottom();
     }
 
     public void OpenBrotherChat()
     {
-        currentChat = "bro";
+        bool firstTime = !chatContainers.ContainsKey("bro");
+        SwitchToChat("bro");
+
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (broBadge != null) broBadge.SetActive(false);
@@ -225,29 +281,38 @@ public class ChatController : MonoBehaviour
         }
         if (contactAvatar != null && brotherAvatar != null) contactAvatar.sprite = brotherAvatar;
 
-        ClearMessages();
-        ClearChoices();
-        AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro");
-
-        if (broFinished)
+        if (firstTime)
         {
-            AddSystem("This conversation has ended. Connection locked.");
-            if (optionsPanel != null) optionsPanel.SetActive(false);
-            return;
+            ClearChoices();
+            AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro", false, "bro");
+
+            if (broFinished)
+            {
+                AddSystem("This conversation has ended. Connection locked.", "bro");
+                return;
+            }
+
+            if (optionsPanel != null) optionsPanel.SetActive(true);
+
+            if (!broStarted)
+            {
+                broStarted = true;
+                StartCoroutine(BroIntro());
+            }
         }
-
-        if (optionsPanel != null) optionsPanel.SetActive(true);
-
-        if (!broStarted)
+        else
         {
-            broStarted = true;
-            StartCoroutine(BroIntro());
+            if (optionsPanel != null) optionsPanel.SetActive(true);
         }
+        
+        ScrollToBottom();
     }
 
     public void OpenUnknownChat()
     {
-        currentChat = "unknown";
+        bool firstTime = !chatContainers.ContainsKey("unknown");
+        SwitchToChat("unknown");
+
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (unknownBadge != null) unknownBadge.SetActive(false);
@@ -259,30 +324,33 @@ public class ChatController : MonoBehaviour
         }
         if (contactAvatar != null && unknownAvatar != null) contactAvatar.sprite = unknownAvatar;
 
-        ClearMessages();
-        ClearChoices();
-        
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        
-        AddMessage(false, "???: Alex...");
-        AddMessage(false, "???: I see you.");
-        AddMessage(false, "???: You don't know me. But I know you.");
-        AddMessage(false, "???: I've been watching.");
-        AddMessage(false, "???: Don't trust anyone. Especially not your family.");
-        AddMessage(false, "???: They are not who you think.");
-        AddMessage(false, "???: The video... it's real.");
-        AddMessage(false, "???: I'll find you.");
-        AddMessage(false, "???: Tick tock.");
-        AddMessage(false, "???: This conversation will self-destruct.");
-        
-        AddSystem("⚠ This number is no longer in service.");
+        if (firstTime)
+        {
+            ClearChoices();
+            
+            AddMessage(false, "???: Alex...", false, "unknown");
+            AddMessage(false, "???: I see you.", false, "unknown");
+            AddMessage(false, "???: You don't know me. But I know you.", false, "unknown");
+            AddMessage(false, "???: I've been watching.", false, "unknown");
+            AddMessage(false, "???: Don't trust anyone. Especially not your family.", false, "unknown");
+            AddMessage(false, "???: They are not who you think.", false, "unknown");
+            AddMessage(false, "???: The video... it's real.", false, "unknown");
+            AddMessage(false, "???: I'll find you.", false, "unknown");
+            AddMessage(false, "???: Tick tock.", false, "unknown");
+            AddMessage(false, "???: This conversation will self-destruct.", false, "unknown");
+            
+            AddSystem("⚠ This number is no longer in service.", "unknown");
+        }
         
         if (unknownPreview != null) unknownPreview.text = "[Read]";
+        ScrollToBottom();
     }
 
     public void OpenProviderChat()
     {
-        currentChat = "provider";
+        bool firstTime = !chatContainers.ContainsKey("provider");
+        SwitchToChat("provider");
+
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (providerBadge != null) providerBadge.SetActive(false);
@@ -293,24 +361,27 @@ public class ChatController : MonoBehaviour
         }
         if (contactAvatar != null && providerAvatar != null) contactAvatar.sprite = providerAvatar;
 
-        ClearMessages();
-        ClearChoices();
-        
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        
-        AddMessage(false, "📡 Internet Provider: Important notice!");
-        AddMessage(false, "📡 Your connection has been unstable for 3 days.");
-        AddMessage(false, "📡 Click the link below to verify your IP address:");
-        
-        AddLinkMessage();
-        
-        AddMessage(false, "📡 If not verified within 24h, your service will be suspended.");
-        AddSystem("⚠ This looks suspicious... The link may be dangerous.");
+        if (firstTime)
+        {
+            ClearChoices();
+            
+            AddMessage(false, "📡 Internet Provider: Important notice!", false, "provider");
+            AddMessage(false, "📡 Your connection has been unstable for 3 days.", false, "provider");
+            AddMessage(false, "📡 Click the link below to verify your IP address:", false, "provider");
+            
+            AddLinkMessage("provider");
+            
+            AddMessage(false, "📡 If not verified within 24h, your service will be suspended.", false, "provider");
+        }
+
+        ScrollToBottom();
     }
 
     public void OpenSarahChat()
     {
-        currentChat = "sarah";
+        bool firstTime = !chatContainers.ContainsKey("sarah");
+        SwitchToChat("sarah");
+
         if (hubScreen != null) hubScreen.SetActive(false);
         chatScreen.SetActive(true);
         if (sarahBadge != null) sarahBadge.SetActive(false);
@@ -321,37 +392,44 @@ public class ChatController : MonoBehaviour
         }
         if (contactAvatar != null && sarahAvatar != null) contactAvatar.sprite = sarahAvatar;
 
-        ClearMessages();
-        ClearChoices();
+        if (firstTime)
+        {
+            ClearChoices();
+            AddMessage(false, "Hey, you there? 💬", false, "sarah");
+
+            if (sarahFinished)
+            {
+                if (sarahBadPath)
+                    AddSystem("Sarah stopped responding. You messed up.", "sarah");
+                else
+                    AddSystem("Sarah is okay now. You're a good friend.", "sarah");
+                return;
+            }
+
+            if (optionsPanel != null) optionsPanel.SetActive(true);
+
+            if (!sarahStarted)
+            {
+                sarahStarted = true;
+                StartCoroutine(SarahIntro());
+            }
+        }
+        else
+        {
+            if (optionsPanel != null) optionsPanel.SetActive(true);
+        }
         
-        AddMessage(false, "Hey, you there? 💬");
-
-        if (sarahFinished)
-        {
-            if (sarahBadPath)
-                AddSystem("Sarah stopped responding. You messed up.");
-            else
-                AddSystem("Sarah is okay now. You're a good friend.");
-            if (optionsPanel != null) optionsPanel.SetActive(false);
-            return;
-        }
-
-        if (optionsPanel != null) optionsPanel.SetActive(true);
-
-        if (!sarahStarted)
-        {
-            sarahStarted = true;
-            StartCoroutine(SarahIntro());
-        }
+        ScrollToBottom();
     }
 
-    void AddLinkMessage()
+    void AddLinkMessage(string targetChatId = null)
     {
-        if (messagesContent == null) return;
-        var row = BuildRow(false);
+        Transform target = GetTargetContainer(targetChatId);
+        var row = BuildRow(false, target);
+        if (row == null) return;
         
         GameObject linkObj = new GameObject("LinkMessage", typeof(RectTransform), typeof(Image), typeof(Button));
-        linkObj.transform.SetParent(row, false);
+linkObj.transform.SetParent(row, false);
         var img = linkObj.GetComponent<Image>();
         img.color = new Color(0.15f, 0.15f, 0.25f, 1f);
         img.sprite = bubbleThemSprite != null ? bubbleThemSprite : roundedBubbleSprite;
@@ -422,33 +500,33 @@ public class ChatController : MonoBehaviour
         
         yield return StartCoroutine(ShowQuickScreamerPhoto());
         
-        AddMessage(false, "⚠ MALICIOUS LINK DETECTED", true);
-        AddMessage(false, "⚠ Downloading: virus_core.exe", true);
+        AddMessage(false, "⚠ MALICIOUS LINK DETECTED", true, "provider");
+        AddMessage(false, "⚠ Downloading: virus_core.exe", true, "provider");
         
         SetParanoia(100);
         StartCoroutine(ShakeRoutine(5f, 20f));
         
         yield return Wait(0.5f);
-        AddSpam("DOWNLOADING... 25%");
+        AddSpam("DOWNLOADING... 25%", "provider");
         FlashRed();
         
         yield return Wait(0.5f);
-        AddSpam("DOWNLOADING... 50%");
+        AddSpam("DOWNLOADING... 50%", "provider");
         FlashRed();
         
         yield return Wait(0.5f);
-        AddSpam("DOWNLOADING... 75%");
+        AddSpam("DOWNLOADING... 75%", "provider");
         FlashRed();
         
         yield return Wait(0.5f);
-        AddSpam("DOWNLOAD COMPLETE");
-        AddSpam("YOUR DEVICE IS COMPROMISED");
-        AddSpam("ALL DATA ENCRYPTED");
+        AddSpam("DOWNLOAD COMPLETE", "provider");
+        AddSpam("YOUR DEVICE IS COMPROMISED", "provider");
+        AddSpam("ALL DATA ENCRYPTED", "provider");
         
         yield return Wait(2.5f);
         
-        AddSpam("⚠ RANSOMWARE ACTIVATED");
-        AddSpam("Contact: darkweb@onion.net");
+        AddSpam("⚠ RANSOMWARE ACTIVATED", "provider");
+        AddSpam("Contact: darkweb@onion.net", "provider");
         
         yield return Wait(2f);
         
@@ -515,7 +593,7 @@ public class ChatController : MonoBehaviour
     {
         ClearChoices();
         providerFinished = true;
-        AddSystem("You blocked the contact. Your device is safe.");
+        AddSystem("You blocked the contact. Your device is safe.", "provider");
         if (providerPreview != null) providerPreview.text = "[Blocked]";
         StartCoroutine(SafeCloseProviderRoutine());
     }
@@ -528,28 +606,25 @@ public class ChatController : MonoBehaviour
 
     public void CloseChat()
     {
-        if (currentChat == "unknown")
+        if (currentChat == null) return;
+
+        bool finished = true;
+        if (currentChat == "mom") finished = momFinished;
+        else if (currentChat == "bro") finished = broFinished;
+        else if (currentChat == "sarah") finished = sarahFinished;
+        else if (currentChat == "provider") finished = providerFinished;
+
+        if (!finished && currentChat != "unknown")
         {
-            chatScreen.SetActive(false);
-            if (hubScreen != null) hubScreen.SetActive(true);
-            currentChat = null;
+            AddSystem("You can't leave now. The conversation isn't over.", currentChat);
             return;
         }
-        
-        if (currentChat == "provider")
+
+        if (chatContainers.ContainsKey(currentChat))
         {
-            chatScreen.SetActive(false);
-            if (hubScreen != null) hubScreen.SetActive(true);
-            currentChat = null;
-            return;
+            chatContainers[currentChat].gameObject.SetActive(false);
         }
-        
-        if ((currentChat == "mom" && !momFinished) || (currentChat == "bro" && !broFinished) || (currentChat == "sarah" && !sarahFinished))
-        {
-            AddSystem("You can't leave now. The conversation isn't over.");
-            return;
-        }
-        
+
         chatScreen.SetActive(false);
         if (hubScreen != null) hubScreen.SetActive(true);
         currentChat = null;
@@ -582,20 +657,34 @@ public class ChatController : MonoBehaviour
         if (unknownBadge != null) unknownBadge.SetActive(true);
         if (providerBadge != null) providerBadge.SetActive(true);
         if (sarahBadge != null) sarahBadge.SetActive(true);
-        ClearMessages();
+        
+        foreach (var kvp in chatContainers)
+        {
+            if (kvp.Value != null) Destroy(kvp.Value.gameObject);
+        }
+        chatContainers.Clear();
+        currentChat = null;
+        messagesContent = templateMessagesContent;
+        if (templateMessagesContent != null)
+        {
+            templateMessagesContent.gameObject.SetActive(false);
+            foreach (Transform child in templateMessagesContent) Destroy(child.gameObject);
+        }
+
         ClearChoices();
         chatScreen.SetActive(false);
         if (hubScreen != null) hubScreen.SetActive(true);
     }
 
     // ════════════════════════════════════════ VIDEO MESSAGE
-    void AddVideoMessage(bool isMe, string videoName, string duration)
+    void AddVideoMessage(bool isMe, string videoName, string duration, string targetChatId = null)
     {
-        if (messagesContent == null) return;
-        var row = BuildRow(isMe);
+        Transform target = GetTargetContainer(targetChatId);
+        var row = BuildRow(isMe, target);
+        if (row == null) return;
         
         GameObject videoObj = new GameObject("VideoMessage", typeof(RectTransform), typeof(Image), typeof(Button));
-        videoObj.transform.SetParent(row, false);
+videoObj.transform.SetParent(row, false);
         var img = videoObj.GetComponent<Image>();
         img.color = new Color(0.10f, 0.10f, 0.16f, 1f);
         Sprite vbs = isMe ? bubbleMeSprite : bubbleThemSprite;
@@ -686,99 +775,176 @@ public class ChatController : MonoBehaviour
     IEnumerator SarahIntro()
     {
         yield return Wait(0.6f);
-        AddMessage(false, "Alex... something weird happened");
-        yield return Wait(0.5f);
-        AddMessage(true, "What's wrong?");
-        yield return Wait(0.5f);
-        AddMessage(false, "My ex sent me this video...");
-        
-        AddVideoMessage(false, "sarah_deepfake_video.mp4", "0:23");
-        
-        yield return Wait(0.8f);
-        AddMessage(false, "It looks like me but... I never filmed this 😭");
+        AddMessage(false, "Alex... something weird happened", false, "sarah");
         yield return Wait(0.5f);
         ShowChoices(
-            ("\"Sarah, that's a deepfake. Don't panic.\"", 2, SarahGoodPath),
-            ("\"Are you sure it's not you? Maybe you forgot?\"", 1, SarahBadPath)
+            ("\"What's wrong? Are you okay?\"", 0, SarahChoiceConcern),
+            ("\"It's 4 AM. Can this wait until morning?\"", 1, SarahChoiceDismissive)
         );
     }
 
-    void SarahGoodPath()
+    void SarahChoiceConcern()
     {
         ClearChoices();
-        AddMessage(true, "Sarah, that's a deepfake. Don't panic.");
+        // No paranoia change
+        AddMessage(true, "What's wrong? Are you okay?", false, "sarah");
+        StartCoroutine(SarahRevealVideo());
+    }
+
+    void SarahChoiceDismissive()
+    {
+        ClearChoices();
+        SetParanoia(paranoia + 5);
+        AddMessage(true, "It's 4 AM. Can this wait until morning?", false, "sarah");
+        StartCoroutine(SarahRevealVideo());
+    }
+
+    IEnumerator SarahRevealVideo()
+    {
+        yield return Wait(0.5f);
+        AddMessage(false, "My ex sent me this video...", false, "sarah");
+        AddVideoMessage(false, "sarah_deepfake_video.mp4", "0:23", "sarah");
+        yield return Wait(1.2f);
+        AddMessage(false, "It looks like me but... I never filmed this 😭", false, "sarah");
+        yield return Wait(0.8f);
+        ShowChoices(
+            ("\"Sarah, that's a deepfake. Don't panic.\"", 0, SarahGoodPathStart),
+            ("\"Are you sure it's not you? Maybe you forgot?\"", 1, SarahBadPathStart)
+        );
+    }
+
+    void SarahGoodPathStart()
+    {
+        ClearChoices();
+        // No paranoia change
+        AddMessage(true, "Sarah, that's a deepfake. Don't panic.", false, "sarah");
         StartCoroutine(SarahGoodPathContinue());
     }
 
     IEnumerator SarahGoodPathContinue()
     {
         yield return Wait(0.8f);
-        AddMessage(false, "What do I do?? I'm so scared 😰");
+        AddMessage(false, "What do I do?? I'm so scared 😰", false, "sarah");
         yield return Wait(0.5f);
         ShowChoices(
-            ("\"Block him immediately. Don't respond.\"", 2, SarahBlockPath),
-            ("\"Save the video as evidence first.\"", 2, SarahEvidencePath)
+            ("\"Block him immediately. Don't respond.\"", 0, SarahAdviceBlock),
+            ("\"Save the video as evidence first. Then block him.\"", 1, SarahAdviceEvidence)
         );
     }
 
-    void SarahBlockPath()
+    void SarahAdviceBlock()
     {
         ClearChoices();
-        AddMessage(true, "Block him immediately. Don't respond.");
-        StartCoroutine(SarahEndGood());
+        SetParanoia(paranoia - 5);
+        AddMessage(true, "Block him immediately. Don't respond.", false, "sarah");
+        StartCoroutine(SarahGoodPathComfort());
     }
 
-    void SarahEvidencePath()
+    void SarahAdviceEvidence()
     {
         ClearChoices();
-        AddMessage(true, "Save the video as evidence first. Then block him.");
-        StartCoroutine(SarahEndGood());
+        SetParanoia(paranoia - 3);
+        AddMessage(true, "Save the video as evidence first. Then block him.", false, "sarah");
+        StartCoroutine(SarahGoodPathComfort());
     }
 
-    IEnumerator SarahEndGood()
+    IEnumerator SarahGoodPathComfort()
     {
-        yield return Wait(0.8f);
-        AddMessage(false, "Okay. I will...");
-        AddMessage(false, "This is so messed up...");
-        AddMessage(false, "Why would someone do this to me? 😢");
         yield return Wait(0.6f);
-        AddMessage(true, "Some people are just evil.");
-        AddMessage(true, "Stay strong. I'm here for you.");
-        yield return Wait(0.6f);
-        AddMessage(false, "Thank you Alex 😢❤️");
-        AddMessage(false, "I'm lucky to have you as a friend.");
+        AddMessage(false, "Okay. I will...", false, "sarah");
         yield return Wait(0.5f);
-        AddMessage(true, "Always here for you.");
+        AddMessage(false, "This is so messed up...", false, "sarah");
+        yield return Wait(0.6f);
+        AddMessage(false, "Why would someone do this to me? 😢", false, "sarah");
+        yield return Wait(0.5f);
+        ShowChoices(
+            ("\"Some people are just evil. Stay strong.\"", 0, SarahComfortStrong),
+            ("\"I'm here for you. You're not alone.\"", 1, SarahComfortHere)
+        );
+    }
+
+    void SarahComfortStrong()
+    {
+        ClearChoices();
+        SetParanoia(paranoia - 5);
+        AddMessage(true, "Some people are just evil. Stay strong.", false, "sarah");
+        StartCoroutine(SarahGoodEnding());
+    }
+
+    void SarahComfortHere()
+    {
+        ClearChoices();
+        SetParanoia(paranoia - 5);
+        AddMessage(true, "I'm here for you. You're not alone.", false, "sarah");
+        StartCoroutine(SarahGoodEnding());
+    }
+
+    IEnumerator SarahGoodEnding()
+    {
+        yield return Wait(0.6f);
+        AddMessage(false, "Thank you Alex 😢❤️", false, "sarah");
+        yield return Wait(0.5f);
+        AddMessage(false, "I'm lucky to have you as a friend.", false, "sarah");
+        yield return Wait(0.5f);
+        AddMessage(true, "Always here for you.", false, "sarah");
         
-        SetParanoia(paranoia - 10);
+        SetParanoia(paranoia); // already updated through the chain
         sarahFinished = true;
+        sarahBadPath = false;
         if (sarahPreview != null) sarahPreview.text = "Thank you Alex ❤️";
         
-        yield return Wait(1.0f);
+        yield return Wait(1.5f);
         CloseChat();
     }
 
-    void SarahBadPath()
+    void SarahBadPathStart()
     {
         ClearChoices();
-        sarahBadPath = true;
-        AddMessage(true, "Are you sure it's not you? Maybe you forgot?");
+        SetParanoia(paranoia + 15);
+        AddMessage(true, "Are you sure it's not you? Maybe you forgot?", false, "sarah");
         StartCoroutine(SarahBadPathContinue());
     }
 
     IEnumerator SarahBadPathContinue()
     {
         yield return Wait(0.8f);
-        AddMessage(false, "Wow. Thanks for believing me.");
-        AddMessage(false, "I thought you were my friend... 😢");
+        AddMessage(false, "Wow. Thanks for believing me.", false, "sarah");
         yield return Wait(0.5f);
-        AddSystem("Sarah stopped responding.");
+        ShowChoices(
+            ("\"Wait, I'm sorry. I believe you. What can I do?\"", 0, SarahRecovery),
+            ("\"I'm just worried about you. The video just looks so real.\"", 1, SarahBadEnding)
+        );
+    }
+
+    void SarahRecovery()
+    {
+        ClearChoices();
+        SetParanoia(paranoia - 10);
+        AddMessage(true, "Wait, I'm sorry. I believe you. What can I do?", false, "sarah");
+        // Redirect to good path at the "What do I do?" stage
+        StartCoroutine(SarahGoodPathContinue());
+    }
+
+    void SarahBadEnding()
+    {
+        ClearChoices();
+        SetParanoia(paranoia + 5);
+        AddMessage(true, "I'm just worried about you. The video just looks so real.", false, "sarah");
+        StartCoroutine(SarahBadEndingFinal());
+    }
+
+    IEnumerator SarahBadEndingFinal()
+    {
+        yield return Wait(0.8f);
+        AddMessage(false, "I thought you were my friend... 😢", false, "sarah");
+        yield return Wait(0.5f);
+        AddSystem("Sarah stopped responding.", "sarah");
         
-        SetParanoia(paranoia + 15);
         sarahFinished = true;
+        sarahBadPath = true;
         if (sarahPreview != null) sarahPreview.text = "[Ignored you]";
         
-        yield return Wait(1.0f);
+        yield return Wait(1.5f);
         CloseChat();
     }
 
@@ -786,7 +952,7 @@ public class ChatController : MonoBehaviour
     IEnumerator MomIntro()
     {
         yield return Wait(0.6f);
-        AddMessage(false, "Are you home??");
+        AddMessage(false, "Are you home??", false, "mom");
         yield return Wait(0.5f);
         ShowChoices(
             ("\"Yeah, where else would I be at 4 AM?\"", 0, MomChoice1A),
@@ -797,7 +963,7 @@ public class ChatController : MonoBehaviour
     void MomChoice1A()
     {
         ClearChoices();
-        AddMessage(true, "Yeah, where else would I be at 4 AM?");
+        AddMessage(true, "Yeah, where else would I be at 4 AM?", false, "mom");
         StartCoroutine(MomRequest());
     }
 
@@ -805,21 +971,21 @@ public class ChatController : MonoBehaviour
     {
         ClearChoices();
         SetParanoia(paranoia - 5);
-        AddMessage(true, "I'm home. Did something happen?");
+        AddMessage(true, "I'm home. Did something happen?", false, "mom");
         StartCoroutine(MomChoice1BSeq());
     }
 
     IEnumerator MomChoice1BSeq()
     {
         yield return Wait(0.8f);
-        AddMessage(false, "Alex, we need the address fast, dad's GPS is acting up. Type it in English please.");
+        AddMessage(false, "Alex, we need the address fast, dad's GPS is acting up. Type it in English please.", false, "mom");
         StartCoroutine(MomRequest());
     }
 
     IEnumerator MomRequest()
     {
         yield return Wait(0.9f);
-        AddMessage(false, "Alex! I need you to type out the FULL home address - in English. Dad's Google Maps keeps resetting. Fast!");
+        AddMessage(false, "Alex! I need you to type out the FULL home address - in English. Dad's Google Maps keeps resetting. Fast!", false, "mom");
         yield return Wait(0.3f);
         ShowChoices(
             ("\"Sure, hold on.\"", 0, MomChoice2A),
@@ -832,14 +998,14 @@ public class ChatController : MonoBehaviour
         ClearChoices();
         SubtractTime(60);
         SetParanoia(paranoia + 5);
-        AddMessage(true, "Sure, hold on.");
+        AddMessage(true, "Sure, hold on.", false, "mom");
         StartCoroutine(MomPressure());
     }
 
     IEnumerator MomPressure()
     {
         yield return Wait(0.8f);
-        AddMessage(false, "Faster, Alex! Dad is losing his mind! Just type it!");
+        AddMessage(false, "Faster, Alex! Dad is losing his mind! Just type it!", false, "mom");
         yield return Wait(0.3f);
         ShowChoices(
             ("[ SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
@@ -850,26 +1016,26 @@ public class ChatController : MonoBehaviour
     void MomChoice2B()
     {
         ClearChoices();
-        AddMessage(true, "Send me a photo first, I'm freaked out.");
+        AddMessage(true, "Send me a photo first, I'm freaked out.", false, "mom");
         StartCoroutine(MomSendPhoto());
     }
 
     void MomAskPhoto()
     {
         ClearChoices();
-        AddMessage(true, "Actually wait - send me a quick photo first. Just to be sure.");
+        AddMessage(true, "Actually wait - send me a quick photo first. Just to be sure.", false, "mom");
         StartCoroutine(MomSendPhoto());
     }
 
     IEnumerator MomSendPhoto()
     {
         yield return Wait(0.7f);
-        AddMessage(false, "Fine! Hurry up!");
+        AddMessage(false, "Fine! Hurry up!", false, "mom");
         yield return Wait(1.0f);
-        AddPhoto();
+        AddPhoto("mom");
         SetParanoia(paranoia + 5);
         yield return Wait(0.6f);
-        AddMessage(false, "See? It's me. Now send it.");
+        AddMessage(false, "See? It's me. Now send it.", false, "mom");
         yield return Wait(0.3f);
         ShowChoices(
             ("[ TRUST & SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
@@ -881,7 +1047,7 @@ public class ChatController : MonoBehaviour
     {
         ClearChoices();
         momFinished = true;
-        AddSystem("Contact BLOCKED at 4:18 AM");
+        AddSystem("Contact BLOCKED at 4:18 AM", "mom");
         SetParanoia(Mathf.Max(0, paranoia - 20));
         if (momPreview != null) momPreview.text = "[Blocked]";
         StartCoroutine(MomBlockSeq());
@@ -890,7 +1056,7 @@ public class ChatController : MonoBehaviour
     IEnumerator MomBlockSeq()
     {
         yield return Wait(1.0f);
-        AddSystem("Something felt wrong. You trusted your gut - your address is safe.");
+        AddSystem("Something felt wrong. You trusted your gut - your address is safe.", "mom");
         yield return Wait(2.0f);
         CloseChat();
     }
@@ -901,7 +1067,7 @@ public class ChatController : MonoBehaviour
         momFinished = true;
         if (momPreview != null) momPreview.text = "address received.";
 
-        AddMessage(true, "Green Street, bld 14, apt 8");
+        AddMessage(true, "Green Street, bld 14, apt 8", false, "mom");
 
         string[] spam = {
             "GOT IT.", "address received.", "we know where you live now, Alex.",
@@ -915,7 +1081,7 @@ public class ChatController : MonoBehaviour
 
         foreach (var s in spam)
         {
-            AddSpam(s);
+            AddSpam(s, "mom");
             FlashRed();
             yield return Wait(0.35f);
         }
@@ -928,9 +1094,9 @@ public class ChatController : MonoBehaviour
     IEnumerator BroIntro()
     {
         yield return Wait(0.6f);
-        AddMessage(false, "Yo, Alex, you up? I need a huge favor right now. Can you wire me 100 bucks? My card is blocked at a gas station. Urgent. Listen:");
+        AddMessage(false, "Yo, Alex, you up? I need a huge favor right now. Can you wire me 100 bucks? My card is blocked at a gas station. Urgent. Listen:", false, "bro");
         yield return Wait(0.5f);
-        AddVoice(false, voiceNoteClip);
+        AddVoice(false, voiceNoteClip, false, "bro");
         yield return Wait(0.7f);
         ShowChoices(
             ("\"Sure, sending it now.\"", 1, BroChoice1A),
@@ -947,14 +1113,14 @@ public class ChatController : MonoBehaviour
     void BroChoice1B()
     {
         ClearChoices();
-        AddMessage(true, "Send me another voice note just to be sure.");
+        AddMessage(true, "Send me another voice note just to be sure.", false, "bro");
         StartCoroutine(BroAngry());
     }
 
     IEnumerator BroAngry()
     {
         yield return Wait(1.5f);
-        AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes? Just send the cash!");
+        AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes? Just send the cash!", false, "bro");
         yield return Wait(0.5f);
         ShowChoices(
             ("\"Okay, okay, sorry. Sending it now.\"", 1, () => StartCoroutine(TriggerTransactionFail())),
@@ -965,14 +1131,14 @@ public class ChatController : MonoBehaviour
     void BroChoiceDangerPath()
     {
         ClearChoices();
-        AddMessage(true, "Come on, just one more. Then I'll send it.");
+        AddMessage(true, "Come on, just one more. Then I'll send it.", false, "bro");
         StartCoroutine(AddDangerVoiceNote());
     }
 
     IEnumerator AddDangerVoiceNote()
     {
         yield return Wait(2.0f);
-        AddVoice(false, screamerClip, true);
+        AddVoice(false, screamerClip, true, "bro");
         broSecondVoiceNoteTriggered = true;
     }
 
@@ -983,13 +1149,13 @@ public class ChatController : MonoBehaviour
         broFinished = true;
         if (broPreview != null) broPreview.text = "[Compromised]";
 
-        AddMessage(true, "Sure, sending it now.");
+        AddMessage(true, "Sure, sending it now.", false, "bro");
         yield return Wait(1.0f);
 
         SubtractTime(60);
         SetParanoia(paranoia + 20);
 
-        AddMessage(false, "⚠ TRANSACTION FAILED\nALERT: Account compromised. Remote access detected.", true);
+        AddMessage(false, "⚠ TRANSACTION FAILED\nALERT: Account compromised. Remote access detected.", true, "bro");
         
         yield return Wait(3.5f);
         CloseChat();
@@ -1002,11 +1168,11 @@ public class ChatController : MonoBehaviour
 
         ClearChoices();
         
-        AddSpam("DO YOU BELIEVE ME NOW, ALEX?");
+        AddSpam("DO YOU BELIEVE ME NOW, ALEX?", "bro");
         yield return Wait(1.0f);
 
-        AddSpam("SIGNAL CORRUPTED");
-        AddSpam("CONNECTION TERMINATED");
+        AddSpam("SIGNAL CORRUPTED", "bro");
+        AddSpam("CONNECTION TERMINATED", "bro");
         FlashRed();
 
         yield return Wait(2.0f);
@@ -1019,23 +1185,23 @@ public class ChatController : MonoBehaviour
         audioSrc.PlayOneShot(momBadEndingClip, 1f);
     }
 
-    void ConfigureChatLayout()
+    void ConfigureChatLayout(Transform container)
     {
-        messagesRT = messagesContent as RectTransform;
-        if (messagesContent == null) return;
+        if (container == null) return;
+        RectTransform containerRT = container as RectTransform;
 
         // Content must be top-anchored (NOT vertically stretched) so the
         // ContentSizeFitter can drive its height. A vertical stretch anchor
         // conflicts with the fitter and breaks message sizing/overlap.
-        messagesRT.anchorMin = new Vector2(0f, 1f);
-        messagesRT.anchorMax = new Vector2(1f, 1f);
-        messagesRT.pivot = new Vector2(0.5f, 1f);
-        messagesRT.offsetMin = new Vector2(0f, messagesRT.offsetMin.y);
-        messagesRT.offsetMax = new Vector2(0f, messagesRT.offsetMax.y);
-        var ap = messagesRT.anchoredPosition; ap.x = 0f; ap.y = 0f; messagesRT.anchoredPosition = ap;
+        containerRT.anchorMin = new Vector2(0f, 1f);
+        containerRT.anchorMax = new Vector2(1f, 1f);
+        containerRT.pivot = new Vector2(0.5f, 1f);
+        containerRT.offsetMin = new Vector2(0f, containerRT.offsetMin.y);
+        containerRT.offsetMax = new Vector2(0f, containerRT.offsetMax.y);
+        var ap = containerRT.anchoredPosition; ap.x = 0f; ap.y = 0f; containerRT.anchoredPosition = ap;
 
-        var vlg = messagesContent.GetComponent<VerticalLayoutGroup>();
-        if (vlg == null) vlg = messagesContent.gameObject.AddComponent<VerticalLayoutGroup>();
+        var vlg = container.GetComponent<VerticalLayoutGroup>();
+        if (vlg == null) vlg = container.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;   // rows span full width so L/R alignment works
@@ -1044,8 +1210,8 @@ public class ChatController : MonoBehaviour
         vlg.spacing = 10f;
         vlg.padding = new RectOffset(10, 10, 12, 12);
 
-        var csf = messagesContent.GetComponent<ContentSizeFitter>();
-        if (csf == null) csf = messagesContent.gameObject.AddComponent<ContentSizeFitter>();
+        var csf = container.GetComponent<ContentSizeFitter>();
+        if (csf == null) csf = container.gameObject.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
@@ -1125,10 +1291,13 @@ public class ChatController : MonoBehaviour
         foreach (Transform child in messagesContent) Destroy(child.gameObject);
     }
 
-    RectTransform BuildRow(bool isMe)
+    RectTransform BuildRow(bool isMe, Transform container = null)
     {
+        Transform target = (container != null) ? container : messagesContent;
+        if (target == null) return null;
+
         GameObject row = new GameObject(isMe ? "RowMe" : "RowThem", typeof(RectTransform));
-        row.transform.SetParent(messagesContent, false);
+        row.transform.SetParent(target, false);
 
         // Row spans the full content width (parent VLG forces expand). The HLG
         // aligns the single bubble to the left or right and sizes it to its
@@ -1154,10 +1323,10 @@ public class ChatController : MonoBehaviour
         return Mathf.Max(100f, w * 0.75f - 40f);
     }
 
-    void AddBubble(bool isMe, string text, Color bubbleCol, Color textCol, FontStyles style = FontStyles.Normal)
+    void AddBubble(bool isMe, string text, Color bubbleCol, Color textCol, FontStyles style = FontStyles.Normal, Transform container = null)
     {
-        if (messagesContent == null) return;
-        var row = BuildRow(isMe);
+        var row = BuildRow(isMe, container);
+        if (row == null) return;
 
         // --- Bubble container ---
         // VerticalLayoutGroup reports the bubble's preferred size up to the row's
@@ -1255,30 +1424,39 @@ public class ChatController : MonoBehaviour
         rt.localScale = Vector3.one;
     }
 
-    void AddMessage(bool isMe, string text, bool isError = false)
+    Transform GetTargetContainer(string targetChatId)
     {
+        if (string.IsNullOrEmpty(targetChatId)) return messagesContent;
+        if (chatContainers.TryGetValue(targetChatId, out Transform container)) return container;
+        return messagesContent;
+    }
+
+    void AddMessage(bool isMe, string text, bool isError = false, string targetChatId = null)
+    {
+        Transform target = GetTargetContainer(targetChatId);
         if (isError)
         {
-            AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold);
+            AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold, target);
         }
-        else if (isMe) AddBubble(true, text, meBubble, meText);
-        else AddBubble(false, text, themBubble, themText);
+        else if (isMe) AddBubble(true, text, meBubble, meText, FontStyles.Normal, target);
+        else AddBubble(false, text, themBubble, themText, FontStyles.Normal, target);
     }
 
-    void AddSystem(string text)
+    void AddSystem(string text, string targetChatId = null)
     {
-        AddBubble(false, text, new Color(0.25f, 0.2f, 0.0f, 0.9f), new Color(1f, 0.82f, 0.38f));
+        AddBubble(false, text, new Color(0.25f, 0.2f, 0.0f, 0.9f), new Color(1f, 0.82f, 0.38f), FontStyles.Normal, GetTargetContainer(targetChatId));
     }
 
-    void AddSpam(string text)
+    void AddSpam(string text, string targetChatId = null)
     {
-        AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold);
+        AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold, GetTargetContainer(targetChatId));
     }
 
-    void AddPhoto()
+    void AddPhoto(string targetChatId = null)
     {
-        if (messagesContent == null) return;
-        var row = BuildRow(false);
+        Transform target = GetTargetContainer(targetChatId);
+        var row = BuildRow(false, target);
+        if (row == null) return;
 
         GameObject holder = new GameObject("Photo", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
@@ -1311,13 +1489,14 @@ public class ChatController : MonoBehaviour
         ScrollToBottom();
     }
 
-    void AddVoice(bool isMe, AudioClip clip = null, bool isDanger = false)
+    void AddVoice(bool isMe, AudioClip clip = null, bool isDanger = false, string targetChatId = null)
     {
-        if (messagesContent == null) return;
-        var row = BuildRow(isMe);
+        Transform target = GetTargetContainer(targetChatId);
+        var row = BuildRow(isMe, target);
+        if (row == null) return;
 
         // Custom, fully controllable voice-note bubble (messenger style): a
-        // play/pause button on the left, a progress bar, and an elapsed-time
+// play/pause button on the left, a progress bar, and an elapsed-time
         // label that counts seconds while the note plays — just like a real app.
         GameObject holder = new GameObject("VoiceNote", typeof(RectTransform), typeof(Image), typeof(Button));
         holder.transform.SetParent(row, false);
@@ -1648,6 +1827,44 @@ public class ChatController : MonoBehaviour
         int s = Mathf.FloorToInt(timer % 60f);
         timerText.text = string.Format("{0:00}:{1:00}", m, s);
         timerText.color = timer < 120f ? new Color(1f, 0.13f, 0.13f) : new Color(0.88f, 0.88f, 1f);
+    }
+
+    void SwitchToChat(string chatId)
+    {
+        if (templateMessagesContent == null) return;
+
+        // Hide all containers to prevent overlapping
+        foreach (var kvp in chatContainers)
+        {
+            if (kvp.Value != null) kvp.Value.gameObject.SetActive(false);
+        }
+
+        // Deactivate the template messages content if it's not already
+        templateMessagesContent.gameObject.SetActive(false);
+
+        // Clear any leftover choices from previous chats
+        ClearChoices();
+        if (optionsPanel != null) optionsPanel.SetActive(true);
+
+        // Create if new
+        if (!chatContainers.ContainsKey(chatId))
+        {
+            GameObject newContent = Instantiate(templateMessagesContent.gameObject, templateMessagesContent.parent);
+            newContent.name = "ChatContent_" + chatId;
+            // Clear placeholders from template
+            foreach (Transform child in newContent.transform) Destroy(child.gameObject);
+            
+            chatContainers[chatId] = newContent.transform;
+            ConfigureChatLayout(newContent.transform);
+        }
+
+        // Show new
+        currentChat = chatId;
+        Transform container = chatContainers[chatId];
+        container.gameObject.SetActive(true);
+        messagesContent = container;
+        if (chatScrollRect != null) chatScrollRect.content = container as RectTransform;
+        messagesRT = container as RectTransform;
     }
 
     void FlashRed()
