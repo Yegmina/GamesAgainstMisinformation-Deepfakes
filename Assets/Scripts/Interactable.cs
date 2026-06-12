@@ -3,9 +3,11 @@ using UnityEngine;
 public class Interactable : MonoBehaviour
 {
     [SerializeField] private string interactionText = "Press E to use computer";
+    [SerializeField] private string exitText = "Esc to exit";
 
     public Transform SitPoint => sitPoint;
     public string InteractionText => interactionText;
+    public string ExitText => exitText;
 
     [SerializeField]
     private Transform sitPoint;

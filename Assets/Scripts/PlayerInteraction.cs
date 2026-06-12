@@ -36,11 +36,15 @@ public class PlayerInteraction : MonoBehaviour
     {
         if (currentInteractable == null) return;
 
+        uiController.UnlockCursor();
+
         activeInteraction = currentInteractable;
         activeInteraction.Interact();
 
         controller.enabled = false;
         controller.InteractionPoint(activeInteraction.SitPoint);
+
+        uiController.ShowInteraction(activeInteraction.ExitText);
     }
 
     private void HandleExit()
@@ -48,9 +52,14 @@ public class PlayerInteraction : MonoBehaviour
         if (activeInteraction == null)
             return;
 
+        uiController.LockCursor();
+
         activeInteraction.ExitInteraction();
-        activeInteraction = null;
         controller.enabled = true;
+
+        uiController.ShowInteraction(activeInteraction.InteractionText);
+
+        activeInteraction = null;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -69,6 +78,7 @@ public class PlayerInteraction : MonoBehaviour
         {
             currentInteractable = null;
             uiController.HideInteraction();
+
         }
     }
 }
