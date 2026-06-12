@@ -63,9 +63,9 @@ public class GlobalCanvasPersistent : MonoBehaviour
             Cursor.visible = true;
         }
 
-        // Don't run the timer if we are in an ending scene
+        // Don't run the timer if we are in an ending scene or start game scene
         string currentScene = SceneManager.GetActiveScene().name;
-        if (currentScene.Contains("Ending_"))
+        if (currentScene.Contains("Ending_") || currentScene == "StartGame")
         {
             timerRunning = false;
             return;
