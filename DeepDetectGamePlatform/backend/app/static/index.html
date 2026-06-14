@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeepDetect Game Platform</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="auth-screen" class="auth-shell">
+        <div class="brand-panel">
+          <p class="kicker">DeepDetect</p>
+          <h1>Morning Shift: False Signal</h1>
+          <p class="lede">Work the new-media desk, verify stories under pressure, and keep rumors out of the feed.</p>
+        </div>
+        <form id="auth-form" class="auth-card">
+          <div class="segmented" role="tablist" aria-label="Auth mode">
+            <button type="button" id="show-login" class="active">Login</button>
+            <button type="button" id="show-register">Register</button>
+          </div>
+          <label id="name-field">
+            Name
+            <input id="name" autocomplete="name" placeholder="Editor name" />
+          </label>
+          <label>
+            Email
+            <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Password
+            <input id="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required />
+          </label>
+          <button id="auth-submit" type="submit">Login</button>
+          <p id="auth-error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="game-shell" class="game-shell hidden">
+        <header class="topbar">
+          <div>
+            <p class="kicker">New Media Desk</p>
+            <h1 id="game-title">DeepDetect</h1>
+            <p id="agent-status" class="agent-status hidden"></p>
+          </div>
+          <div class="topbar-actions">
+            <div class="scorebox">
+              <span>Score</span>
+              <strong id="score">0</strong>
+            </div>
+            <button id="advance-world" class="ghost hidden">Advance World</button>
+            <button id="generate-game" class="primary">New Session</button>
+            <button id="logout" class="ghost">Logout</button>
+          </div>
+        </header>
+
+        <section id="session-library" class="session-library hidden"></section>
+
+        <section id="empty-state" class="empty-state">
+          <h2>Choose a session</h2>
+          <p>Start a new shift or resume a saved one from this account.</p>
+          <button id="generate-game-empty" class="primary large">New Session</button>
+        </section>
+
+        <section id="active-game" class="hidden">
+          <div class="mission-strip">
+            <div id="goals" class="goals"></div>
+            <div id="agent-log" class="agent-log"></div>
+          </div>
+
+          <nav class="tabs" aria-label="Game workspaces">
+            <button class="tab active" data-tab="news">Newsdesk</button>
+            <button class="tab" data-tab="email">Inbox</button>
+            <button class="tab" data-tab="telegram">Telegram</button>
+            <button class="tab" data-tab="briefing">Briefing</button>
+          </nav>
+
+          <section id="tab-news" class="tab-panel"></section>
+          <section id="tab-email" class="tab-panel hidden"></section>
+          <section id="tab-telegram" class="tab-panel hidden"></section>
+          <section id="tab-briefing" class="tab-panel hidden"></section>
+        </section>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
