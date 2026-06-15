@@ -54,6 +54,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private ComputerGameState currentGame;
     private string activeTab = "home";
     private string activeEmailId = string.Empty;
+    private string activeTelegramId = string.Empty;
     private bool initialized;
     private bool initializing;
     private bool busy;
@@ -431,6 +432,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(activeEmailId) || !EmailExists(activeEmailId))
         {
             activeEmailId = FirstOpenEmailId();
+        }
+
+        if (string.IsNullOrWhiteSpace(activeTelegramId) || !TelegramExists(activeTelegramId))
+        {
+            activeTelegramId = FirstOpenTelegramId();
         }
 
         if (GlobalCanvasPersistent.Instance != null)
@@ -1023,62 +1029,46 @@ public sealed class ComputerOverlayController : MonoBehaviour
         List<ComputerNewsItem> items = currentGame.newsItems ?? new List<ComputerNewsItem>();
         if (items.Count == 0)
         {
-                Text(parent, "EmptyNews", "No newsroom items are available in this runtime shift.", 18, Muted);
+            Text(parent, "EmptyNews", "No newsroom items are available in this runtime shift.", 22, Muted);
             return;
         }
 
-        GameObject shell = Element(parent: parent, name: "NewsroomShell");
+        GameObject shell = PanelObject(parent, "NewsdeskApp", Html("#f5f6f8"));
         Layout(shell, -1f, TabPanelHeight, 1f, 0f);
-        HorizontalLayoutGroup shellLayout = shell.AddComponent<HorizontalLayoutGroup>();
-        shellLayout.spacing = 0;
+        VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
+        shellLayout.padding = new RectOffset(20, 20, 18, 20);
+        shellLayout.spacing = 14;
         shellLayout.childControlWidth = true;
-        shellLayout.childControlHeight = true;
         shellLayout.childForceExpandWidth = true;
+        shellLayout.childControlHeight = true;
         shellLayout.childForceExpandHeight = false;
 
-        GameObject sidebar = PanelObject(shell.transform, "NewsSidebar", Ink);
-        Layout(sidebar, 96f, -1f, 0f, 0f);
-        VerticalLayoutGroup sideLayout = sidebar.AddComponent<VerticalLayoutGroup>();
-        sideLayout.padding = new RectOffset(12, 12, 16, 16);
-        sideLayout.spacing = 10;
-        sideLayout.childAlignment = TextAnchor.UpperCenter;
-        Text(sidebar.transform, "Logo", "DD", 24, Color.white, FontStyles.Bold).alignment = TextAlignmentOptions.Center;
-        Text(sidebar.transform, "Wire", "Wire", 14, Color.white, FontStyles.Bold).alignment = TextAlignmentOptions.Center;
-        Text(sidebar.transform, "Cms", "CMS", 14, Html("#c8d4df")).alignment = TextAlignmentOptions.Center;
-        Text(sidebar.transform, "Verify", "Verify", 14, Html("#c8d4df")).alignment = TextAlignmentOptions.Center;
-        Text(sidebar.transform, "Legal", "Legal", 14, Html("#c8d4df")).alignment = TextAlignmentOptions.Center;
+        Text(shell.transform, "Header", "Newsdesk", 34, Ink, FontStyles.Bold);
+        Text(shell.transform, "Status", $"{items.Count} incoming wires / {OpenNewsCount(items)} open decisions", 20, Muted, FontStyles.Bold);
 
-        GameObject main = Element(parent: shell.transform, name: "NewsMain");
-        Layout(main, -1f, -1f, 1f, 0f);
-        VerticalLayoutGroup mainLayout = main.AddComponent<VerticalLayoutGroup>();
-        mainLayout.padding = new RectOffset(16, 0, 0, 0);
-        mainLayout.spacing = 12;
-
-        Text(main.transform, "Toolbar", $"{items.Count} incoming wires / {OpenNewsCount(items)} open decisions", 15, Muted, FontStyles.Bold);
-        AddNewsCard(main.transform, items[0], true);
-        for (int i = 1; i < items.Count; i++)
+        for (int i = 0; i < items.Count; i++)
         {
-            AddNewsCard(main.transform, items[i], false);
+            AddNewsCard(shell.transform, items[i], i == 0);
         }
     }
 
     private void AddNewsCard(Transform parent, ComputerNewsItem item, bool lead)
     {
         GameObject card = Card(parent, lead ? "LeadStory" : "WireRow");
-        Layout(card, -1f, lead ? 260f : 184f, 1f, 0f);
+        Layout(card, -1f, lead ? 306f : 246f, 1f, 0f);
 
-        Text(card.transform, "Meta", $"{(lead ? "Lead slot" : "Wire")} / {SourceHost(item.url, item.source)} / {NewsStatus(item)}", 13, BlueDark, FontStyles.Bold);
-        Text(card.transform, "Title", Fallback(item.title, "Untitled story"), lead ? 28 : 20, Ink, FontStyles.Bold);
-        Text(card.transform, "Summary", Fallback(item.summary, "No summary available."), lead ? 17 : 15, Ink);
-        Text(card.transform, "Evidence", $"Source: {Fallback(item.source, "pending")}    Pressure: {Fallback(item.publicPressure, "pending")}    Desk note: {Fallback(item.editorNote, "No note")}", 13, Muted);
+        Text(card.transform, "Meta", $"{(lead ? "Lead slot" : "Wire")} / {SourceHost(item.url, item.source)} / {NewsStatus(item)}", 18, BlueDark, FontStyles.Bold);
+        Text(card.transform, "Title", Fallback(item.title, "Untitled story"), lead ? 30 : 24, Ink, FontStyles.Bold);
+        Text(card.transform, "Summary", Fallback(item.summary, "No summary available."), lead ? 20 : 18, Ink);
+        Text(card.transform, "Evidence", $"Source: {Fallback(item.source, "pending")} / Pressure: {Fallback(item.publicPressure, "pending")} / Desk note: {Fallback(item.editorNote, "No note")}", 17, Muted);
         AddResult(card.transform, item.correct);
 
         GameObject choices = Element(parent: card.transform, name: "Choices");
-        Layout(choices, -1f, 42f, 1f, 0f);
+        Layout(choices, -1f, 54f, 1f, 0f);
         HorizontalLayoutGroup choiceLayout = choices.AddComponent<HorizontalLayoutGroup>();
-        choiceLayout.spacing = 8;
-        Button publish = Button(choices.transform, "Publish", Green, Color.white, () => SendActionClicked("news", item.id, "publish"), 110f, 38f);
-        Button reject = Button(choices.transform, "Reject", Red, Color.white, () => SendActionClicked("news", item.id, "reject"), 110f, 38f);
+        choiceLayout.spacing = 10;
+        Button publish = Button(choices.transform, "Publish", Green, Color.white, () => SendActionClicked("news", item.id, "publish"), 142f, 50f);
+        Button reject = Button(choices.transform, "Reject", Red, Color.white, () => SendActionClicked("news", item.id, "reject"), 142f, 50f);
         bool decided = !string.IsNullOrWhiteSpace(item.decision);
         publish.interactable = !decided && !busy;
         reject.interactable = !decided && !busy;
@@ -1089,7 +1079,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         List<ComputerEmailItem> emails = currentGame.emails ?? new List<ComputerEmailItem>();
         if (emails.Count == 0)
         {
-            Text(parent, "EmptyInbox", "No inbox messages are available in this runtime shift.", 18, Muted);
+            Text(parent, "EmptyInbox", "No inbox messages are available in this runtime shift.", 22, Muted);
             return;
         }
 
@@ -1100,30 +1090,31 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         ComputerEmailItem active = FindEmail(activeEmailId) ?? emails[0];
 
-        GameObject shell = PanelObject(parent, "GmailShell", Html("#f2f6fb"));
+        GameObject shell = PanelObject(parent, "InboxApp", Html("#f2f6fb"));
         Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
-        shellLayout.padding = new RectOffset(14, 14, 14, 14);
-        shellLayout.spacing = 12;
+        shellLayout.padding = new RectOffset(20, 20, 18, 20);
+        shellLayout.spacing = 14;
         shellLayout.childControlWidth = true;
         shellLayout.childForceExpandWidth = true;
         shellLayout.childControlHeight = true;
         shellLayout.childForceExpandHeight = false;
 
-        Text(shell.transform, "Header", "Menu  Gmail     Search mail                                      Help   Settings   More", 20, Ink, FontStyles.Bold);
+        Text(shell.transform, "Header", "Inbox", 34, Ink, FontStyles.Bold);
+        Text(shell.transform, "Subheader", $"{emails.Count} newsroom threads / {OpenThreadCount(emails)} need a reply", 20, Muted, FontStyles.Bold);
 
         GameObject body = Element(parent: shell.transform, name: "GmailBody");
-        Layout(body, -1f, InboxBodyHeight, 1f, 0f);
+        Layout(body, -1f, 690f, 1f, 0f);
         HorizontalLayoutGroup bodyLayout = body.AddComponent<HorizontalLayoutGroup>();
-        bodyLayout.spacing = 12;
+        bodyLayout.spacing = 14;
         bodyLayout.childControlWidth = true;
         bodyLayout.childControlHeight = true;
         bodyLayout.childForceExpandWidth = false;
         bodyLayout.childForceExpandHeight = true;
 
         GameObject left = Card(body.transform, "InboxList");
-        Layout(left, 420f, -1f, 0f, 1f);
-        Text(left.transform, "Mailbox", "Inbox", 18, BlueDark, FontStyles.Bold);
+        Layout(left, 450f, -1f, 0f, 1f);
+        Text(left.transform, "Mailbox", "Threads", 24, BlueDark, FontStyles.Bold);
         foreach (ComputerEmailItem item in emails)
         {
             AddEmailRow(left.transform, item, item.id == active.id);
@@ -1131,8 +1122,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         GameObject reader = Card(body.transform, "Reader");
         Layout(reader, -1f, -1f, 1f, 1f);
-        Text(reader.transform, "Subject", Fallback(active.subject, "No subject"), 28, Ink, FontStyles.Bold);
-        Text(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")} <{Fallback(active.fromEmail, "unknown")}>    {ThreadProgress(active)}", 14, Muted);
+        Text(reader.transform, "Subject", Fallback(active.subject, "No subject"), 30, Ink, FontStyles.Bold);
+        Text(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")} <{Fallback(active.fromEmail, "unknown")}> / {ThreadProgress(active)}", 18, Muted);
         AddThread(reader.transform, EmailMessages(active), active.fromName);
         AddResult(reader.transform, active.correct);
         AddOptionButtons(reader.transform, "email", active.id, active.options, ThreadResolved(active));
@@ -1145,7 +1136,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void AddEmailRow(Transform parent, ComputerEmailItem item, bool selected)
     {
         GameObject row = PanelObject(parent, "EmailRow", selected ? Html("#e7f0ff") : Panel);
-        Layout(row, -1f, 74f, 1f, 0f);
+        Layout(row, -1f, 104f, 1f, 0f);
         Button button = row.AddComponent<Button>();
         button.targetGraphic = row.GetComponent<Image>();
         button.onClick.AddListener(() =>
@@ -1155,12 +1146,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         });
 
         VerticalLayoutGroup layout = row.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(10, 10, 7, 7);
-        layout.spacing = 2;
+        layout.padding = new RectOffset(12, 12, 10, 10);
+        layout.spacing = 4;
 
-        Text(row.transform, "From", Fallback(item.fromName, "Sender"), 14, Ink, FontStyles.Bold);
-        Text(row.transform, "Subject", Fallback(item.subject, "No subject"), 13, Ink);
-        Text(row.transform, "Preview", $"{LastMessagePreview(EmailMessages(item), item.body)} / {ThreadProgress(item)}", 12, Muted);
+        Text(row.transform, "From", Fallback(item.fromName, "Sender"), 18, Ink, FontStyles.Bold);
+        Text(row.transform, "Subject", Fallback(item.subject, "No subject"), 17, Ink);
+        Text(row.transform, "Preview", ThreadProgress(item), 16, Muted);
     }
 
     private void RenderTelegram(Transform parent)
@@ -1168,32 +1159,79 @@ public sealed class ComputerOverlayController : MonoBehaviour
         List<ComputerTelegramThread> threads = currentGame.telegramThreads ?? new List<ComputerTelegramThread>();
         if (threads.Count == 0)
         {
-            Text(parent, "EmptyTelegram", "No Telegram sidequests are available in this runtime shift.", 18, Muted);
+            Text(parent, "EmptyTelegram", "No Telegram sidequests are available in this runtime shift.", 22, Muted);
             return;
         }
 
-        for (int i = 0; i < threads.Count; i += 2)
+        if (string.IsNullOrWhiteSpace(activeTelegramId) || !TelegramExists(activeTelegramId))
         {
-            GameObject row = Element(parent: parent, name: "TelegramRow");
-            Layout(row, -1f, TelegramRowHeight, 1f, 0f);
-            HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.spacing = 12;
-            rowLayout.childControlWidth = true;
-            rowLayout.childControlHeight = true;
-            rowLayout.childForceExpandWidth = true;
-            rowLayout.childForceExpandHeight = true;
-
-            AddTelegramCard(row.transform, threads[i]);
-            if (i + 1 < threads.Count)
-            {
-                AddTelegramCard(row.transform, threads[i + 1]);
-            }
-            else
-            {
-                GameObject spacer = Element(parent: row.transform, name: "Spacer");
-                Layout(spacer, -1f, 1f, 1f, 0f);
-            }
+            activeTelegramId = FirstOpenTelegramId();
         }
+
+        ComputerTelegramThread active = FindTelegram(activeTelegramId) ?? threads[0];
+
+        GameObject shell = PanelObject(parent, "TelegramApp", Html("#eef3f8"));
+        Layout(shell, -1f, TabPanelHeight, 1f, 0f);
+        VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
+        shellLayout.padding = new RectOffset(20, 20, 18, 20);
+        shellLayout.spacing = 14;
+        shellLayout.childControlWidth = true;
+        shellLayout.childForceExpandWidth = true;
+        shellLayout.childControlHeight = true;
+        shellLayout.childForceExpandHeight = false;
+
+        Text(shell.transform, "Header", "Telegram", 34, Ink, FontStyles.Bold);
+        Text(shell.transform, "Subheader", $"{threads.Count} private threads / {OpenThreadCount(threads)} need a reply", 20, Muted, FontStyles.Bold);
+
+        GameObject body = Element(parent: shell.transform, name: "TelegramBody");
+        Layout(body, -1f, 690f, 1f, 0f);
+        HorizontalLayoutGroup bodyLayout = body.AddComponent<HorizontalLayoutGroup>();
+        bodyLayout.spacing = 14;
+        bodyLayout.childControlWidth = true;
+        bodyLayout.childControlHeight = true;
+        bodyLayout.childForceExpandWidth = false;
+        bodyLayout.childForceExpandHeight = true;
+
+        GameObject left = Card(body.transform, "ThreadList");
+        Layout(left, 430f, -1f, 0f, 1f);
+        Text(left.transform, "Threads", "Chats", 24, BlueDark, FontStyles.Bold);
+        foreach (ComputerTelegramThread thread in threads)
+        {
+            AddTelegramRow(left.transform, thread, thread.id == active.id);
+        }
+
+        GameObject conversation = Card(body.transform, "Conversation");
+        Layout(conversation, -1f, -1f, 1f, 1f);
+        Text(conversation.transform, "Contact", Fallback(active.contact, "Contact"), 30, Ink, FontStyles.Bold);
+        Text(conversation.transform, "Meta", $"{Fallback(active.relationship, "relationship")} / {ThreadProgress(active)}", 18, Muted);
+        AddThread(conversation.transform, active.messages ?? new List<JToken>(), active.contact);
+        AddResult(conversation.transform, active.correct);
+        AddOptionButtons(conversation.transform, "telegram", active.id, active.options, ThreadResolved(active));
+        if (!ThreadResolved(active))
+        {
+            AddCustomReply(conversation.transform, "telegram", active.id, "Write your own message...");
+        }
+    }
+
+    private void AddTelegramRow(Transform parent, ComputerTelegramThread thread, bool selected)
+    {
+        GameObject row = PanelObject(parent, "TelegramRow", selected ? Html("#e2f0ff") : Panel);
+        Layout(row, -1f, 104f, 1f, 0f);
+        Button button = row.AddComponent<Button>();
+        button.targetGraphic = row.GetComponent<Image>();
+        button.onClick.AddListener(() =>
+        {
+            activeTelegramId = thread.id;
+            RenderTabs();
+        });
+
+        VerticalLayoutGroup layout = row.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(12, 12, 10, 10);
+        layout.spacing = 4;
+
+        Text(row.transform, "Contact", Fallback(thread.contact, "Contact"), 18, Ink, FontStyles.Bold);
+        Text(row.transform, "Relationship", Fallback(thread.relationship, "relationship"), 17, Ink);
+        Text(row.transform, "Progress", ThreadProgress(thread), 16, Muted);
     }
 
     private void AddTelegramCard(Transform parent, ComputerTelegramThread thread)
@@ -1212,14 +1250,27 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void RenderBriefing(Transform parent)
     {
-        Text(parent, "Heading", currentGame.complete
-            ? "Shift complete. Review your calls and replay with a new generated day."
-            : "Shift active. Finish every workspace to complete the day.", 28, Ink, FontStyles.Bold);
+        GameObject shell = PanelObject(parent, "BriefingApp", Html("#f7f9fb"));
+        Layout(shell, -1f, TabPanelHeight, 1f, 0f);
+        VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
+        shellLayout.padding = new RectOffset(20, 20, 18, 20);
+        shellLayout.spacing = 14;
+        shellLayout.childControlWidth = true;
+        shellLayout.childForceExpandWidth = true;
+        shellLayout.childControlHeight = true;
+        shellLayout.childForceExpandHeight = false;
 
-        GameObject systems = Element(parent: parent, name: "BriefingSystems");
-        Layout(systems, -1f, BriefingSystemsHeight, 1f, 0f);
+        Text(shell.transform, "Heading", currentGame.complete
+            ? "Shift complete"
+            : "Shift active", 34, Ink, FontStyles.Bold);
+        Text(shell.transform, "Subheading", currentGame.complete
+            ? "Review your calls and replay with a new generated day."
+            : "Finish every workspace to complete the day.", 20, Muted, FontStyles.Bold);
+
+        GameObject systems = Element(parent: shell.transform, name: "BriefingSystems");
+        Layout(systems, -1f, 330f, 1f, 0f);
         HorizontalLayoutGroup systemsLayout = systems.AddComponent<HorizontalLayoutGroup>();
-        systemsLayout.spacing = 12;
+        systemsLayout.spacing = 14;
         systemsLayout.childControlWidth = true;
         systemsLayout.childControlHeight = true;
         systemsLayout.childForceExpandWidth = true;
@@ -1227,33 +1278,33 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         GameObject values = Card(systems.transform, "Values");
         Layout(values, -1f, -1f, 1f, 1f);
-        Text(values.transform, "Title", "Values", 20, Ink, FontStyles.Bold);
+        Text(values.transform, "Title", "Values", 26, Ink, FontStyles.Bold);
         foreach (ComputerValue value in ValuesList())
         {
-            Text(values.transform, "Value", $"{Fallback(value.label, "Value")}: {value.value}/100 - {Fallback(value.description, "No description")}", 14, Ink);
+            Text(values.transform, "Value", $"{Fallback(value.label, "Value")}: {value.value}/100 - {Fallback(value.description, "No description")}", 18, Ink);
         }
 
         GameObject quests = Card(systems.transform, "Quests");
         Layout(quests, -1f, -1f, 1f, 1f);
-        Text(quests.transform, "Title", "Quests", 20, Ink, FontStyles.Bold);
+        Text(quests.transform, "Title", "Quests", 26, Ink, FontStyles.Bold);
         foreach (ComputerQuest quest in currentGame.quests ?? new List<ComputerQuest>())
         {
-            Text(quests.transform, "Quest", $"{Fallback(quest.title, "Quest")}: {quest.current}/{quest.target} {(quest.complete ? "complete" : "active")} - {Fallback(quest.reward, "reward pending")}", 14, Ink);
+            Text(quests.transform, "Quest", $"{Fallback(quest.title, "Quest")}: {quest.current}/{quest.target} {(quest.complete ? "complete" : "active")} - {Fallback(quest.reward, "reward pending")}", 18, Ink);
         }
 
-        Text(parent, "Rules", "1. You are responsible for what appears on the new-media front page.\n2. Real stories should be published only when the source and framing are credible.\n3. Manipulated stories often contain pressure, unsupported certainty, or emotional wording.\n4. Email and Telegram sidequests affect your trust score just like newsdesk calls.", 16, Ink);
-        Text(parent, "LogTitle", "Action log", 20, Ink, FontStyles.Bold);
+        Text(shell.transform, "Rules", "1. You are responsible for what appears on the new-media front page.\n2. Real stories should be published only when the source and framing are credible.\n3. Manipulated stories often contain pressure, unsupported certainty, or emotional wording.\n4. Email and Telegram sidequests affect your trust score just like newsdesk calls.", 20, Ink);
+        Text(shell.transform, "LogTitle", "Action log", 26, Ink, FontStyles.Bold);
 
         List<string> lines = currentGame.actionLog ?? new List<string>();
         if (lines.Count == 0)
         {
-            Text(parent, "EmptyLog", "No actions yet.", 14, Muted);
+            Text(shell.transform, "EmptyLog", "No actions yet.", 18, Muted);
         }
         else
         {
             foreach (string line in lines)
             {
-                Text(parent, "ActionLog", line, 14, Muted);
+                Text(shell.transform, "ActionLog", line, 18, Muted);
             }
         }
     }
@@ -1268,7 +1319,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         GameObject row = Element(parent: parent, name: "Options");
         Layout(row, -1f, -1f, 1f, 0f);
         HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 8;
+        layout.spacing = 10;
         layout.childControlWidth = true;
         layout.childForceExpandWidth = false;
 
@@ -1279,7 +1330,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
                 continue;
             }
 
-            Button button = Button(row.transform, Fallback(option.label, option.id), Panel, BlueDark, () => SendActionClicked(surface, itemId, option.id), 210f, 42f);
+            Button button = Button(row.transform, Fallback(option.label, option.id), Panel, BlueDark, () => SendActionClicked(surface, itemId, option.id), 270f, 54f);
             button.interactable = !resolved && !busy;
         }
     }
@@ -1287,17 +1338,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void AddCustomReply(Transform parent, string surface, string itemId, string placeholder)
     {
         GameObject box = PanelObject(parent, "CustomReply", Html("#f7f9fb"));
-        Layout(box, -1f, 112f, 1f, 0f);
+        Layout(box, -1f, 136f, 1f, 0f);
         HorizontalLayoutGroup layout = box.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(10, 10, 10, 10);
-        layout.spacing = 10;
+        layout.padding = new RectOffset(12, 12, 12, 12);
+        layout.spacing = 12;
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
         layout.childControlHeight = true;
 
         TMP_InputField input = InputField(box.transform, placeholder);
-        Layout(input.gameObject, -1f, 92f, 1f, 0f);
-        Button(box.transform, "Send custom reply", Blue, Color.white, () => SendCustomReplyClicked(surface, itemId, input), 180f, 48f);
+        Layout(input.gameObject, -1f, 112f, 1f, 0f);
+        Button(box.transform, "Send reply", Blue, Color.white, () => SendCustomReplyClicked(surface, itemId, input), 168f, 56f);
     }
 
     private void AddThread(Transform parent, List<JToken> messages, string fallbackSender)
@@ -1305,12 +1356,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         GameObject thread = PanelObject(parent, "Thread", Html("#f8fafc"));
         Layout(thread, -1f, -1f, 1f, 0f);
         VerticalLayoutGroup layout = thread.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(12, 12, 12, 12);
-        layout.spacing = 8;
+        layout.padding = new RectOffset(14, 14, 14, 14);
+        layout.spacing = 10;
 
         if (messages == null || messages.Count == 0)
         {
-            Text(thread.transform, "EmptyMessage", "No messages yet.", 14, Muted);
+            Text(thread.transform, "EmptyMessage", "No messages yet.", 18, Muted);
             return;
         }
 
@@ -1320,11 +1371,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
             GameObject bubble = PanelObject(thread.transform, "Bubble", player ? Html("#dbeafe") : Color.white);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bubbleLayout = bubble.AddComponent<VerticalLayoutGroup>();
-            bubbleLayout.padding = new RectOffset(10, 10, 8, 8);
-            bubbleLayout.spacing = 2;
+            bubbleLayout.padding = new RectOffset(14, 14, 12, 12);
+            bubbleLayout.spacing = 4;
             string sender = Fallback(MessageSender(message), player ? "You" : fallbackSender);
-            Text(bubble.transform, "Sender", sender, 12, player ? BlueDark : Muted, FontStyles.Bold);
-            Text(bubble.transform, "Text", MessageText(message), 15, Ink);
+            Text(bubble.transform, "Sender", sender, 16, player ? BlueDark : Muted, FontStyles.Bold);
+            Text(bubble.transform, "Text", MessageText(message), 19, Ink);
         }
     }
 
@@ -1335,7 +1386,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             return;
         }
 
-        TMP_Text result = Text(parent, "Result", correct.Value ? "Correct call" : "Risky call", 14, correct.Value ? Green : Red, FontStyles.Bold);
+        TMP_Text result = Text(parent, "Result", correct.Value ? "Correct call" : "Risky call", 18, correct.Value ? Green : Red, FontStyles.Bold);
         result.alignment = TextAlignmentOptions.Left;
     }
 
@@ -1687,6 +1738,46 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         return currentGame.emails[0].id;
+    }
+
+    private bool TelegramExists(string id)
+    {
+        return FindTelegram(id) != null;
+    }
+
+    private ComputerTelegramThread FindTelegram(string id)
+    {
+        if (currentGame == null || currentGame.telegramThreads == null)
+        {
+            return null;
+        }
+
+        foreach (ComputerTelegramThread thread in currentGame.telegramThreads)
+        {
+            if (thread != null && thread.id == id)
+            {
+                return thread;
+            }
+        }
+        return null;
+    }
+
+    private string FirstOpenTelegramId()
+    {
+        if (currentGame == null || currentGame.telegramThreads == null || currentGame.telegramThreads.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        foreach (ComputerTelegramThread thread in currentGame.telegramThreads)
+        {
+            if (thread != null && !ThreadResolved(thread))
+            {
+                return thread.id;
+            }
+        }
+
+        return currentGame.telegramThreads[0].id;
     }
 
     private static List<JToken> EmailMessages(ComputerEmailItem email)
