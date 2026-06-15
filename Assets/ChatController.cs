@@ -112,9 +112,21 @@ TMP_FontAsset font;
     float broVoiceDuration;
     Coroutine broVoiceRoutine;
 
-    int paranoia = 0;
-    float timer = 900f;
-    bool timerRunning = true;
+    int paranoia
+    {
+        get => GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Paranoia : 0;
+        set { if (GlobalCanvasPersistent.Instance != null) GlobalCanvasPersistent.Instance.SetParanoia(value); }
+    }
+    float timer
+    {
+        get => GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Timer : 600f;
+        set { if (GlobalCanvasPersistent.Instance != null) GlobalCanvasPersistent.Instance.Timer = value; }
+    }
+    bool timerRunning
+    {
+        get => GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.IsTimerRunning : true;
+        set { if (GlobalCanvasPersistent.Instance != null) GlobalCanvasPersistent.Instance.SetTimerRunning(value); }
+    }
     bool ended = false;
     bool locked = false;
     string currentChat = null;
@@ -220,17 +232,6 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
 
     void Update()
     {
-        if (timerRunning)
-        {
-            timer -= Time.deltaTime;
-            if (timer <= 0f)
-            {
-                timer = 0f;
-                timerRunning = false;
-                SetAppState("OFFLINE");
-            }
-            UpdateTimerLabel();
-        }
     }
 
     public void OpenMomChat()
@@ -645,7 +646,7 @@ linkObj.transform.SetParent(row, false);
         if (voiceSrc != null) voiceSrc.Stop();
         broVoicePlaying = false; broVoiceElapsed = 0f; broVoiceRoutine = null;
         broVoiceIcon = null; broVoiceFill = null; broVoiceTimer = null;
-        paranoia = 0; timer = 900f; timerRunning = true; ended = false; locked = false;
+        paranoia = 0; timer = 600f; timerRunning = true; ended = false; locked = false;
         momFinished = false; broFinished = false; broWarned = false; currentChat = null;
         momStarted = false; broStarted = false; broSecondVoiceNoteTriggered = false;
         unknownRead = false; providerFinished = false; providerLinkClicked = false;
@@ -1805,15 +1806,25 @@ videoObj.transform.SetParent(row, false);
     void SetParanoia(int val)
     {
         paranoia = Mathf.Clamp(val, 0, 100);
-        if (paranoiaText != null) paranoiaText.text = "PARANOIA " + paranoia + "%";
+        if (paranoiaText != null) 
+        {
+            paranoiaText.text = paranoia + "%\n<size=10><color=#888888>PARANOIA</color></size>";
+        }
         if (paranoiaFill != null)
         {
             paranoiaFill.rectTransform.anchorMax = new Vector2(paranoia / 100f, 1f);
-            Color col = paranoia < 30 ? new Color(1f, 0.42f, 0f)
-                      : paranoia < 60 ? new Color(1f, 0.23f, 0f)
-                      : paranoia < 90 ? new Color(1f, 0.1f, 0f)
-                      : new Color(1f, 0f, 0f);
+            
+            // Linear green-to-red color interpolation for paranoia stackbar
+            Color col = Color.Lerp(new Color(0.3f, 0.75f, 0.3f), new Color(0.9f, 0.25f, 0.25f), paranoia / 100f);
             paranoiaFill.color = col;
+        }
+
+        // Load ending immediately if 100% paranoia
+        if (paranoia >= 100)
+        {
+            timerRunning = false;
+            Debug.Log("Paranoia reached 100%! Loading Ending_100_Paranoia scene.");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Ending_100_Paranoia");
         }
     }
 
@@ -1837,9 +1848,11 @@ videoObj.transform.SetParent(row, false);
         if (timerText == null) return;
         int m = Mathf.FloorToInt(timer / 60f);
         int s = Mathf.FloorToInt(timer % 60f);
-        timerText.text = string.Format("{0:00}:{1:00}", m, s);
-        timerText.color = timer < 120f ? new Color(1f, 0.13f, 0.13f) : new Color(0.88f, 0.88f, 1f);
+        timerText.text = string.Format("{0:00}:{1:00}\n<size=10><color=#888888>TIME LEFT</color></size>", m, s);
+        timerText.color = timer < 120f ? new Color(1f, 0.25f, 0.25f) : Color.white;
     }
+
+
 
     void SwitchToChat(string chatId)
     {
@@ -1960,43 +1973,35 @@ videoObj.transform.SetParent(row, false);
 
     void BuildHud()
     {
-        if (canvas == null) return;
+        // Lookup our beautifully designed, dark theme HUD on GlobalCanvas
+        GameObject hud = GameObject.Find("GlobalCanvas/HUD");
+        if (hud == null)
+        {
+            hud = GameObject.Find("HUD");
+        }
 
-        GameObject hud = NewUI("HUD", canvas.transform);
-        var hr = hud.GetComponent<RectTransform>();
-        hr.anchorMin = new Vector2(0f, 1f);
-        hr.anchorMax = new Vector2(1f, 1f);
-        hr.pivot = new Vector2(0.5f, 1f);
-        hr.anchoredPosition = Vector2.zero;
-        hr.sizeDelta = new Vector2(0f, 34f);
-        var bg = hud.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.05f, 0.08f, 0.85f);
-        bg.raycastTarget = false;
+        if (hud != null)
+        {
+            Transform timerTxtTrans = hud.transform.Find("TimerPanel/Content/TimerText");
+            if (timerTxtTrans != null) timerText = timerTxtTrans.GetComponent<TMPro.TextMeshProUGUI>();
 
-        timerText = MakeText(hud.transform, "Timer", "15:00", 18, TextAlignmentOptions.Left);
-        Anchor(timerText.rectTransform, new Vector2(0f, 0f), new Vector2(0.25f, 1f), new Vector2(12f, 0f), new Vector2(-4f, 0f));
+            Transform paranoiaTxtTrans = hud.transform.Find("ParanoiaPanel/ParanoiaText");
+            if (paranoiaTxtTrans != null) paranoiaText = paranoiaTxtTrans.GetComponent<TMPro.TextMeshProUGUI>();
 
-        paranoiaText = MakeText(hud.transform, "Paranoia", "PARANOIA 0%", 14, TextAlignmentOptions.Center);
-        Anchor(paranoiaText.rectTransform, new Vector2(0.27f, 0.45f), new Vector2(0.73f, 1f), Vector2.zero, Vector2.zero);
+            Transform paranoiaFillTrans = hud.transform.Find("ParanoiaPanel/ParanoiaBar/Fill");
+            if (paranoiaFillTrans != null) paranoiaFill = paranoiaFillTrans.GetComponent<UnityEngine.UI.Image>();
 
-        GameObject barBg = NewUI("ParaBarBg", hud.transform);
-        var pbg = barBg.AddComponent<Image>();
-        pbg.color = new Color(1f, 1f, 1f, 0.08f);
-        pbg.raycastTarget = false;
-        Anchor(barBg.GetComponent<RectTransform>(), new Vector2(0.27f, 0.12f), new Vector2(0.73f, 0.42f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
-
-        GameObject barFill = NewUI("ParaBarFill", barBg.transform);
-        paranoiaFill = barFill.AddComponent<Image>();
-        paranoiaFill.color = new Color(1f, 0.42f, 0f);
-        paranoiaFill.raycastTarget = false;
-        var pf = barFill.GetComponent<RectTransform>();
-        pf.anchorMin = new Vector2(0f, 0f);
-        pf.anchorMax = new Vector2(0f, 1f);
-        pf.offsetMin = Vector2.zero;
-        pf.offsetMax = Vector2.zero;
-
-        stateText = MakeText(hud.transform, "State", "STATE: ACTIVE", 14, TextAlignmentOptions.Right);
-        Anchor(stateText.rectTransform, new Vector2(0.75f, 0f), new Vector2(1f, 1f), new Vector2(4f, 0f), new Vector2(-12f, 0f));
+            Transform pointsTxtTrans = hud.transform.Find("PointsPanel/Content/PointsText");
+            if (pointsTxtTrans != null)
+            {
+                var pt = pointsTxtTrans.GetComponent<TMPro.TextMeshProUGUI>();
+                if (pt != null) pt.text = "0\n<size=10><color=#888888>POINTS</color></size>";
+            }
+        }
+        else
+        {
+            Debug.LogWarning("GlobalCanvas/HUD not found in scene!");
+        }
     }
 
     void BuildOverlays()

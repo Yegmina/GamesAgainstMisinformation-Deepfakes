@@ -6,8 +6,26 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/StartGame.unity
+    guid: 78c9848914855cd408b665bff3054edb
+  - enabled: 1
+    path: Assets/Scenes/Apartment.unity
+    guid: aab70544039ddf742ad45fdd459e95b4
+  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/Ending_0_Paranoia.unity
+    guid: f6db0a5f1fce2d7419e16cc8fd79b1da
+  - enabled: 1
+    path: Assets/Scenes/Ending_Under_50_Paranoia.unity
+    guid: 3e9c316e4394a1f4b8c9cb101fc4f8c8
+  - enabled: 1
+    path: Assets/Scenes/Ending_Over_50_Paranoia.unity
+    guid: 8e3c884ab96ffa84b9d1651eccec5288
+  - enabled: 1
+    path: Assets/Scenes/Ending_100_Paranoia.unity
+    guid: 46a5623624b74d44185853170b50b1ae
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

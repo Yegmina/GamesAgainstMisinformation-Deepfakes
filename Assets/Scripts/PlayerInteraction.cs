@@ -6,30 +6,60 @@ public class PlayerInteraction : MonoBehaviour
     [SerializeField] private UIController uiController;
 
     private PlayerInputHandler playerInputHandler;
+    private PlayerController controller;
+
     private Interactable currentInteractable;
+    private Interactable activeInteraction;
 
     private void Awake()
     {
         playerInputHandler = GetComponent<PlayerInputHandler>();
+        controller = GetComponent<PlayerController>();
     }
 
     private void OnEnable()
     {
         if (playerInputHandler != null)
+        {
             playerInputHandler.OnInteract += HandleInteraction;
+            playerInputHandler.OnExit += HandleExit;
+        }
     }
 
     private void OnDisable()
     {
-        if (playerInputHandler != null)
-            playerInputHandler.OnInteract -= HandleInteraction;
+        playerInputHandler.OnInteract -= HandleInteraction;
+        playerInputHandler.OnExit -= HandleExit;
     }
 
     private void HandleInteraction()
     {
         if (currentInteractable == null) return;
 
-        currentInteractable.Interact();
+        uiController.UnlockCursor();
+
+        activeInteraction = currentInteractable;
+        activeInteraction.Interact();
+
+        controller.enabled = false;
+        controller.InteractionPoint(activeInteraction.SitPoint);
+
+        uiController.ShowInteraction(" "); //activeInteraction.ExitText
+    }
+
+    private void HandleExit()
+    {
+        if (activeInteraction == null)
+            return;
+
+        uiController.LockCursor();
+
+        activeInteraction.ExitInteraction();
+        controller.enabled = true;
+
+        uiController.ShowInteraction(activeInteraction.InteractionText);
+
+        activeInteraction = null;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -48,6 +78,7 @@ public class PlayerInteraction : MonoBehaviour
         {
             currentInteractable = null;
             uiController.HideInteraction();
+
         }
     }
 }

@@ -1,0 +1,41 @@
+{
+    "asset": "3a54cccc376bd554fba14c0f105c21bc",
+    "fileName": "019ec755-6415-7a2c-b44c-072e70c3119a.png",
+    "prompt": "A 2D game UI button with the text 'EXIT'. Style must perfectly match the provided reference image: a glowing, semi-transparent frame with a high-tech or sci-fi aesthetic, similar colors and font style. The button should be horizontally oriented. White and cyan/teal glowing accents.",
+    "negativePrompt": "",
+    "model": "gemini-3.1-flash",
+    "modelName": "Gemini 3.1 Nano Banana 2",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "pixelateTargetSize": 0,
+    "pixelateKeepImageSize": false,
+    "pixelatePixelBlockSize": 0,
+    "pixelatePixelGridSize": 0,
+    "pixelateMode": 0,
+    "pixelateOutlineThickness": 0,
+    "doodles": {
+        "m_Items": [
+            {
+                "doodleReferenceType": 7,
+                "doodle": [],
+                "label": "Image",
+                "strength": 0.25,
+                "invertStrength": false,
+                "assetReferenceGuid": "598676b1f5bcd9e489301f2490b3146a",
+                "unlabeledIndex": -1
+            }
+        ]
+    },
+    "upscaleFactor": 0,
+    "dimensions": {
+        "width": 1024,
+        "height": 1024
+    },
+    "spriteSheet": false,
+    "duration": 0.0,
+    "dynamicParams": {
+        "serializedData": []
+    }
+}
