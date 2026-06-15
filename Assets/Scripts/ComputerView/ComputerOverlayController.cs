@@ -18,9 +18,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float BriefingSystemsHeight = 360f;
     private const float CanvasReferenceWidth = 1920f;
     private const float CanvasReferenceHeight = 1080f;
-    private const float MonitorScreenWidthRatio = 0.86f;
+    private const float MonitorScreenWidthRatio = 0.94f;
+    private const float MonitorScreenVerticalOffsetRatio = 0.08f;
     private const float MonitorFallbackWorldWidth = 4.8f;
-    private const float MonitorSurfaceOffset = 0.06f;
+    private const float MonitorSurfaceOffset = 0.025f;
     private const float FocusDistance = 6.2f;
     private const float FocusHeightOffset = 0.1f;
     private const float FocusFov = 34f;
@@ -633,9 +634,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         Bounds bounds;
         bool hasBounds = TryGetRendererBounds(monitor, out bounds);
-        Vector3 surfaceCenter = hasBounds ? bounds.center : monitor.position;
         Vector3 surfaceForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
         Vector3 surfaceUp = Vector3.Dot(monitor.up, Vector3.up) > 0.1f ? monitor.up.normalized : Vector3.up;
+        Vector3 surfaceCenter = hasBounds ? bounds.center + surfaceUp * (bounds.size.y * MonitorScreenVerticalOffsetRatio) : monitor.position;
         float worldWidth = hasBounds ? Mathf.Clamp(bounds.size.x * MonitorScreenWidthRatio, 3.2f, 8.2f) : MonitorFallbackWorldWidth;
         float worldScale = worldWidth / CanvasReferenceWidth;
         float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, surfaceForward) : 0f;
@@ -694,8 +695,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         focusActive = true;
 
         canvas.worldCamera = camera;
+        float focusDistance = GetFocusDistance(camera);
         Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
-        Vector3 cameraPosition = canvasObject.transform.position - canvasObject.transform.forward * FocusDistance + Vector3.up * FocusHeightOffset;
+        Vector3 cameraPosition = canvasObject.transform.position - canvasObject.transform.forward * focusDistance + Vector3.up * FocusHeightOffset;
         camera.transform.position = cameraPosition;
         camera.transform.rotation = Quaternion.LookRotation((target - cameraPosition).normalized, Vector3.up);
         camera.fieldOfView = FocusFov;
@@ -766,6 +768,23 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         Vector3 absoluteDirection = new Vector3(Mathf.Abs(direction.x), Mathf.Abs(direction.y), Mathf.Abs(direction.z));
         return extents.x * absoluteDirection.x + extents.y * absoluteDirection.y + extents.z * absoluteDirection.z;
+    }
+
+    private float GetFocusDistance(Camera camera)
+    {
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        if (canvasRect == null || camera == null)
+        {
+            return FocusDistance;
+        }
+
+        float worldWidth = canvasRect.rect.width * canvasObject.transform.lossyScale.x;
+        float worldHeight = canvasRect.rect.height * canvasObject.transform.lossyScale.y;
+        float verticalRadians = FocusFov * Mathf.Deg2Rad;
+        float horizontalRadians = Camera.VerticalToHorizontalFieldOfView(FocusFov, Mathf.Max(camera.aspect, 0.1f)) * Mathf.Deg2Rad;
+        float verticalFit = worldHeight * 0.5f / Mathf.Tan(verticalRadians * 0.5f);
+        float horizontalFit = worldWidth * 0.5f / Mathf.Tan(horizontalRadians * 0.5f);
+        return Mathf.Max(FocusDistance, verticalFit, horizontalFit) * 1.08f;
     }
 
     private void BuildTopbar(Transform parent)
