@@ -636,17 +636,16 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Vector3 surfaceUp = Vector3.Dot(monitor.up, Vector3.up) > 0.1f ? monitor.up.normalized : Vector3.up;
         float worldWidth = hasBounds ? Mathf.Clamp(bounds.size.x * MonitorScreenWidthRatio, 3.2f, 8.2f) : MonitorFallbackWorldWidth;
         float worldScale = worldWidth / CanvasReferenceWidth;
+        float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, surfaceForward) : 0f;
 
         canvasRect.anchorMin = new Vector2(0.5f, 0.5f);
         canvasRect.anchorMax = new Vector2(0.5f, 0.5f);
         canvasRect.pivot = new Vector2(0.5f, 0.5f);
         canvasRect.sizeDelta = new Vector2(CanvasReferenceWidth, CanvasReferenceHeight);
         canvasRect.anchoredPosition = Vector2.zero;
-        canvasRect.offsetMin = Vector2.zero;
-        canvasRect.offsetMax = Vector2.zero;
 
         canvasObject.transform.SetParent(null, false);
-        canvasObject.transform.position = surfaceCenter - surfaceForward * MonitorSurfaceOffset;
+        canvasObject.transform.position = surfaceCenter - surfaceForward * (forwardHalfDepth + MonitorSurfaceOffset);
         canvasObject.transform.rotation = Quaternion.LookRotation(surfaceForward, surfaceUp);
         canvasObject.transform.localScale = Vector3.one * worldScale;
         usingWorldMonitor = true;
@@ -759,6 +758,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         return initializedBounds;
+    }
+
+    private static float ProjectBoundsExtent(Vector3 extents, Vector3 direction)
+    {
+        Vector3 absoluteDirection = new Vector3(Mathf.Abs(direction.x), Mathf.Abs(direction.y), Mathf.Abs(direction.z));
+        return extents.x * absoluteDirection.x + extents.y * absoluteDirection.y + extents.z * absoluteDirection.z;
     }
 
     private void BuildTopbar(Transform parent)
