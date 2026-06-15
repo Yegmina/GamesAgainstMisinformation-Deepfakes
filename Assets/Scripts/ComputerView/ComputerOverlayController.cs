@@ -1038,45 +1038,183 @@ public sealed class ComputerOverlayController : MonoBehaviour
             return;
         }
 
-        GameObject shell = PanelObject(parent, "NewsdeskApp", Html("#f5f6f8"));
-        Layout(shell, -1f, TabPanelHeight, 1f, 0f);
+        int childCount = 2 + (items.Count > 1 ? items.Count : 0);
+        float shellHeight = 42f + 116f + 388f + (items.Count > 1 ? 32f + (items.Count - 1) * 224f : 0f) + Mathf.Max(0, childCount - 1) * 16f;
+        GameObject shell = PanelObject(parent, "NewsdeskApp", Html("#eef3f8"));
+        Layout(shell, -1f, Mathf.Max(TabPanelHeight, shellHeight), 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
-        shellLayout.padding = new RectOffset(20, 20, 18, 20);
-        shellLayout.spacing = 14;
+        shellLayout.padding = new RectOffset(22, 22, 20, 22);
+        shellLayout.spacing = 16;
         shellLayout.childControlWidth = true;
         shellLayout.childForceExpandWidth = true;
         shellLayout.childControlHeight = true;
         shellLayout.childForceExpandHeight = false;
 
-        Text(shell.transform, "Header", "Newsdesk", 34, Ink, FontStyles.Bold);
-        Text(shell.transform, "Status", $"{items.Count} incoming wires / {OpenNewsCount(items)} open decisions", 20, Muted, FontStyles.Bold);
+        GameObject toolbar = PanelObject(shell.transform, "NewsToolbar", Color.white);
+        Layout(toolbar, -1f, 116f, 1f, 0f);
+        HorizontalLayoutGroup toolbarLayout = toolbar.AddComponent<HorizontalLayoutGroup>();
+        toolbarLayout.padding = new RectOffset(20, 20, 16, 16);
+        toolbarLayout.spacing = 18;
+        toolbarLayout.childAlignment = TextAnchor.MiddleCenter;
+        toolbarLayout.childControlWidth = true;
+        toolbarLayout.childForceExpandWidth = false;
+        toolbarLayout.childControlHeight = true;
 
-        for (int i = 0; i < items.Count; i++)
+        GameObject toolbarCopy = Element(parent: toolbar.transform, name: "ToolbarCopy");
+        Layout(toolbarCopy, -1f, -1f, 1f, 1f);
+        VerticalLayoutGroup toolbarCopyLayout = toolbarCopy.AddComponent<VerticalLayoutGroup>();
+        toolbarCopyLayout.spacing = 6;
+        toolbarCopyLayout.childAlignment = TextAnchor.MiddleLeft;
+        NewsText(toolbarCopy.transform, "Heading", "Newsdesk", 36, Ink, 44f, FontStyles.Bold);
+        NewsText(toolbarCopy.transform, "Status", "Review incoming wires before they reach the DeepDetect front page.", 19, Muted, 30f, FontStyles.Bold);
+
+        GameObject metrics = Element(parent: toolbar.transform, name: "NewsMetrics");
+        Layout(metrics, 460f, -1f, 0f, 1f);
+        HorizontalLayoutGroup metricsLayout = metrics.AddComponent<HorizontalLayoutGroup>();
+        metricsLayout.spacing = 10;
+        metricsLayout.childAlignment = TextAnchor.MiddleRight;
+        metricsLayout.childControlWidth = true;
+        metricsLayout.childControlHeight = true;
+        metricsLayout.childForceExpandWidth = false;
+        AddNewsMetric(metrics.transform, "Wires", items.Count.ToString(), BlueDark);
+        AddNewsMetric(metrics.transform, "Open", OpenNewsCount(items).ToString(), Amber);
+        AddNewsMetric(metrics.transform, "Tick", currentGame.worldTick.ToString(), Green);
+
+        AddNewsCard(shell.transform, items[0], true);
+
+        if (items.Count > 1)
         {
-            AddNewsCard(shell.transform, items[i], i == 0);
+            NewsText(shell.transform, "QueueHeading", "Wire queue", 22, Ink, 32f, FontStyles.Bold);
+            for (int i = 1; i < items.Count; i++)
+            {
+                AddNewsCard(shell.transform, items[i], false);
+            }
         }
     }
 
     private void AddNewsCard(Transform parent, ComputerNewsItem item, bool lead)
     {
-        GameObject card = Card(parent, lead ? "LeadStory" : "WireRow");
-        Layout(card, -1f, lead ? 306f : 246f, 1f, 0f);
+        if (lead)
+        {
+            AddLeadNewsCard(parent, item);
+            return;
+        }
 
-        Text(card.transform, "Meta", $"{(lead ? "Lead slot" : "Wire")} / {SourceHost(item.url, item.source)} / {NewsStatus(item)}", 18, BlueDark, FontStyles.Bold);
-        Text(card.transform, "Title", Fallback(item.title, "Untitled story"), lead ? 30 : 24, Ink, FontStyles.Bold);
-        Text(card.transform, "Summary", Fallback(item.summary, "No summary available."), lead ? 20 : 18, Ink);
-        Text(card.transform, "Evidence", $"Source: {Fallback(item.source, "pending")} / Pressure: {Fallback(item.publicPressure, "pending")} / Desk note: {Fallback(item.editorNote, "No note")}", 17, Muted);
+        AddWireNewsRow(parent, item);
+    }
+
+    private void AddLeadNewsCard(Transform parent, ComputerNewsItem item)
+    {
+        GameObject card = PanelObject(parent, "LeadStory", Color.white);
+        Layout(card, -1f, 388f, 1f, 0f);
+        VerticalLayoutGroup layout = card.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(22, 22, 18, 18);
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = false;
+
+        NewsText(card.transform, "Meta", $"Lead story / {SourceHost(item.url, item.source)} / {NewsStatus(item)}", 18, BlueDark, 28f, FontStyles.Bold);
+        NewsText(card.transform, "Title", Fallback(item.title, "Untitled story"), 34, Ink, 82f, FontStyles.Bold);
+        NewsText(card.transform, "Summary", Fallback(item.summary, "No summary available."), 21, Ink, 78f);
+
+        GameObject evidence = Element(parent: card.transform, name: "EvidenceStrip");
+        Layout(evidence, -1f, 84f, 1f, 0f);
+        HorizontalLayoutGroup evidenceLayout = evidence.AddComponent<HorizontalLayoutGroup>();
+        evidenceLayout.spacing = 10;
+        evidenceLayout.childControlWidth = true;
+        evidenceLayout.childControlHeight = true;
+        evidenceLayout.childForceExpandWidth = true;
+        evidenceLayout.childForceExpandHeight = true;
+        AddEvidenceTile(evidence.transform, "Source", Fallback(item.source, "pending"));
+        AddEvidenceTile(evidence.transform, "Pressure", Fallback(item.publicPressure, "pending"));
+        AddEvidenceTile(evidence.transform, "Desk note", Fallback(item.editorNote, "No note"));
+
+        AddNewsActionRow(card.transform, item, true);
         AddResult(card.transform, item.correct);
+    }
 
-        GameObject choices = Element(parent: card.transform, name: "Choices");
-        Layout(choices, -1f, 54f, 1f, 0f);
-        HorizontalLayoutGroup choiceLayout = choices.AddComponent<HorizontalLayoutGroup>();
-        choiceLayout.spacing = 10;
-        Button publish = Button(choices.transform, "Publish", Green, Color.white, () => SendActionClicked("news", item.id, "publish"), 142f, 50f);
-        Button reject = Button(choices.transform, "Reject", Red, Color.white, () => SendActionClicked("news", item.id, "reject"), 142f, 50f);
+    private void AddWireNewsRow(Transform parent, ComputerNewsItem item)
+    {
+        GameObject row = PanelObject(parent, "WireRow", Color.white);
+        Layout(row, -1f, 224f, 1f, 0f);
+        VerticalLayoutGroup layout = row.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(18, 18, 16, 16);
+        layout.spacing = 8;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = false;
+
+        NewsText(row.transform, "Meta", $"{NewsStatus(item)} / {SourceHost(item.url, item.source)}", 18, BlueDark, 28f, FontStyles.Bold);
+        NewsText(row.transform, "Title", Fallback(item.title, "Untitled story"), 24, Ink, 38f, FontStyles.Bold);
+        NewsText(row.transform, "Summary", Fallback(item.summary, "No summary available."), 18, Ink, 54f);
+        NewsText(row.transform, "Note", Fallback(item.editorNote, "No editor note."), 16, Muted, 28f);
+
+        AddNewsActionRow(row.transform, item, false);
+        AddResult(row.transform, item.correct);
+    }
+
+    private void AddNewsActionRow(Transform parent, ComputerNewsItem item, bool lead)
+    {
+        GameObject actions = PanelObject(parent, lead ? "LeadActions" : "WireActions", Html("#f8fafc"));
+        Layout(actions, -1f, lead ? 64f : 58f, 1f, 0f);
+        HorizontalLayoutGroup layout = actions.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(12, 12, 7, 12);
+        layout.spacing = 12;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        string state = !string.IsNullOrWhiteSpace(item.decision) ? item.decision.ToUpperInvariant() : "Awaiting decision";
+        GameObject statePill = PanelObject(actions.transform, "DecisionState", Html("#eaf1fb"));
+        Layout(statePill, lead ? 260f : 230f, 44f, 0f, 0f);
+        TMP_Text stateText = NewsText(statePill.transform, "Label", state, 17, Ink, 44f, FontStyles.Bold, TextAlignmentOptions.Center);
+        Stretch(stateText.rectTransform);
+
+        Button publish = Button(actions.transform, "Publish", Green, Color.white, () => SendActionClicked("news", item.id, "publish"), lead ? 168f : 140f, 46f);
+        Button reject = Button(actions.transform, "Reject", Red, Color.white, () => SendActionClicked("news", item.id, "reject"), lead ? 168f : 140f, 46f);
         bool decided = !string.IsNullOrWhiteSpace(item.decision);
         publish.interactable = !decided && !busy;
         reject.interactable = !decided && !busy;
+    }
+
+    private void AddNewsMetric(Transform parent, string label, string value, Color accent)
+    {
+        GameObject metric = PanelObject(parent, $"Metric-{label}", Html("#eef4fb"));
+        Layout(metric, 140f, 76f, 0f, 0f);
+        VerticalLayoutGroup layout = metric.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(10, 10, 8, 8);
+        layout.spacing = 2;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        NewsText(metric.transform, "Label", label, 15, Muted, 22f, FontStyles.Bold, TextAlignmentOptions.Center);
+        NewsText(metric.transform, "Value", value, 28, accent, 36f, FontStyles.Bold, TextAlignmentOptions.Center);
+    }
+
+    private void AddEvidenceTile(Transform parent, string label, string value)
+    {
+        GameObject tile = PanelObject(parent, $"Evidence-{label}", Html("#f4f8fb"));
+        Layout(tile, -1f, -1f, 1f, 1f);
+        VerticalLayoutGroup layout = tile.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(10, 10, 8, 8);
+        layout.spacing = 4;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = false;
+        NewsText(tile.transform, "Label", label, 15, Muted, 20f, FontStyles.Bold);
+        NewsText(tile.transform, "Value", value, 17, Ink, 42f);
+    }
+
+    private static TMP_Text NewsText(Transform parent, string name, string value, int size, Color color, float height, FontStyles style = FontStyles.Normal, TextAlignmentOptions alignment = TextAlignmentOptions.TopLeft)
+    {
+        TMP_Text text = Text(parent, name, value, size, color, style);
+        Layout(text.gameObject, -1f, height, 1f, 0f);
+        text.alignment = alignment;
+        return text;
     }
 
     private void RenderInbox(Transform parent)
