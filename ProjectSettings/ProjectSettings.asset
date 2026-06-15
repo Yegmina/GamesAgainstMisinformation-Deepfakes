@@ -935,11 +935,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 9f52e5f0-d2e1-4cf8-9b64-70d7fc9677fb
+  cloudProjectId: 314fcbb9-6640-467d-a802-cd83a3fd11e5
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: GamesAgainstMisinformation-Deepfakes
-  organizationId: unity_0cb432b2fa4684e6fefe
+  projectName: Horror
+  organizationId: deepdetect
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
