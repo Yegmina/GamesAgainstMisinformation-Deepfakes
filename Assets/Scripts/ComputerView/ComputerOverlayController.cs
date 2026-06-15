@@ -16,6 +16,16 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float InboxBodyHeight = 680f;
     private const float TelegramRowHeight = 600f;
     private const float BriefingSystemsHeight = 360f;
+    private const float CanvasReferenceWidth = 1920f;
+    private const float CanvasReferenceHeight = 1080f;
+    private const float MonitorScreenWidthRatio = 0.86f;
+    private const float MonitorFallbackWorldWidth = 4.8f;
+    private const float MonitorSurfaceOffset = 0.06f;
+    private const float FocusDistance = 6.2f;
+    private const float FocusHeightOffset = 0.1f;
+    private const float FocusFov = 34f;
+    private const string PrimaryMonitorName = "monitor";
+    private const string FallbackMonitorName = "Monitor_27__Curved";
     private const string BackendUrlKey = "DeepDetect.BackendUrl";
     private const string TokenKey = "DeepDetect.UnityToken";
     private const string UserKey = "DeepDetect.UnityUser";
@@ -45,8 +55,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool initialized;
     private bool initializing;
     private bool busy;
+    private bool usingWorldMonitor;
+    private bool focusActive;
+    private Vector3 savedCameraPosition;
+    private Quaternion savedCameraRotation;
+    private float savedCameraFov;
 
     private GameObject canvasObject;
+    private Canvas canvas;
+    private CanvasScaler canvasScaler;
     private CanvasGroup canvasGroup;
     private TMP_Text titleText;
     private TMP_Text statusText;
@@ -94,6 +111,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void OnDestroy()
     {
+        ExitFocusMode();
+
         if (instance == this)
         {
             instance = null;
@@ -114,7 +133,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
             BuildUi();
         }
 
+        AttachCanvasToComputerSurface();
         canvasObject.SetActive(true);
+        EnterFocusMode();
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
         RenderAll();
@@ -136,6 +157,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             BuildUi();
         }
 
+        AttachCanvasToComputerSurface();
         canvasObject.SetActive(false);
         if (!initialized && !initializing)
         {
@@ -145,6 +167,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void Close()
     {
+        ExitFocusMode();
+
         if (canvasObject != null)
         {
             canvasObject.SetActive(false);
@@ -538,17 +562,18 @@ public sealed class ComputerOverlayController : MonoBehaviour
         canvasRect.offsetMin = Vector2.zero;
         canvasRect.offsetMax = Vector2.zero;
         canvasRect.pivot = new Vector2(0.5f, 0.5f);
+        canvasRect.sizeDelta = new Vector2(CanvasReferenceWidth, CanvasReferenceHeight);
 
-        Canvas canvas = canvasObject.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = Camera.main;
         canvas.overrideSorting = true;
         canvas.sortingOrder = 6000;
 
-        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
+        canvasScaler = canvasObject.AddComponent<CanvasScaler>();
+        canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+        canvasScaler.referencePixelsPerUnit = 100f;
+        canvasScaler.dynamicPixelsPerUnit = 3f;
 
         canvasObject.AddComponent<GraphicRaycaster>();
         canvasGroup = canvasObject.AddComponent<CanvasGroup>();
@@ -572,6 +597,160 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         canvasObject.SetActive(false);
         Debug.Log("[ComputerOverlay] UI built.");
+    }
+
+    private void AttachCanvasToComputerSurface()
+    {
+        if (canvasObject == null || canvas == null || canvasScaler == null)
+        {
+            return;
+        }
+
+        Transform monitor = FindMonitorTransform();
+        if (monitor == null)
+        {
+            ConfigureScreenFallback();
+            Debug.LogWarning("[ComputerOverlay] Monitor anchor not found; using screen-space fallback.");
+            return;
+        }
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = Camera.main;
+        canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+        canvasScaler.referencePixelsPerUnit = 100f;
+        canvasScaler.dynamicPixelsPerUnit = 3f;
+
+        Bounds bounds;
+        bool hasBounds = TryGetRendererBounds(monitor, out bounds);
+        Vector3 surfaceCenter = hasBounds ? bounds.center : monitor.position;
+        Vector3 surfaceForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
+        Vector3 surfaceUp = Vector3.Dot(monitor.up, Vector3.up) > 0.1f ? monitor.up.normalized : Vector3.up;
+        float worldWidth = hasBounds ? Mathf.Clamp(bounds.size.x * MonitorScreenWidthRatio, 3.2f, 8.2f) : MonitorFallbackWorldWidth;
+        float worldScale = worldWidth / CanvasReferenceWidth;
+
+        canvasRect.anchorMin = new Vector2(0.5f, 0.5f);
+        canvasRect.anchorMax = new Vector2(0.5f, 0.5f);
+        canvasRect.pivot = new Vector2(0.5f, 0.5f);
+        canvasRect.sizeDelta = new Vector2(CanvasReferenceWidth, CanvasReferenceHeight);
+        canvasRect.anchoredPosition = Vector2.zero;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+
+        canvasObject.transform.SetParent(null, false);
+        canvasObject.transform.position = surfaceCenter - surfaceForward * MonitorSurfaceOffset;
+        canvasObject.transform.rotation = Quaternion.LookRotation(surfaceForward, surfaceUp);
+        canvasObject.transform.localScale = Vector3.one * worldScale;
+        usingWorldMonitor = true;
+    }
+
+    private void ConfigureScreenFallback()
+    {
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.worldCamera = null;
+        canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        canvasScaler.referenceResolution = new Vector2(CanvasReferenceWidth, CanvasReferenceHeight);
+        canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        canvasScaler.matchWidthOrHeight = 0.5f;
+
+        canvasObject.transform.SetParent(null, false);
+        canvasObject.transform.localPosition = Vector3.zero;
+        canvasObject.transform.localRotation = Quaternion.identity;
+        canvasObject.transform.localScale = Vector3.one;
+        canvasRect.anchorMin = Vector2.zero;
+        canvasRect.anchorMax = Vector2.one;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+        canvasRect.pivot = new Vector2(0.5f, 0.5f);
+        usingWorldMonitor = false;
+    }
+
+    private void EnterFocusMode()
+    {
+        if (!usingWorldMonitor || canvasObject == null || focusActive)
+        {
+            return;
+        }
+
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            return;
+        }
+
+        savedCameraPosition = camera.transform.position;
+        savedCameraRotation = camera.transform.rotation;
+        savedCameraFov = camera.fieldOfView;
+        focusActive = true;
+
+        canvas.worldCamera = camera;
+        Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
+        Vector3 cameraPosition = canvasObject.transform.position - canvasObject.transform.forward * FocusDistance + Vector3.up * FocusHeightOffset;
+        camera.transform.position = cameraPosition;
+        camera.transform.rotation = Quaternion.LookRotation((target - cameraPosition).normalized, Vector3.up);
+        camera.fieldOfView = FocusFov;
+    }
+
+    private void ExitFocusMode()
+    {
+        if (!focusActive)
+        {
+            return;
+        }
+
+        Camera camera = Camera.main;
+        if (camera != null)
+        {
+            camera.transform.position = savedCameraPosition;
+            camera.transform.rotation = savedCameraRotation;
+            camera.fieldOfView = savedCameraFov;
+        }
+
+        focusActive = false;
+    }
+
+    private static Transform FindMonitorTransform()
+    {
+        GameObject monitor = GameObject.Find(PrimaryMonitorName);
+        if (monitor != null)
+        {
+            return monitor.transform;
+        }
+
+        monitor = GameObject.Find(FallbackMonitorName);
+        return monitor != null ? monitor.transform : null;
+    }
+
+    private static bool TryGetRendererBounds(Transform root, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initializedBounds = false;
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null || renderer.bounds.size.sqrMagnitude < 0.001f)
+            {
+                continue;
+            }
+
+            if (!initializedBounds)
+            {
+                bounds = renderer.bounds;
+                initializedBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return initializedBounds;
     }
 
     private void BuildTopbar(Transform parent)

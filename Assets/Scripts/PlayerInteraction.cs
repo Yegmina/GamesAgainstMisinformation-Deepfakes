@@ -39,10 +39,9 @@ public class PlayerInteraction : MonoBehaviour
         uiController.UnlockCursor();
 
         activeInteraction = currentInteractable;
-        activeInteraction.Interact();
-
         controller.enabled = false;
         controller.InteractionPoint(activeInteraction.SitPoint);
+        activeInteraction.Interact();
 
         uiController.ShowInteraction(" "); //activeInteraction.ExitText
     }
