@@ -4072,7 +4072,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Interactable
   interactionText: Press E to use the computer
   exitText: Esc to exit
-  sceneToLoad: SampleScene
+  sceneToLoad: 
+  openComputerOverlay: 1
   sitPoint: {fileID: 168970057}
 --- !u!1 &7742780738051876068
 GameObject:
@@ -4762,6 +4763,7 @@ MonoBehaviour:
   interactionText: Press E to use the phone
   exitText: Esc to exit
   sceneToLoad: SampleScene
+  openComputerOverlay: 0
   sitPoint: {fileID: 1382169355}
 --- !u!23 &9039637510118680883
 MeshRenderer:
