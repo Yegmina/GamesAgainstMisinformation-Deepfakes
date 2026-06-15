@@ -935,11 +935,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 9adcf18f-0913-43e8-b944-23f119aeecad
+  cloudProjectId: 314fcbb9-6640-467d-a802-cd83a3fd11e5
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
   projectName: Horror
-  organizationId: nadiiahaidash
+  organizationId: deepdetect
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
