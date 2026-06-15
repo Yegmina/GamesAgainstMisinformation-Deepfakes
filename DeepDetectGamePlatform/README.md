@@ -18,6 +18,41 @@ Open:
 http://127.0.0.1:8765
 ```
 
+On Windows in this Unity repo, these helper scripts do the same setup:
+
+```cmd
+DeepDetectGamePlatform\setup-backend.cmd
+DeepDetectGamePlatform\start-backend.cmd
+```
+
+Create `DeepDetectGamePlatform\.env` before starting the server:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL_AGENT=gpt-5.3-chat-latest
+```
+
+## Unity Integration
+
+The Unity scene `Assets/Scenes/Apartment.unity` routes the computer interaction to
+`Assets/Scenes/SampleScene.unity`. That scene now has a `DeepDetectComputerController`
+and `DeepDetectApiClient` on the existing `BrowserController` object.
+
+In Play Mode, the computer frontend connects to:
+
+```text
+http://127.0.0.1:8765
+```
+
+Use the in-Unity terminal buttons in this order:
+
+1. `Health`
+2. `Login`
+3. `Sessions` or `New Shift`
+
+The Unity UI calls the same FastAPI endpoints as the browser frontend and renders
+Newsdesk, Inbox, Telegram, and Briefing tabs directly in Unity.
+
 ## What New Session Does
 
 `New Session` runs an agent pipeline and saves the generated shift to the logged-in account. `OPENAI_API_KEY` is required: the platform uses OpenAI (`OPENAI_MODEL_AGENT`, default `gpt-5.3-chat-latest`) for shift generation, newsdesk feedback, multi-turn email/Telegram conversations, and world simulation. The app does not synthesize canned local chat replies when the agent runtime is unavailable.
