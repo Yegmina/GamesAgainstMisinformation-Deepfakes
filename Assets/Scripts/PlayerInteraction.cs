@@ -44,7 +44,7 @@ public class PlayerInteraction : MonoBehaviour
         controller.enabled = false;
         controller.InteractionPoint(activeInteraction.SitPoint);
 
-        uiController.ShowInteraction(activeInteraction.ExitText);
+        uiController.ShowInteraction(" "); //activeInteraction.ExitText
     }
 
     private void HandleExit()
