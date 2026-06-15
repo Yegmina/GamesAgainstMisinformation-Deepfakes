@@ -179,4 +179,12 @@ public class MissionSidebarManager : MonoBehaviour
             UpdateMissionUI();
         }
     }
+
+    public string GetMissionTitle(int missionIndex)
+    {
+        if (currentMissionSet == null || missionIndex < 0 || missionIndex > 2)
+            return null;
+
+        return currentMissionSet[missionIndex].title;
+    }
 }
