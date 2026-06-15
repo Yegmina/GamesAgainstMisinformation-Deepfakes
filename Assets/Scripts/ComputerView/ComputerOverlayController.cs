@@ -12,6 +12,10 @@ using UnityEngine.UI;
 
 public sealed class ComputerOverlayController : MonoBehaviour
 {
+    private const float TabPanelHeight = 820f;
+    private const float InboxBodyHeight = 680f;
+    private const float TelegramRowHeight = 600f;
+    private const float BriefingSystemsHeight = 360f;
     private const string BackendUrlKey = "DeepDetect.BackendUrl";
     private const string TokenKey = "DeepDetect.UnityToken";
     private const string UserKey = "DeepDetect.UnityUser";
@@ -807,11 +811,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         GameObject shell = Element(parent: parent, name: "NewsroomShell");
-        Layout(shell, -1f, -1f, 1f, 0f);
+        Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         HorizontalLayoutGroup shellLayout = shell.AddComponent<HorizontalLayoutGroup>();
         shellLayout.spacing = 0;
         shellLayout.childControlWidth = true;
         shellLayout.childControlHeight = true;
+        shellLayout.childForceExpandWidth = true;
         shellLayout.childForceExpandHeight = false;
 
         GameObject sidebar = PanelObject(shell.transform, "NewsSidebar", Ink);
@@ -879,22 +884,28 @@ public sealed class ComputerOverlayController : MonoBehaviour
         ComputerEmailItem active = FindEmail(activeEmailId) ?? emails[0];
 
         GameObject shell = PanelObject(parent, "GmailShell", Html("#f2f6fb"));
-        Layout(shell, -1f, -1f, 1f, 0f);
+        Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
         shellLayout.padding = new RectOffset(14, 14, 14, 14);
         shellLayout.spacing = 12;
+        shellLayout.childControlWidth = true;
+        shellLayout.childForceExpandWidth = true;
+        shellLayout.childControlHeight = true;
+        shellLayout.childForceExpandHeight = false;
 
         Text(shell.transform, "Header", "Menu  Gmail     Search mail                                      Help   Settings   More", 20, Ink, FontStyles.Bold);
 
         GameObject body = Element(parent: shell.transform, name: "GmailBody");
-        Layout(body, -1f, -1f, 1f, 0f);
+        Layout(body, -1f, InboxBodyHeight, 1f, 0f);
         HorizontalLayoutGroup bodyLayout = body.AddComponent<HorizontalLayoutGroup>();
         bodyLayout.spacing = 12;
         bodyLayout.childControlWidth = true;
+        bodyLayout.childControlHeight = true;
         bodyLayout.childForceExpandWidth = false;
+        bodyLayout.childForceExpandHeight = true;
 
         GameObject left = Card(body.transform, "InboxList");
-        Layout(left, 420f, -1f, 0f, 0f);
+        Layout(left, 420f, -1f, 0f, 1f);
         Text(left.transform, "Mailbox", "Inbox", 18, BlueDark, FontStyles.Bold);
         foreach (ComputerEmailItem item in emails)
         {
@@ -902,7 +913,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         GameObject reader = Card(body.transform, "Reader");
-        Layout(reader, -1f, -1f, 1f, 0f);
+        Layout(reader, -1f, -1f, 1f, 1f);
         Text(reader.transform, "Subject", Fallback(active.subject, "No subject"), 28, Ink, FontStyles.Bold);
         Text(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")} <{Fallback(active.fromEmail, "unknown")}>    {ThreadProgress(active)}", 14, Muted);
         AddThread(reader.transform, EmailMessages(active), active.fromName);
@@ -947,11 +958,13 @@ public sealed class ComputerOverlayController : MonoBehaviour
         for (int i = 0; i < threads.Count; i += 2)
         {
             GameObject row = Element(parent: parent, name: "TelegramRow");
-            Layout(row, -1f, -1f, 1f, 0f);
+            Layout(row, -1f, TelegramRowHeight, 1f, 0f);
             HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 12;
             rowLayout.childControlWidth = true;
+            rowLayout.childControlHeight = true;
             rowLayout.childForceExpandWidth = true;
+            rowLayout.childForceExpandHeight = true;
 
             AddTelegramCard(row.transform, threads[i]);
             if (i + 1 < threads.Count)
@@ -969,7 +982,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void AddTelegramCard(Transform parent, ComputerTelegramThread thread)
     {
         GameObject card = Card(parent, "TelegramCard");
-        Layout(card, -1f, -1f, 1f, 0f);
+        Layout(card, -1f, -1f, 1f, 1f);
         Text(card.transform, "Meta", $"{Fallback(thread.contact, "Contact")} / {Fallback(thread.relationship, "relationship")} / {ThreadProgress(thread)}", 16, BlueDark, FontStyles.Bold);
         AddThread(card.transform, thread.messages ?? new List<JToken>(), thread.contact);
         AddResult(card.transform, thread.correct);
@@ -987,14 +1000,16 @@ public sealed class ComputerOverlayController : MonoBehaviour
             : "Shift active. Finish every workspace to complete the day.", 28, Ink, FontStyles.Bold);
 
         GameObject systems = Element(parent: parent, name: "BriefingSystems");
-        Layout(systems, -1f, -1f, 1f, 0f);
+        Layout(systems, -1f, BriefingSystemsHeight, 1f, 0f);
         HorizontalLayoutGroup systemsLayout = systems.AddComponent<HorizontalLayoutGroup>();
         systemsLayout.spacing = 12;
         systemsLayout.childControlWidth = true;
+        systemsLayout.childControlHeight = true;
         systemsLayout.childForceExpandWidth = true;
+        systemsLayout.childForceExpandHeight = true;
 
         GameObject values = Card(systems.transform, "Values");
-        Layout(values, -1f, -1f, 1f, 0f);
+        Layout(values, -1f, -1f, 1f, 1f);
         Text(values.transform, "Title", "Values", 20, Ink, FontStyles.Bold);
         foreach (ComputerValue value in ValuesList())
         {
@@ -1002,7 +1017,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         GameObject quests = Card(systems.transform, "Quests");
-        Layout(quests, -1f, -1f, 1f, 0f);
+        Layout(quests, -1f, -1f, 1f, 1f);
         Text(quests.transform, "Title", "Quests", 20, Ink, FontStyles.Bold);
         foreach (ComputerQuest quest in currentGame.quests ?? new List<ComputerQuest>())
         {
@@ -1218,8 +1233,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         GameObject viewport = PanelObject(root.transform, "Viewport", new Color(1f, 1f, 1f, 0f));
         Stretch(viewport.GetComponent<RectTransform>());
-        Mask mask = viewport.AddComponent<Mask>();
-        mask.showMaskGraphic = false;
+        viewport.AddComponent<RectMask2D>();
 
         GameObject contentObject = Element(parent: viewport.transform, name: "Content");
         content = contentObject.GetComponent<RectTransform>();
