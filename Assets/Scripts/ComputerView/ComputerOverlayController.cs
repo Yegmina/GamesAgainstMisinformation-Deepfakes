@@ -24,6 +24,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float FocusDistance = 6.2f;
     private const float FocusHeightOffset = 0.1f;
     private const float FocusFov = 34f;
+    private const float DesktopSummaryHeight = 148f;
+    private const float DesktopDockHeight = 76f;
     private const string PrimaryMonitorName = "monitor";
     private const string FallbackMonitorName = "Monitor_27__Curved";
     private const string BackendUrlKey = "DeepDetect.BackendUrl";
@@ -50,7 +52,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private ComputerApiClient api;
     private ComputerUser user;
     private ComputerGameState currentGame;
-    private string activeTab = "news";
+    private string activeTab = "home";
     private string activeEmailId = string.Empty;
     private bool initialized;
     private bool initializing;
@@ -824,7 +826,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         GameObject mission = Element(parent: activeGameObject.transform, name: "MissionStrip");
         missionStrip = mission.GetComponent<RectTransform>();
-        Layout(mission, -1f, 212f, 1f, 0f);
+        Layout(mission, -1f, DesktopSummaryHeight, 1f, 0f);
         HorizontalLayoutGroup missionLayout = mission.AddComponent<HorizontalLayoutGroup>();
         missionLayout.spacing = 12;
         missionLayout.childControlWidth = true;
@@ -834,9 +836,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         GameObject tabs = Element(parent: activeGameObject.transform, name: "Tabs");
         tabButtons = tabs.GetComponent<RectTransform>();
-        Layout(tabs, -1f, 48f, 1f, 0f);
+        Layout(tabs, -1f, DesktopDockHeight, 1f, 0f);
         HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
-        tabLayout.spacing = 8;
+        tabLayout.padding = new RectOffset(0, 0, 8, 8);
+        tabLayout.spacing = 10;
         tabLayout.childControlWidth = true;
         tabLayout.childForceExpandWidth = false;
         tabLayout.childControlHeight = true;
@@ -903,45 +906,31 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         Clear(missionStrip);
 
-        GameObject goalsPanel = Card(missionStrip, "MissionBoard");
-        Layout(goalsPanel, -1f, -1f, 1f, 1f);
-        Text(goalsPanel.transform, "Heading", "Mission board", 18, Ink, FontStyles.Bold);
-        Text(goalsPanel.transform, "State", currentGame.complete ? "Shift complete" : "Shift active", 13, currentGame.complete ? Green : Amber, FontStyles.Bold);
-        foreach (ComputerGoal goal in currentGame.goals ?? new List<ComputerGoal>())
-        {
-            string line = $"{Fallback(goal.title, "Goal")}  {goal.current}/{goal.target} complete";
-            Text(goalsPanel.transform, "Goal", goal.complete ? $"Done: {line}" : line, 13, goal.complete ? Green : Ink);
-        }
+        GameObject shiftPanel = Card(missionStrip, "ShiftStatus");
+        Layout(shiftPanel, -1f, -1f, 1f, 1f);
+        Text(shiftPanel.transform, "Heading", currentGame.complete ? "Shift complete" : "Shift active", 22, currentGame.complete ? Green : BlueDark, FontStyles.Bold);
+        Text(shiftPanel.transform, "Subline", $"{Fallback(currentGame.title, "DeepDetect shift")} / Tick {currentGame.worldTick}", 17, Muted);
+        Text(shiftPanel.transform, "OpenItems", $"Open work: {OpenNewsCount(currentGame.newsItems)} news / {OpenThreadCount(currentGame.emails)} inbox / {OpenThreadCount(currentGame.telegramThreads)} Telegram", 18, Ink, FontStyles.Bold);
 
-        GameObject valuesPanel = Card(missionStrip, "Values");
+        GameObject valuesPanel = Card(missionStrip, "ValueSnapshot");
         Layout(valuesPanel, -1f, -1f, 1f, 1f);
-        Text(valuesPanel.transform, "Heading", "Values", 18, Ink, FontStyles.Bold);
+        Text(valuesPanel.transform, "Heading", "Values", 22, Ink, FontStyles.Bold);
         foreach (ComputerValue value in ValuesList())
         {
             AddMeter(valuesPanel.transform, Fallback(value.label, "Value"), value.value, value.description);
         }
 
-        GameObject logPanel = Card(missionStrip, "LiveFeed");
-        Layout(logPanel, -1f, -1f, 1f, 1f);
-        Text(logPanel.transform, "Heading", "Quest log / Live feed", 18, Ink, FontStyles.Bold);
-        foreach (ComputerQuest quest in currentGame.quests ?? new List<ComputerQuest>())
-        {
-            Text(logPanel.transform, "Quest", $"{(quest.complete ? "Done:" : "-")} {Fallback(quest.title, "Quest")} {quest.current}/{quest.target}", 13, quest.complete ? Green : Ink);
-        }
-
-        List<string> feed = new List<string>();
-        AddRange(feed, currentGame.questLog, 2);
-        AddRange(feed, currentGame.worldFeed, 3);
-        AddRange(feed, currentGame.generationLog, 2, true);
-        foreach (string line in feed)
-        {
-            Text(logPanel.transform, "Feed", line, 12, Muted);
-        }
+        GameObject feedPanel = Card(missionStrip, "LatestFeed");
+        Layout(feedPanel, -1f, -1f, 1f, 1f);
+        Text(feedPanel.transform, "Heading", "Latest", 22, Ink, FontStyles.Bold);
+        string latest = LatestLine(currentGame.actionLog, currentGame.questLog, currentGame.worldFeed, currentGame.generationLog);
+        Text(feedPanel.transform, "LatestLine", latest, 17, Muted);
     }
 
     private void RenderTabs()
     {
         Clear(tabButtons);
+        AddTabButton("home", "Home");
         AddTabButton("news", "Newsdesk");
         AddTabButton("email", "Inbox");
         AddTabButton("telegram", "Telegram");
@@ -954,6 +943,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         switch (activeTab)
         {
+            case "home":
+                RenderDesktop(content);
+                break;
             case "email":
                 RenderInbox(content);
                 break;
@@ -976,8 +968,54 @@ public sealed class ComputerOverlayController : MonoBehaviour
         {
             activeTab = tab;
             RenderTabs();
-        }, 138f, 44f);
+        }, tab == "home" ? 124f : 166f, 56f);
         button.interactable = !selected && !busy;
+    }
+
+    private void RenderDesktop(Transform parent)
+    {
+        GameObject desktop = Element(parent: parent, name: "Desktop");
+        Layout(desktop, -1f, TabPanelHeight, 1f, 0f);
+        VerticalLayoutGroup desktopLayout = desktop.AddComponent<VerticalLayoutGroup>();
+        desktopLayout.padding = new RectOffset(24, 24, 24, 24);
+        desktopLayout.spacing = 18;
+        desktopLayout.childControlWidth = true;
+        desktopLayout.childForceExpandWidth = true;
+        desktopLayout.childControlHeight = true;
+        desktopLayout.childForceExpandHeight = false;
+
+        Text(desktop.transform, "Heading", "DeepDetect workstation", 36, Ink, FontStyles.Bold);
+        Text(desktop.transform, "Subheading", "Choose one workspace. Each app uses the same live runtime shift.", 20, Muted);
+
+        GameObject appGrid = Element(parent: desktop.transform, name: "AppGrid");
+        Layout(appGrid, -1f, 540f, 1f, 0f);
+        GridLayoutGroup grid = appGrid.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(430f, 238f);
+        grid.spacing = new Vector2(18f, 18f);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 2;
+
+        AddDesktopApp(appGrid.transform, "news", "Newsdesk", $"{OpenNewsCount(currentGame.newsItems)} decisions open", "Publish credible stories and reject manipulated claims.", BlueDark);
+        AddDesktopApp(appGrid.transform, "email", "Inbox", ThreadSummary(currentGame.emails), "Handle newsroom pressure with evidence-first replies.", Green);
+        AddDesktopApp(appGrid.transform, "telegram", "Telegram", ThreadSummary(currentGame.telegramThreads), "Slow down private-message rumors without escalating.", Html("#2b6cb0"));
+        AddDesktopApp(appGrid.transform, "briefing", "Briefing", currentGame.complete ? "Review complete shift" : "Rules and action log", "Check values, quests, rules, and the live action log.", Amber);
+    }
+
+    private void AddDesktopApp(Transform parent, string tab, string title, string meta, string description, Color accent)
+    {
+        GameObject card = Card(parent, $"App-{tab}");
+        Layout(card, 430f, 238f, 0f, 0f);
+        Image image = card.GetComponent<Image>();
+        image.color = Color.Lerp(Panel, accent, 0.08f);
+
+        Text(card.transform, "Title", title, 30, Ink, FontStyles.Bold);
+        Text(card.transform, "Meta", meta, 18, accent, FontStyles.Bold);
+        Text(card.transform, "Description", description, 18, Ink);
+        Button(card.transform, $"Open {title}", accent, Color.white, () =>
+        {
+            activeTab = tab;
+            RenderTabs();
+        }, 190f, 52f);
     }
 
     private void RenderNewsdesk(Transform parent)
@@ -1323,8 +1361,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         GameObject card = PanelObject(parent, name, Panel);
         VerticalLayoutGroup layout = card.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(14, 14, 12, 12);
-        layout.spacing = 8;
+        layout.padding = new RectOffset(18, 18, 16, 16);
+        layout.spacing = 10;
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
         layout.childControlHeight = true;
@@ -1348,7 +1386,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         colors.colorMultiplier = 1f;
         button.colors = colors;
 
-        TMP_Text text = Text(go.transform, "Label", label, 14, foreground, FontStyles.Bold);
+        TMP_Text text = Text(go.transform, "Label", label, 16, foreground, FontStyles.Bold);
         text.alignment = TextAlignmentOptions.Center;
         Stretch(text.rectTransform);
         return button;
@@ -1367,11 +1405,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         RectMask2D mask = viewport.AddComponent<RectMask2D>();
         mask.padding = Vector4.zero;
 
-        TMP_Text text = Text(viewport.transform, "Text", string.Empty, 15, Ink);
+        TMP_Text text = Text(viewport.transform, "Text", string.Empty, 18, Ink);
         Stretch(text.rectTransform);
         text.alignment = TextAlignmentOptions.TopLeft;
 
-        TMP_Text placeholderText = Text(viewport.transform, "Placeholder", placeholder, 15, Muted);
+        TMP_Text placeholderText = Text(viewport.transform, "Placeholder", placeholder, 18, Muted);
         Stretch(placeholderText.rectTransform);
         placeholderText.alignment = TextAlignmentOptions.TopLeft;
 
@@ -1389,15 +1427,40 @@ public sealed class ComputerOverlayController : MonoBehaviour
         GameObject go = Element(parent: parent, name: name);
         TMP_Text text = go.AddComponent<TextMeshProUGUI>();
         text.text = DisplayText(value);
-        text.fontSize = size;
+        text.fontSize = ReadableFontSize(size);
         text.color = color;
         text.fontStyle = style;
         text.richText = false;
         text.raycastTarget = false;
         text.textWrappingMode = TextWrappingModes.Normal;
-        text.overflowMode = TextOverflowModes.Overflow;
+        text.overflowMode = TextOverflowModes.Ellipsis;
         Layout(go, -1f, -1f, 1f, 0f);
         return text;
+    }
+
+    private static int ReadableFontSize(int size)
+    {
+        if (size <= 12)
+        {
+            return 16;
+        }
+
+        if (size <= 14)
+        {
+            return 18;
+        }
+
+        if (size <= 16)
+        {
+            return 20;
+        }
+
+        if (size <= 20)
+        {
+            return 24;
+        }
+
+        return Mathf.RoundToInt(size * 1.08f);
     }
 
     private static RectTransform CreateScroll(Transform parent, string name, out RectTransform content, bool horizontal)
@@ -1733,6 +1796,47 @@ public sealed class ComputerOverlayController : MonoBehaviour
             }
         }
         return count;
+    }
+
+    private static int OpenThreadCount<T>(List<T> items)
+    {
+        int count = 0;
+        foreach (T item in items ?? new List<T>())
+        {
+            if (!ThreadResolved(item))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static string ThreadSummary<T>(List<T> items)
+    {
+        int total = items != null ? items.Count : 0;
+        int open = OpenThreadCount(items);
+        return $"{Mathf.Max(0, total - open)}/{total} resolved";
+    }
+
+    private static string LatestLine(params List<string>[] sources)
+    {
+        foreach (List<string> source in sources)
+        {
+            if (source == null)
+            {
+                continue;
+            }
+
+            for (int i = source.Count - 1; i >= 0; i--)
+            {
+                if (!string.IsNullOrWhiteSpace(source[i]))
+                {
+                    return source[i];
+                }
+            }
+        }
+
+        return "No workstation events yet.";
     }
 
     private static string NewsStatus(ComputerNewsItem item)
