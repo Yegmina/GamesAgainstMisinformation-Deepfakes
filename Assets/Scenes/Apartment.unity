@@ -305,7 +305,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.23105785, y: 0.08954797, z: 0.10908806}
   m_Center: {x: 0.16891246, y: 0.04406317, z: -0.21150321}
-<<<<<<< HEAD
 --- !u!1 &168970056
 GameObject:
   m_ObjectHideFlags: 0
@@ -337,7 +336,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 7044878420365234069}
   m_LocalEulerAnglesHint: {x: -2.772, y: 170.079, z: 1.465}
-=======
 --- !u!1001 &226418089
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -583,7 +581,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 893553f68540d2f418c554c987047c0e, type: 3}
->>>>>>> a8a1d4631af6bad67c0c36915e1e2ae02a0ca005
 --- !u!1 &256603409
 GameObject:
   m_ObjectHideFlags: 0
@@ -3940,12 +3937,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Interactable
   interactionText: Press E to use the computer
-<<<<<<< HEAD
   exitText: Esc to exit
   sitPoint: {fileID: 168970057}
-=======
   sceneToLoad: SampleScene
->>>>>>> a8a1d4631af6bad67c0c36915e1e2ae02a0ca005
+  exitText: Esc to exit
+  sitPoint: {fileID: 168970057}
+  sceneToLoad: SampleScene
+>>>>>>> c132126311d7bf8a832165dcc5e0c4b4fc15bec7
 --- !u!1 &7742780738051876068
 GameObject:
   m_ObjectHideFlags: 0
@@ -4633,13 +4631,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Interactable
   interactionText: Press E to use the phone
-<<<<<<< HEAD
   exitText: Esc to exit
   sitPoint: {fileID: 1382169355}
-=======
   sceneToLoad: SampleScene
->>>>>>> a8a1d4631af6bad67c0c36915e1e2ae02a0ca005
---- !u!33 &9018230162227093340
+  exitText: Esc to exit
+  sitPoint: {fileID: 1382169355}
+  sceneToLoad: SampleScene
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
