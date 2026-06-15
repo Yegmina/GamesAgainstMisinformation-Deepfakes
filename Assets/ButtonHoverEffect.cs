@@ -28,6 +28,12 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         audioSource.playOnAwake = false;
     }
 
+    void OnDisable()
+    {
+        StopScale();
+        transform.localScale = originalScale;
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         StopScale();

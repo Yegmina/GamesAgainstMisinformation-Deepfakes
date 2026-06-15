@@ -75,3 +75,6 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 .vsconfig
+/Assets/AI Toolkit
+Assets/AI Toolkit.meta
+ProjectSettings/ProjectSettings.asset
