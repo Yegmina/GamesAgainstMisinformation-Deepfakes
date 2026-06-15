@@ -1475,17 +1475,17 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 866426782}
-  m_LocalRotation: {x: 0, y: 0, z: 0.004363274, w: 0.9999905}
+  m_LocalRotation: {x: 0, y: 0, z: -0.01745245, w: 0.99984777}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1958038486}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0.5}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -2}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 308, y: 25}
-  m_SizeDelta: {x: 495, y: 230}
+  m_AnchoredPosition: {x: 306.6, y: 20.7}
+  m_SizeDelta: {x: 490, y: 225}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &866426784
 MonoBehaviour:
@@ -1499,12 +1499,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63a32280e9faeb34aa1a909e1910809a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FlickerEffect
-  glowColor: {r: 0.35, g: 0.75, b: 1, a: 0.007843138}
-  sineAmplitude: 0.025
-  sineFrequency: 1
-  noiseAmplitude: 0.04
-  noiseFrequency: 15
-  dropChance: 0.01
+  glowColor: {r: 0.12, g: 0.45, b: 0.8, a: 0.007843138}
+  sineAmplitude: 0.008
+  sineFrequency: 0.8
+  noiseAmplitude: 0.012
+  noiseFrequency: 10
+  dropChance: 0.003
   dropIntensity: 0.4
   dropDuration: 0.15
 --- !u!114 &866426785
@@ -1519,15 +1519,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.35, g: 0.75, b: 1, a: 0}
+  m_Material: {fileID: 2100000, guid: fb669163e2a918e4b98c9371bcd3688a, type: 2}
+  m_Color: {r: 0.12, g: 0.45, b: 0.8, a: 0.007843138}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 013ec0b1b9fdbcd41b86a09940ef931b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 84f5f67b17d72a142809896214784d96, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3813,17 +3813,17 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1867846326}
-  m_LocalRotation: {x: 0, y: 0, z: -0.052335896, w: 0.9986295}
+  m_LocalRotation: {x: 0, y: 0, z: -0.034899585, w: 0.99939084}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1958038486}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -6}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -4}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 620, y: -140}
-  m_SizeDelta: {x: 125, y: 175}
+  m_AnchoredPosition: {x: 622.5, y: -131.2}
+  m_SizeDelta: {x: 125, y: 139}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1867846328
 MonoBehaviour:
@@ -3837,12 +3837,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63a32280e9faeb34aa1a909e1910809a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FlickerEffect
-  glowColor: {r: 0.25, g: 0.5, b: 1, a: 0.003921569}
-  sineAmplitude: 0.015
-  sineFrequency: 2
-  noiseAmplitude: 0.035
-  noiseFrequency: 18
-  dropChance: 0.015
+  glowColor: {r: 0.08, g: 0.21960784, b: 0.8, a: 0.019607844}
+  sineAmplitude: 0.006
+  sineFrequency: 1.2
+  noiseAmplitude: 0.01
+  noiseFrequency: 12
+  dropChance: 0.005
   dropIntensity: 0.4
   dropDuration: 0.15
 --- !u!114 &1867846329
@@ -3857,15 +3857,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.25, g: 0.5, b: 1, a: 0.007843138}
+  m_Material: {fileID: 2100000, guid: fb669163e2a918e4b98c9371bcd3688a, type: 2}
+  m_Color: {r: 0.078431375, g: 0.21960784, b: 0.8, a: 0.019607844}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 013ec0b1b9fdbcd41b86a09940ef931b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 84f5f67b17d72a142809896214784d96, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
