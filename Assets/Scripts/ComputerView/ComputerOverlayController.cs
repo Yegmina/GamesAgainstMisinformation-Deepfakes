@@ -36,16 +36,18 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const string DefaultEmail = "unity.player@deepdetectgame.dev";
     private const string DefaultPassword = "unity-local-player-2026";
 
-    private static readonly Color Ink = Html("#17212b");
-    private static readonly Color Muted = Html("#657383");
-    private static readonly Color Line = Html("#d8e0e8");
-    private static readonly Color Paper = Html("#f7f9fb");
-    private static readonly Color Panel = Color.white;
-    private static readonly Color Blue = Html("#1e5aa8");
-    private static readonly Color BlueDark = Html("#16447f");
-    private static readonly Color Green = Html("#19745b");
-    private static readonly Color Red = Html("#b9383f");
-    private static readonly Color Amber = Html("#a66300");
+    private static readonly Color Ink = Html("#e8eef7");
+    private static readonly Color Muted = Html("#94a3b8");
+    private static readonly Color Line = Html("#263548");
+    private static readonly Color Paper = Html("#05080d");
+    private static readonly Color Panel = Html("#111923");
+    private static readonly Color PanelRaised = Html("#172232");
+    private static readonly Color PanelSoft = Html("#1f2b3b");
+    private static readonly Color Blue = Html("#74a7ff");
+    private static readonly Color BlueDark = Html("#3b82f6");
+    private static readonly Color Green = Html("#3dd6a3");
+    private static readonly Color Red = Html("#ff6b7a");
+    private static readonly Color Amber = Html("#ffb65c");
 
     private static ComputerOverlayController instance;
 
@@ -797,7 +799,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         actionLayout.childForceExpandHeight = false;
         actionLayout.childForceExpandWidth = false;
 
-        GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", Html("#eef4fb"));
+        GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", PanelRaised);
         Layout(scoreBox, 116f, 72f, 0f, 0f);
         VerticalLayoutGroup scoreLayout = scoreBox.AddComponent<VerticalLayoutGroup>();
         scoreLayout.padding = new RectOffset(10, 10, 8, 8);
@@ -1040,7 +1042,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         int childCount = 2 + (items.Count > 1 ? items.Count : 0);
         float shellHeight = 42f + 116f + 388f + (items.Count > 1 ? 32f + (items.Count - 1) * 224f : 0f) + Mathf.Max(0, childCount - 1) * 16f;
-        GameObject shell = PanelObject(parent, "NewsdeskApp", Html("#eef3f8"));
+        GameObject shell = PanelObject(parent, "NewsdeskApp", Paper);
         Layout(shell, -1f, Mathf.Max(TabPanelHeight, shellHeight), 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
         shellLayout.padding = new RectOffset(22, 22, 20, 22);
@@ -1050,7 +1052,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         shellLayout.childControlHeight = true;
         shellLayout.childForceExpandHeight = false;
 
-        GameObject toolbar = PanelObject(shell.transform, "NewsToolbar", Color.white);
+        GameObject toolbar = PanelObject(shell.transform, "NewsToolbar", Panel);
         Layout(toolbar, -1f, 116f, 1f, 0f);
         HorizontalLayoutGroup toolbarLayout = toolbar.AddComponent<HorizontalLayoutGroup>();
         toolbarLayout.padding = new RectOffset(20, 20, 16, 16);
@@ -1105,7 +1107,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddLeadNewsCard(Transform parent, ComputerNewsItem item)
     {
-        GameObject card = PanelObject(parent, "LeadStory", Color.white);
+        GameObject card = PanelObject(parent, "LeadStory", Panel);
         Layout(card, -1f, 388f, 1f, 0f);
         VerticalLayoutGroup layout = card.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(22, 22, 18, 18);
@@ -1137,7 +1139,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddWireNewsRow(Transform parent, ComputerNewsItem item)
     {
-        GameObject row = PanelObject(parent, "WireRow", Color.white);
+        GameObject row = PanelObject(parent, "WireRow", Panel);
         Layout(row, -1f, 224f, 1f, 0f);
         VerticalLayoutGroup layout = row.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(18, 18, 16, 16);
@@ -1158,7 +1160,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddNewsActionRow(Transform parent, ComputerNewsItem item, bool lead)
     {
-        GameObject actions = PanelObject(parent, lead ? "LeadActions" : "WireActions", Html("#f8fafc"));
+        GameObject actions = PanelObject(parent, lead ? "LeadActions" : "WireActions", PanelRaised);
         Layout(actions, -1f, lead ? 64f : 58f, 1f, 0f);
         HorizontalLayoutGroup layout = actions.AddComponent<HorizontalLayoutGroup>();
         layout.padding = new RectOffset(12, 12, 7, 12);
@@ -1170,7 +1172,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         layout.childForceExpandHeight = false;
 
         string state = !string.IsNullOrWhiteSpace(item.decision) ? item.decision.ToUpperInvariant() : "Awaiting decision";
-        GameObject statePill = PanelObject(actions.transform, "DecisionState", Html("#eaf1fb"));
+        GameObject statePill = PanelObject(actions.transform, "DecisionState", PanelSoft);
         Layout(statePill, lead ? 260f : 230f, 44f, 0f, 0f);
         TMP_Text stateText = NewsText(statePill.transform, "Label", state, 17, Ink, 44f, FontStyles.Bold, TextAlignmentOptions.Center);
         Stretch(stateText.rectTransform);
@@ -1184,7 +1186,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddNewsMetric(Transform parent, string label, string value, Color accent)
     {
-        GameObject metric = PanelObject(parent, $"Metric-{label}", Html("#eef4fb"));
+        GameObject metric = PanelObject(parent, $"Metric-{label}", PanelRaised);
         Layout(metric, 140f, 76f, 0f, 0f);
         VerticalLayoutGroup layout = metric.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(10, 10, 8, 8);
@@ -1196,7 +1198,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddEvidenceTile(Transform parent, string label, string value)
     {
-        GameObject tile = PanelObject(parent, $"Evidence-{label}", Html("#f4f8fb"));
+        GameObject tile = PanelObject(parent, $"Evidence-{label}", PanelRaised);
         Layout(tile, -1f, -1f, 1f, 1f);
         VerticalLayoutGroup layout = tile.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(10, 10, 8, 8);
@@ -1233,7 +1235,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         ComputerEmailItem active = FindEmail(activeEmailId) ?? emails[0];
 
-        GameObject shell = PanelObject(parent, "InboxApp", Html("#f2f6fb"));
+        GameObject shell = PanelObject(parent, "InboxApp", Paper);
         Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
         shellLayout.padding = new RectOffset(20, 20, 18, 20);
@@ -1278,7 +1280,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddEmailRow(Transform parent, ComputerEmailItem item, bool selected)
     {
-        GameObject row = PanelObject(parent, "EmailRow", selected ? Html("#e7f0ff") : Panel);
+        GameObject row = PanelObject(parent, "EmailRow", selected ? PanelSoft : Panel);
         Layout(row, -1f, 104f, 1f, 0f);
         Button button = row.AddComponent<Button>();
         button.targetGraphic = row.GetComponent<Image>();
@@ -1313,7 +1315,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         ComputerTelegramThread active = FindTelegram(activeTelegramId) ?? threads[0];
 
-        GameObject shell = PanelObject(parent, "TelegramApp", Html("#eef3f8"));
+        GameObject shell = PanelObject(parent, "TelegramApp", Paper);
         Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
         shellLayout.padding = new RectOffset(20, 20, 18, 20);
@@ -1358,7 +1360,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddTelegramRow(Transform parent, ComputerTelegramThread thread, bool selected)
     {
-        GameObject row = PanelObject(parent, "TelegramRow", selected ? Html("#e2f0ff") : Panel);
+        GameObject row = PanelObject(parent, "TelegramRow", selected ? PanelSoft : Panel);
         Layout(row, -1f, 104f, 1f, 0f);
         Button button = row.AddComponent<Button>();
         button.targetGraphic = row.GetComponent<Image>();
@@ -1393,7 +1395,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void RenderBriefing(Transform parent)
     {
-        GameObject shell = PanelObject(parent, "BriefingApp", Html("#f7f9fb"));
+        GameObject shell = PanelObject(parent, "BriefingApp", Paper);
         Layout(shell, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup shellLayout = shell.AddComponent<VerticalLayoutGroup>();
         shellLayout.padding = new RectOffset(20, 20, 18, 20);
@@ -1480,7 +1482,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddCustomReply(Transform parent, string surface, string itemId, string placeholder)
     {
-        GameObject box = PanelObject(parent, "CustomReply", Html("#f7f9fb"));
+        GameObject box = PanelObject(parent, "CustomReply", PanelRaised);
         Layout(box, -1f, 136f, 1f, 0f);
         HorizontalLayoutGroup layout = box.AddComponent<HorizontalLayoutGroup>();
         layout.padding = new RectOffset(12, 12, 12, 12);
@@ -1496,7 +1498,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddThread(Transform parent, List<JToken> messages, string fallbackSender)
     {
-        GameObject thread = PanelObject(parent, "Thread", Html("#f8fafc"));
+        GameObject thread = PanelObject(parent, "Thread", PanelRaised);
         Layout(thread, -1f, -1f, 1f, 0f);
         VerticalLayoutGroup layout = thread.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(14, 14, 14, 14);
@@ -1511,7 +1513,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         foreach (JToken message in messages)
         {
             bool player = MessageRole(message) == "player" || MessageSender(message) == "You";
-            GameObject bubble = PanelObject(thread.transform, "Bubble", player ? Html("#dbeafe") : Color.white);
+            GameObject bubble = PanelObject(thread.transform, "Bubble", player ? Html("#173660") : Panel);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bubbleLayout = bubble.AddComponent<VerticalLayoutGroup>();
             bubbleLayout.padding = new RectOffset(14, 14, 12, 12);
@@ -1541,7 +1543,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         layout.spacing = 2;
 
         Text(block.transform, "Label", $"{label}: {value}/100", 12, Ink, FontStyles.Bold);
-        GameObject track = PanelObject(block.transform, "Track", Html("#e5ecf3"));
+        GameObject track = PanelObject(block.transform, "Track", Line);
         Layout(track, -1f, 8f, 1f, 0f);
         GameObject fill = PanelObject(track.transform, "Fill", value >= 55 ? Green : Amber);
         RectTransform fillRect = fill.GetComponent<RectTransform>();
@@ -1576,7 +1578,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         colors.normalColor = background;
         colors.highlightedColor = Color.Lerp(background, Color.white, 0.18f);
         colors.pressedColor = Color.Lerp(background, Color.black, 0.12f);
-        colors.disabledColor = Html("#d3dbe4");
+        colors.disabledColor = Html("#344154");
         colors.colorMultiplier = 1f;
         button.colors = colors;
 
@@ -1588,7 +1590,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private static TMP_InputField InputField(Transform parent, string placeholder)
     {
-        GameObject root = PanelObject(parent, "InputField", Color.white);
+        GameObject root = PanelObject(parent, "InputField", PanelSoft);
         TMP_InputField input = root.AddComponent<TMP_InputField>();
         Image image = root.GetComponent<Image>();
         input.targetGraphic = image;
