@@ -1,0 +1,6 @@
+PlayMode Scene Transition Report:
+Loaded Scene: SampleScene
+Canvas/Background: FOUND
+  ActiveSelf: True
+  ActiveInHierarchy: True
+  Sprite: null
