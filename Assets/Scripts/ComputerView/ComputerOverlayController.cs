@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -12,10 +13,11 @@ using UnityEngine.UI;
 
 public sealed class ComputerOverlayController : MonoBehaviour
 {
-    private const float TabPanelHeight = 820f;
+    private const float TabPanelHeight = 850f;
     private const float InboxBodyHeight = 680f;
     private const float TelegramRowHeight = 600f;
     private const float BriefingSystemsHeight = 360f;
+    private const float ThreadViewportHeight = 360f;
     private const float CanvasReferenceWidth = 1920f;
     private const float CanvasReferenceHeight = 1080f;
     private const float MonitorScreenWidthRatio = 0.94f;
@@ -25,8 +27,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float FocusDistance = 6.2f;
     private const float FocusHeightOffset = 0.1f;
     private const float FocusFov = 34f;
-    private const float DesktopSummaryHeight = 148f;
-    private const float DesktopDockHeight = 76f;
+    private const float FocusEnterTransitionDuration = 1f;
+    private const float FocusExitTransitionDuration = 0.65f;
+    private const float TopbarHeight = 76f;
+    private const float BottomDockHeight = 88f;
+    private const float ActiveMissionsHomeHeight = 292f;
+    private const float ActiveMissionsBriefingHeight = 336f;
     private const string PrimaryMonitorName = "monitor";
     private const string FallbackMonitorName = "Monitor_27__Curved";
     private const string BackendUrlKey = "DeepDetect.BackendUrl";
@@ -63,9 +69,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool busy;
     private bool usingWorldMonitor;
     private bool focusActive;
+    private bool focusTransitioning;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private float savedCameraFov;
+    private Coroutine focusTransitionRoutine;
+    private Transform focusAnchor;
 
     private GameObject canvasObject;
     private Canvas canvas;
@@ -76,17 +85,25 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private TMP_Text scoreText;
     private Button advanceButton;
     private Button refreshButton;
+    private Button backButton;
     private GameObject bootStateObject;
     private TMP_Text bootTitleText;
     private TMP_Text bootBodyText;
     private GameObject activeGameObject;
-    private RectTransform missionStrip;
     private RectTransform tabButtons;
     private RectTransform tabHost;
 
+    public static event Action ReturnToApartmentRequested;
+    public static bool IsTransitioning => instance != null && instance.focusTransitioning;
+
     public static void OpenComputer()
     {
-        EnsureInstance().Open();
+        EnsureInstance().Open(null);
+    }
+
+    public static void OpenComputer(Transform anchor)
+    {
+        EnsureInstance().Open(anchor);
     }
 
     public static void CloseComputer()
@@ -99,7 +116,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     public static void PreloadComputer()
     {
-        EnsureInstance().Preload();
+        EnsureInstance().Preload(null);
+    }
+
+    public static void PreloadComputer(Transform anchor)
+    {
+        EnsureInstance().Preload(anchor);
     }
 
     private static ComputerOverlayController EnsureInstance()
@@ -117,7 +139,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void OnDestroy()
     {
-        ExitFocusMode();
+        ExitFocusModeImmediate();
 
         if (instance == this)
         {
@@ -131,9 +153,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
     }
 
-    private void Open()
+    private void Open(Transform anchor)
     {
         Debug.Log("[ComputerOverlay] Open requested.");
+        SetFocusAnchor(anchor);
+
         if (canvasObject == null)
         {
             BuildUi();
@@ -156,8 +180,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
     }
 
-    private void Preload()
+    private void Preload(Transform anchor)
     {
+        SetFocusAnchor(anchor);
+
         if (canvasObject == null)
         {
             BuildUi();
@@ -173,10 +199,19 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void Close()
     {
-        ExitFocusMode();
-
-        if (canvasObject != null)
+        if (canvasObject == null)
         {
+            ExitFocusModeImmediate();
+            return;
+        }
+
+        if (focusActive && usingWorldMonitor)
+        {
+            ExitFocusMode();
+        }
+        else
+        {
+            ExitFocusModeImmediate();
             canvasObject.SetActive(false);
         }
     }
@@ -389,6 +424,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
                 RenderAll();
             }
         }
+    }
+
+    private void BackToApartmentClicked()
+    {
+        if (ReturnToApartmentRequested != null)
+        {
+            ReturnToApartmentRequested.Invoke();
+            return;
+        }
+
+        Close();
     }
 
     private bool CanUseBackend()
@@ -605,6 +651,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         BuildTopbar(shell.transform);
         BuildBootState(shell.transform);
         BuildActiveGame(shell.transform);
+        BuildBottomDock(shell.transform);
 
         canvasObject.SetActive(false);
         Debug.Log("[ComputerOverlay] UI built.");
@@ -634,12 +681,19 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         Bounds bounds;
         bool hasBounds = TryGetRendererBounds(monitor, out bounds);
-        Vector3 surfaceForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
+        Vector3 monitorForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
         Vector3 surfaceUp = Vector3.Dot(monitor.up, Vector3.up) > 0.1f ? monitor.up.normalized : Vector3.up;
         Vector3 surfaceCenter = hasBounds ? bounds.center + surfaceUp * (bounds.size.y * MonitorScreenVerticalOffsetRatio) : monitor.position;
+        Vector3 viewDirection = GetPreferredViewDirection(surfaceCenter);
+        Vector3 screenNormal = monitorForward;
+        if (viewDirection.sqrMagnitude > 0.001f && Vector3.Dot(screenNormal, viewDirection) < 0f)
+        {
+            screenNormal = -screenNormal;
+        }
+
         float worldWidth = hasBounds ? Mathf.Clamp(bounds.size.x * MonitorScreenWidthRatio, 3.2f, 8.2f) : MonitorFallbackWorldWidth;
         float worldScale = worldWidth / CanvasReferenceWidth;
-        float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, surfaceForward) : 0f;
+        float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, screenNormal) : 0f;
 
         canvasRect.anchorMin = new Vector2(0.5f, 0.5f);
         canvasRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -648,8 +702,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         canvasRect.anchoredPosition = Vector2.zero;
 
         canvasObject.transform.SetParent(null, false);
-        canvasObject.transform.position = surfaceCenter - surfaceForward * (forwardHalfDepth + MonitorSurfaceOffset);
-        canvasObject.transform.rotation = Quaternion.LookRotation(surfaceForward, surfaceUp);
+        canvasObject.transform.position = surfaceCenter + screenNormal * (forwardHalfDepth + MonitorSurfaceOffset);
+        canvasObject.transform.rotation = Quaternion.LookRotation(-screenNormal, surfaceUp);
         canvasObject.transform.localScale = Vector3.one * worldScale;
         usingWorldMonitor = true;
     }
@@ -678,7 +732,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void EnterFocusMode()
     {
-        if (!usingWorldMonitor || canvasObject == null || focusActive)
+        if (!usingWorldMonitor || canvasObject == null)
         {
             return;
         }
@@ -689,18 +743,24 @@ public sealed class ComputerOverlayController : MonoBehaviour
             return;
         }
 
-        savedCameraPosition = camera.transform.position;
-        savedCameraRotation = camera.transform.rotation;
-        savedCameraFov = camera.fieldOfView;
-        focusActive = true;
+        if (focusActive && !focusTransitioning)
+        {
+            return;
+        }
+
+        if (!focusActive)
+        {
+            savedCameraPosition = camera.transform.position;
+            savedCameraRotation = camera.transform.rotation;
+            savedCameraFov = camera.fieldOfView;
+            focusActive = true;
+        }
 
         canvas.worldCamera = camera;
-        float focusDistance = GetFocusDistance(camera);
-        Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
-        Vector3 cameraPosition = canvasObject.transform.position - canvasObject.transform.forward * focusDistance + Vector3.up * FocusHeightOffset;
-        camera.transform.position = cameraPosition;
-        camera.transform.rotation = Quaternion.LookRotation((target - cameraPosition).normalized, Vector3.up);
-        camera.fieldOfView = FocusFov;
+        Vector3 targetPosition;
+        Quaternion targetRotation;
+        GetFocusPose(camera, out targetPosition, out targetRotation);
+        StartFocusTransition(camera, targetPosition, targetRotation, FocusFov, FocusEnterTransitionDuration, false, false);
     }
 
     private void ExitFocusMode()
@@ -713,12 +773,156 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Camera camera = Camera.main;
         if (camera != null)
         {
-            camera.transform.position = savedCameraPosition;
-            camera.transform.rotation = savedCameraRotation;
-            camera.fieldOfView = savedCameraFov;
+            StartFocusTransition(camera, savedCameraPosition, savedCameraRotation, savedCameraFov, FocusExitTransitionDuration, true, true);
+            return;
         }
 
         focusActive = false;
+        focusTransitioning = false;
+
+        if (canvasObject != null)
+        {
+            canvasObject.SetActive(false);
+        }
+    }
+
+    private void ExitFocusModeImmediate()
+    {
+        if (focusTransitionRoutine != null)
+        {
+            StopCoroutine(focusTransitionRoutine);
+            focusTransitionRoutine = null;
+        }
+
+        if (focusActive)
+        {
+            Camera camera = Camera.main;
+            if (camera != null)
+            {
+                camera.transform.position = savedCameraPosition;
+                camera.transform.rotation = savedCameraRotation;
+                camera.fieldOfView = savedCameraFov;
+            }
+        }
+
+        focusActive = false;
+        focusTransitioning = false;
+        SetCanvasInteractive(true);
+    }
+
+    private void GetFocusPose(Camera camera, out Vector3 targetPosition, out Quaternion targetRotation)
+    {
+        float focusDistance = GetFocusDistance(camera);
+        Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
+        Vector3 viewDirection = GetPreferredViewDirection(canvasObject.transform.position);
+        if (viewDirection.sqrMagnitude < 0.001f)
+        {
+            viewDirection = -canvasObject.transform.forward;
+        }
+
+        targetPosition = canvasObject.transform.position + viewDirection.normalized * focusDistance + Vector3.up * FocusHeightOffset;
+        targetRotation = Quaternion.LookRotation((target - targetPosition).normalized, Vector3.up);
+    }
+
+    private void SetFocusAnchor(Transform anchor)
+    {
+        if (anchor != null)
+        {
+            focusAnchor = anchor;
+        }
+    }
+
+    private Vector3 GetPreferredViewDirection(Vector3 origin)
+    {
+        if (focusAnchor != null)
+        {
+            Vector3 toAnchor = focusAnchor.position - origin;
+            toAnchor.y = 0f;
+            if (toAnchor.sqrMagnitude > 0.001f)
+            {
+                return toAnchor.normalized;
+            }
+        }
+
+        Camera camera = Camera.main;
+        if (camera != null)
+        {
+            Vector3 toCamera = camera.transform.position - origin;
+            toCamera.y = 0f;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                return toCamera.normalized;
+            }
+        }
+
+        return Vector3.zero;
+    }
+
+    private void StartFocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
+    {
+        if (focusTransitionRoutine != null)
+        {
+            StopCoroutine(focusTransitionRoutine);
+        }
+
+        focusTransitionRoutine = StartCoroutine(FocusTransition(camera, targetPosition, targetRotation, targetFov, duration, hideCanvasOnComplete, clearFocusOnComplete));
+    }
+
+    private IEnumerator FocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
+    {
+        focusTransitioning = true;
+        SetCanvasInteractive(false);
+
+        Vector3 startPosition = camera.transform.position;
+        Quaternion startRotation = camera.transform.rotation;
+        float startFov = camera.fieldOfView;
+        float elapsed = 0f;
+        float transitionDuration = Mathf.Max(duration, 0.01f);
+
+        while (elapsed < transitionDuration && camera != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float progress = Mathf.Clamp01(elapsed / transitionDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+
+            camera.transform.position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            camera.transform.rotation = Quaternion.Slerp(startRotation, targetRotation, easedProgress);
+            camera.fieldOfView = Mathf.Lerp(startFov, targetFov, easedProgress);
+
+            yield return null;
+        }
+
+        if (camera != null)
+        {
+            camera.transform.position = targetPosition;
+            camera.transform.rotation = targetRotation;
+            camera.fieldOfView = targetFov;
+        }
+
+        if (hideCanvasOnComplete && canvasObject != null)
+        {
+            canvasObject.SetActive(false);
+        }
+
+        if (clearFocusOnComplete)
+        {
+            focusActive = false;
+        }
+
+        focusTransitioning = false;
+        focusTransitionRoutine = null;
+        SetCanvasInteractive(true);
+    }
+
+    private void SetCanvasInteractive(bool interactive)
+    {
+        if (canvasGroup == null)
+        {
+            return;
+        }
+
+        canvasGroup.interactable = interactive;
+        canvasGroup.blocksRaycasts = interactive;
     }
 
     private static Transform FindMonitorTransform()
@@ -790,45 +994,24 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void BuildTopbar(Transform parent)
     {
         GameObject topbar = PanelObject(parent, "Topbar", Panel);
-        Layout(topbar, -1f, 104f, 1f, 0f);
+        Layout(topbar, -1f, TopbarHeight, 1f, 0f);
         HorizontalLayoutGroup layout = topbar.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(22, 22, 14, 14);
-        layout.spacing = 16;
+        layout.padding = new RectOffset(20, 20, 10, 10);
+        layout.spacing = 12;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
-        layout.childForceExpandWidth = false;
+        layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
 
         GameObject copy = Element(parent: topbar.transform, name: "TitleCopy");
         Layout(copy, -1f, -1f, 1f, 1f);
         VerticalLayoutGroup copyLayout = copy.AddComponent<VerticalLayoutGroup>();
-        copyLayout.spacing = 2;
+        copyLayout.spacing = 0;
         copyLayout.childAlignment = TextAnchor.MiddleLeft;
-        Text(copy.transform, "Kicker", "New Media Desk", 18, Blue, FontStyles.Bold);
-        titleText = Text(copy.transform, "Title", "DeepDetect", 32, Ink, FontStyles.Bold);
+        Text(copy.transform, "Kicker", "DeepDetect workstation", 16, Blue, FontStyles.Bold);
+        titleText = Text(copy.transform, "Title", "DeepDetect", 30, Ink, FontStyles.Bold);
         statusText = Text(copy.transform, "Status", "Press Refresh if the backend is offline.", 16, Muted);
-
-        GameObject actions = Element(parent: topbar.transform, name: "Actions");
-        Layout(actions, 400f, -1f, 0f, 1f);
-        HorizontalLayoutGroup actionLayout = actions.AddComponent<HorizontalLayoutGroup>();
-        actionLayout.spacing = 10;
-        actionLayout.childAlignment = TextAnchor.MiddleRight;
-        actionLayout.childControlHeight = true;
-        actionLayout.childForceExpandHeight = false;
-        actionLayout.childForceExpandWidth = false;
-
-        GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", PanelRaised);
-        Layout(scoreBox, 116f, 72f, 0f, 0f);
-        VerticalLayoutGroup scoreLayout = scoreBox.AddComponent<VerticalLayoutGroup>();
-        scoreLayout.padding = new RectOffset(10, 10, 8, 8);
-        scoreLayout.childAlignment = TextAnchor.MiddleCenter;
-        Text(scoreBox.transform, "ScoreLabel", "Score", 14, Muted, FontStyles.Bold).alignment = TextAlignmentOptions.Center;
-        scoreText = Text(scoreBox.transform, "Score", "0", 28, BlueDark, FontStyles.Bold);
-        scoreText.alignment = TextAlignmentOptions.Center;
-
-        advanceButton = Button(actions.transform, "Advance World", BlueDark, Color.white, AdvanceWorldClicked, 152f, 48f);
-        refreshButton = Button(actions.transform, "Refresh", Panel, BlueDark, RefreshClicked, 104f, 48f);
     }
 
     private void BuildBootState(Transform parent)
@@ -850,36 +1033,64 @@ public sealed class ComputerOverlayController : MonoBehaviour
         activeGameObject = Element(parent: parent, name: "ActiveGame");
         Layout(activeGameObject, -1f, -1f, 1f, 1f);
         VerticalLayoutGroup layout = activeGameObject.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 12;
+        layout.spacing = 0;
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
         layout.childControlHeight = true;
-        layout.childForceExpandHeight = false;
+        layout.childForceExpandHeight = true;
 
-        GameObject mission = Element(parent: activeGameObject.transform, name: "MissionStrip");
-        missionStrip = mission.GetComponent<RectTransform>();
-        Layout(mission, -1f, DesktopSummaryHeight, 1f, 0f);
-        HorizontalLayoutGroup missionLayout = mission.AddComponent<HorizontalLayoutGroup>();
-        missionLayout.spacing = 12;
-        missionLayout.childControlWidth = true;
-        missionLayout.childForceExpandWidth = true;
-        missionLayout.childControlHeight = true;
-        missionLayout.childForceExpandHeight = true;
+        GameObject host = PanelObject(activeGameObject.transform, "TabHost", Panel);
+        tabHost = host.GetComponent<RectTransform>();
+        Layout(host, -1f, -1f, 1f, 1f);
+    }
 
-        GameObject tabs = Element(parent: activeGameObject.transform, name: "Tabs");
+    private void BuildBottomDock(Transform parent)
+    {
+        GameObject dock = PanelObject(parent, "BottomDock", Panel);
+        Layout(dock, -1f, BottomDockHeight, 1f, 0f);
+        HorizontalLayoutGroup layout = dock.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(16, 16, 12, 12);
+        layout.spacing = 14;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = false;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = true;
+
+        GameObject tabs = Element(parent: dock.transform, name: "DockTabs");
         tabButtons = tabs.GetComponent<RectTransform>();
-        Layout(tabs, -1f, DesktopDockHeight, 1f, 0f);
+        Layout(tabs, -1f, -1f, 1f, 1f);
         HorizontalLayoutGroup tabLayout = tabs.AddComponent<HorizontalLayoutGroup>();
-        tabLayout.padding = new RectOffset(0, 0, 8, 8);
         tabLayout.spacing = 10;
+        tabLayout.childAlignment = TextAnchor.MiddleLeft;
         tabLayout.childControlWidth = true;
         tabLayout.childForceExpandWidth = false;
         tabLayout.childControlHeight = true;
         tabLayout.childForceExpandHeight = true;
 
-        GameObject host = PanelObject(activeGameObject.transform, "TabHost", Panel);
-        tabHost = host.GetComponent<RectTransform>();
-        Layout(host, -1f, -1f, 1f, 1f);
+        GameObject actions = Element(parent: dock.transform, name: "DockActions");
+        Layout(actions, 640f, -1f, 0f, 1f);
+        HorizontalLayoutGroup actionLayout = actions.AddComponent<HorizontalLayoutGroup>();
+        actionLayout.spacing = 10;
+        actionLayout.childAlignment = TextAnchor.MiddleRight;
+        actionLayout.childControlWidth = true;
+        actionLayout.childForceExpandWidth = false;
+        actionLayout.childControlHeight = true;
+        actionLayout.childForceExpandHeight = false;
+
+        backButton = Button(actions.transform, "Back", PanelSoft, Ink, BackToApartmentClicked, 92f, 54f);
+
+        GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", PanelRaised);
+        Layout(scoreBox, 104f, 58f, 0f, 0f);
+        VerticalLayoutGroup scoreLayout = scoreBox.AddComponent<VerticalLayoutGroup>();
+        scoreLayout.padding = new RectOffset(8, 8, 6, 6);
+        scoreLayout.childAlignment = TextAnchor.MiddleCenter;
+        Text(scoreBox.transform, "ScoreLabel", "Score", 14, Muted, FontStyles.Bold).alignment = TextAlignmentOptions.Center;
+        scoreText = Text(scoreBox.transform, "Score", "0", 24, BlueDark, FontStyles.Bold);
+        scoreText.alignment = TextAlignmentOptions.Center;
+
+        advanceButton = Button(actions.transform, "Advance World", BlueDark, Color.white, AdvanceWorldClicked, 158f, 54f);
+        refreshButton = Button(actions.transform, "Refresh", PanelSoft, Blue, RefreshClicked, 112f, 54f);
     }
 
     private void RenderAll()
@@ -890,6 +1101,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         RenderTopbar();
+        RenderBottomDock();
 
         bool hasGame = currentGame != null;
         bootStateObject.SetActive(!hasGame);
@@ -897,7 +1109,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         if (hasGame)
         {
-            RenderMissionStrip();
             RenderTabs();
         }
     }
@@ -908,11 +1119,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         titleText.text = DisplayText(currentGame != null && !string.IsNullOrWhiteSpace(currentGame.title)
             ? currentGame.title
             : $"DeepDetect / {userName}");
-
-        scoreText.text = currentGame != null ? currentGame.score.ToString() : "0";
-        advanceButton.gameObject.SetActive(currentGame != null);
-        advanceButton.interactable = currentGame != null && !busy && initialized;
-        refreshButton.interactable = !busy;
 
         if (currentGame != null && !busy && ShouldShowAgentStatus())
         {
@@ -934,40 +1140,42 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         return statusText.text == "Ready." || statusText.text.StartsWith("Agent runtime:", StringComparison.Ordinal);
     }
-    private void RenderMissionStrip()
+
+    private void RenderBottomDock()
     {
-        Clear(missionStrip);
-
-        GameObject shiftPanel = Card(missionStrip, "ShiftStatus");
-        Layout(shiftPanel, -1f, -1f, 1f, 1f);
-        Text(shiftPanel.transform, "Heading", currentGame.complete ? "Shift complete" : "Shift active", 22, currentGame.complete ? Green : BlueDark, FontStyles.Bold);
-        Text(shiftPanel.transform, "Subline", $"{Fallback(currentGame.title, "DeepDetect shift")} / Tick {currentGame.worldTick}", 17, Muted);
-        Text(shiftPanel.transform, "OpenItems", $"Open work: {OpenNewsCount(currentGame.newsItems)} news / {OpenThreadCount(currentGame.emails)} inbox / {OpenThreadCount(currentGame.telegramThreads)} Telegram", 18, Ink, FontStyles.Bold);
-
-        GameObject valuesPanel = Card(missionStrip, "ValueSnapshot");
-        Layout(valuesPanel, -1f, -1f, 1f, 1f);
-        Text(valuesPanel.transform, "Heading", "Values", 22, Ink, FontStyles.Bold);
-        foreach (ComputerValue value in ValuesList())
+        if (tabButtons != null)
         {
-            AddMeter(valuesPanel.transform, Fallback(value.label, "Value"), value.value, value.description);
+            Clear(tabButtons);
+            AddTabButton("home", "Home");
+            AddTabButton("news", "Newsdesk");
+            AddTabButton("email", "Inbox");
+            AddTabButton("telegram", "Telegram");
+            AddTabButton("briefing", "Briefing");
         }
 
-        GameObject feedPanel = Card(missionStrip, "LatestFeed");
-        Layout(feedPanel, -1f, -1f, 1f, 1f);
-        Text(feedPanel.transform, "Heading", "Latest", 22, Ink, FontStyles.Bold);
-        string latest = LatestLine(currentGame.actionLog, currentGame.questLog, currentGame.worldFeed, currentGame.generationLog);
-        Text(feedPanel.transform, "LatestLine", latest, 17, Muted);
+        if (scoreText != null)
+        {
+            scoreText.text = currentGame != null ? currentGame.score.ToString() : "0";
+        }
+
+        if (backButton != null)
+        {
+            backButton.interactable = true;
+        }
+
+        if (advanceButton != null)
+        {
+            advanceButton.interactable = currentGame != null && !busy && initialized;
+        }
+
+        if (refreshButton != null)
+        {
+            refreshButton.interactable = !busy;
+        }
     }
 
     private void RenderTabs()
     {
-        Clear(tabButtons);
-        AddTabButton("home", "Home");
-        AddTabButton("news", "Newsdesk");
-        AddTabButton("email", "Inbox");
-        AddTabButton("telegram", "Telegram");
-        AddTabButton("briefing", "Briefing");
-
         Clear(tabHost);
         RectTransform content;
         CreateScroll(tabHost, "TabScroll", out content, false);
@@ -1000,8 +1208,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         {
             activeTab = tab;
             RenderTabs();
+            RenderBottomDock();
         }, tab == "home" ? 124f : 166f, 56f);
-        button.interactable = !selected && !busy;
+        button.interactable = currentGame != null && !selected && !busy;
     }
 
     private void RenderDesktop(Transform parent)
@@ -1009,23 +1218,23 @@ public sealed class ComputerOverlayController : MonoBehaviour
         GameObject desktop = Element(parent: parent, name: "Desktop");
         Layout(desktop, -1f, TabPanelHeight, 1f, 0f);
         VerticalLayoutGroup desktopLayout = desktop.AddComponent<VerticalLayoutGroup>();
-        desktopLayout.padding = new RectOffset(24, 24, 24, 24);
-        desktopLayout.spacing = 18;
+        desktopLayout.padding = new RectOffset(22, 22, 20, 20);
+        desktopLayout.spacing = 16;
         desktopLayout.childControlWidth = true;
         desktopLayout.childForceExpandWidth = true;
         desktopLayout.childControlHeight = true;
         desktopLayout.childForceExpandHeight = false;
 
-        Text(desktop.transform, "Heading", "DeepDetect workstation", 36, Ink, FontStyles.Bold);
-        Text(desktop.transform, "Subheading", "Choose one workspace. Each app uses the same live runtime shift.", 20, Muted);
+        AddActiveMissionsPanel(desktop.transform, ActiveMissionsHomeHeight);
+        Text(desktop.transform, "Heading", "Workspaces", 30, Ink, FontStyles.Bold);
 
         GameObject appGrid = Element(parent: desktop.transform, name: "AppGrid");
-        Layout(appGrid, -1f, 540f, 1f, 0f);
+        Layout(appGrid, -1f, 220f, 1f, 0f);
         GridLayoutGroup grid = appGrid.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(430f, 238f);
-        grid.spacing = new Vector2(18f, 18f);
+        grid.cellSize = new Vector2(430f, 200f);
+        grid.spacing = new Vector2(14f, 14f);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 2;
+        grid.constraintCount = 4;
 
         AddDesktopApp(appGrid.transform, "news", "Newsdesk", $"{OpenNewsCount(currentGame.newsItems)} decisions open", "Publish credible stories and reject manipulated claims.", BlueDark);
         AddDesktopApp(appGrid.transform, "email", "Inbox", ThreadSummary(currentGame.emails), "Handle newsroom pressure with evidence-first replies.", Green);
@@ -1036,18 +1245,83 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void AddDesktopApp(Transform parent, string tab, string title, string meta, string description, Color accent)
     {
         GameObject card = Card(parent, $"App-{tab}");
-        Layout(card, 430f, 238f, 0f, 0f);
+        Layout(card, 430f, 200f, 0f, 0f);
         Image image = card.GetComponent<Image>();
         image.color = Color.Lerp(Panel, accent, 0.08f);
 
-        Text(card.transform, "Title", title, 30, Ink, FontStyles.Bold);
+        Text(card.transform, "Title", title, 28, Ink, FontStyles.Bold);
         Text(card.transform, "Meta", meta, 18, accent, FontStyles.Bold);
         Text(card.transform, "Description", description, 18, Ink);
         Button(card.transform, $"Open {title}", accent, Color.white, () =>
         {
             activeTab = tab;
             RenderTabs();
-        }, 190f, 52f);
+            RenderBottomDock();
+        }, 180f, 48f);
+    }
+
+    private void AddActiveMissionsPanel(Transform parent, float height)
+    {
+        GameObject panel = PanelObject(parent, "ActiveMissions", PanelRaised);
+        Layout(panel, -1f, height, 1f, 0f);
+        HorizontalLayoutGroup layout = panel.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(16, 16, 14, 14);
+        layout.spacing = 12;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = true;
+
+        GameObject summary = MissionBlock(panel.transform, "MissionSummary", "Active Missions", BlueDark);
+        Text(summary.transform, "State", currentGame.complete ? "Shift complete" : "Shift active", 24, currentGame.complete ? Green : BlueDark, FontStyles.Bold);
+        Text(summary.transform, "Tick", $"{Fallback(currentGame.title, "DeepDetect shift")} / Tick {currentGame.worldTick}", 17, Muted);
+        Text(summary.transform, "OpenWork", $"Open work: {OpenNewsCount(currentGame.newsItems)} news / {OpenThreadCount(currentGame.emails)} inbox / {OpenThreadCount(currentGame.telegramThreads)} Telegram", 18, Ink, FontStyles.Bold);
+
+        GameObject quests = MissionBlock(panel.transform, "QuestSummary", "Quests", Green);
+        List<ComputerQuest> questItems = currentGame.quests ?? new List<ComputerQuest>();
+        if (questItems.Count == 0)
+        {
+            Text(quests.transform, "EmptyQuest", "No active quests.", 17, Muted);
+        }
+        else
+        {
+            foreach (ComputerQuest quest in questItems)
+            {
+                Text(quests.transform, "Quest", $"{quest.current}/{quest.target} - {Fallback(quest.title, "Quest")}", 17, quest.complete ? Green : Ink, quest.complete ? FontStyles.Bold : FontStyles.Normal);
+            }
+        }
+
+        GameObject values = MissionBlock(panel.transform, "ValueSummary", "Values", Amber);
+        List<ComputerValue> valueItems = ValuesList();
+        if (valueItems.Count == 0)
+        {
+            Text(values.transform, "EmptyValues", "Values are loading.", 17, Muted);
+        }
+        else
+        {
+            foreach (ComputerValue value in valueItems)
+            {
+                AddMeter(values.transform, Fallback(value.label, "Value"), value.value, value.description);
+            }
+        }
+
+        GameObject latest = MissionBlock(panel.transform, "LatestSummary", "Latest", Blue);
+        Text(latest.transform, "LatestLine", LatestLine(currentGame.actionLog, currentGame.questLog, currentGame.worldFeed, currentGame.generationLog), 18, Ink);
+    }
+
+    private GameObject MissionBlock(Transform parent, string name, string title, Color accent)
+    {
+        GameObject block = PanelObject(parent, name, Panel);
+        Layout(block, -1f, -1f, 1f, 1f);
+        VerticalLayoutGroup layout = block.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(14, 14, 12, 12);
+        layout.spacing = 6;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = false;
+        Text(block.transform, "Title", title, 21, accent, FontStyles.Bold);
+        return block;
     }
 
     private void RenderNewsdesk(Transform parent)
@@ -1431,30 +1705,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             ? "Review your calls and replay with a new generated day."
             : "Finish every workspace to complete the day.", 20, Muted, FontStyles.Bold);
 
-        GameObject systems = Element(parent: shell.transform, name: "BriefingSystems");
-        Layout(systems, -1f, 330f, 1f, 0f);
-        HorizontalLayoutGroup systemsLayout = systems.AddComponent<HorizontalLayoutGroup>();
-        systemsLayout.spacing = 14;
-        systemsLayout.childControlWidth = true;
-        systemsLayout.childControlHeight = true;
-        systemsLayout.childForceExpandWidth = true;
-        systemsLayout.childForceExpandHeight = true;
-
-        GameObject values = Card(systems.transform, "Values");
-        Layout(values, -1f, -1f, 1f, 1f);
-        Text(values.transform, "Title", "Values", 26, Ink, FontStyles.Bold);
-        foreach (ComputerValue value in ValuesList())
-        {
-            Text(values.transform, "Value", $"{Fallback(value.label, "Value")}: {value.value}/100 - {Fallback(value.description, "No description")}", 18, Ink);
-        }
-
-        GameObject quests = Card(systems.transform, "Quests");
-        Layout(quests, -1f, -1f, 1f, 1f);
-        Text(quests.transform, "Title", "Quests", 26, Ink, FontStyles.Bold);
-        foreach (ComputerQuest quest in currentGame.quests ?? new List<ComputerQuest>())
-        {
-            Text(quests.transform, "Quest", $"{Fallback(quest.title, "Quest")}: {quest.current}/{quest.target} {(quest.complete ? "complete" : "active")} - {Fallback(quest.reward, "reward pending")}", 18, Ink);
-        }
+        AddActiveMissionsPanel(shell.transform, ActiveMissionsBriefingHeight);
 
         Text(shell.transform, "Rules", "1. You are responsible for what appears on the new-media front page.\n2. Real stories should be published only when the source and framing are credible.\n3. Manipulated stories often contain pressure, unsupported certainty, or emotional wording.\n4. Email and Telegram sidequests affect your trust score just like newsdesk calls.", 20, Ink);
         Text(shell.transform, "LogTitle", "Action log", 26, Ink, FontStyles.Bold);
@@ -1517,29 +1768,46 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddThread(Transform parent, List<JToken> messages, string fallbackSender)
     {
-        GameObject thread = PanelObject(parent, "Thread", PanelRaised);
-        Layout(thread, -1f, -1f, 1f, 0f);
-        VerticalLayoutGroup layout = thread.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(14, 14, 14, 14);
-        layout.spacing = 10;
+        RectTransform content;
+        RectTransform thread = CreateScroll(parent, "Thread", out content, false);
+        Layout(thread.gameObject, -1f, ThreadViewportHeight, 1f, 0f);
+        Image image = thread.GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = PanelRaised;
+        }
+
+        ScrollRect scroll = thread.GetComponent<ScrollRect>();
+        if (scroll != null)
+        {
+            scroll.scrollSensitivity = 30f;
+        }
+
+        VerticalLayoutGroup layout = content.GetComponent<VerticalLayoutGroup>();
+        if (layout != null)
+        {
+            layout.padding = new RectOffset(14, 14, 14, 14);
+            layout.spacing = 10;
+        }
 
         if (messages == null || messages.Count == 0)
         {
-            Text(thread.transform, "EmptyMessage", "No messages yet.", 18, Muted);
+            Text(content, "EmptyMessage", "No messages yet.", 18, Muted);
             return;
         }
 
         foreach (JToken message in messages)
         {
             bool player = MessageRole(message) == "player" || MessageSender(message) == "You";
-            GameObject bubble = PanelObject(thread.transform, "Bubble", player ? Html("#173660") : Panel);
+            GameObject bubble = PanelObject(content, "Bubble", player ? Html("#173660") : Panel);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bubbleLayout = bubble.AddComponent<VerticalLayoutGroup>();
             bubbleLayout.padding = new RectOffset(14, 14, 12, 12);
             bubbleLayout.spacing = 4;
             string sender = Fallback(MessageSender(message), player ? "You" : fallbackSender);
             Text(bubble.transform, "Sender", sender, 16, player ? BlueDark : Muted, FontStyles.Bold);
-            Text(bubble.transform, "Text", MessageText(message), 19, Ink);
+            TMP_Text body = Text(bubble.transform, "Text", MessageText(message), 19, Ink);
+            body.overflowMode = TextOverflowModes.Overflow;
         }
     }
 
@@ -1787,6 +2055,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
         SetStatus(message);
         RenderTopbar();
+        RenderBottomDock();
     }
 
     private void SetStatus(string message)
