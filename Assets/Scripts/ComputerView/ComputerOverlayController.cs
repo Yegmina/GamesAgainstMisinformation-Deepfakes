@@ -16,6 +16,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float InboxBodyHeight = 680f;
     private const float TelegramRowHeight = 600f;
     private const float BriefingSystemsHeight = 360f;
+    private const float ThreadViewportHeight = 360f;
     private const float CanvasReferenceWidth = 1920f;
     private const float CanvasReferenceHeight = 1080f;
     private const float MonitorScreenWidthRatio = 0.94f;
@@ -1517,29 +1518,46 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void AddThread(Transform parent, List<JToken> messages, string fallbackSender)
     {
-        GameObject thread = PanelObject(parent, "Thread", PanelRaised);
-        Layout(thread, -1f, -1f, 1f, 0f);
-        VerticalLayoutGroup layout = thread.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(14, 14, 14, 14);
-        layout.spacing = 10;
+        RectTransform content;
+        RectTransform thread = CreateScroll(parent, "Thread", out content, false);
+        Layout(thread.gameObject, -1f, ThreadViewportHeight, 1f, 0f);
+        Image image = thread.GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = PanelRaised;
+        }
+
+        ScrollRect scroll = thread.GetComponent<ScrollRect>();
+        if (scroll != null)
+        {
+            scroll.scrollSensitivity = 30f;
+        }
+
+        VerticalLayoutGroup layout = content.GetComponent<VerticalLayoutGroup>();
+        if (layout != null)
+        {
+            layout.padding = new RectOffset(14, 14, 14, 14);
+            layout.spacing = 10;
+        }
 
         if (messages == null || messages.Count == 0)
         {
-            Text(thread.transform, "EmptyMessage", "No messages yet.", 18, Muted);
+            Text(content, "EmptyMessage", "No messages yet.", 18, Muted);
             return;
         }
 
         foreach (JToken message in messages)
         {
             bool player = MessageRole(message) == "player" || MessageSender(message) == "You";
-            GameObject bubble = PanelObject(thread.transform, "Bubble", player ? Html("#173660") : Panel);
+            GameObject bubble = PanelObject(content, "Bubble", player ? Html("#173660") : Panel);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bubbleLayout = bubble.AddComponent<VerticalLayoutGroup>();
             bubbleLayout.padding = new RectOffset(14, 14, 12, 12);
             bubbleLayout.spacing = 4;
             string sender = Fallback(MessageSender(message), player ? "You" : fallbackSender);
             Text(bubble.transform, "Sender", sender, 16, player ? BlueDark : Muted, FontStyles.Bold);
-            Text(bubble.transform, "Text", MessageText(message), 19, Ink);
+            TMP_Text body = Text(bubble.transform, "Text", MessageText(message), 19, Ink);
+            body.overflowMode = TextOverflowModes.Overflow;
         }
     }
 
