@@ -1,5 +1,16 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.akiojin",
+        "com.akiojin.unity-mcp-server"
+      ]
+    }
+  ],
   "dependencies": {
+    "com.akiojin.unity-mcp-server": "5.5.2",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.ai.assistant": "2.12.0-pre.2",
     "com.unity.ai.inference": "2.6.1",
@@ -10,6 +21,7 @@
     "com.unity.ide.visualstudio": "2.0.26",
     "com.unity.inputsystem": "1.19.0",
     "com.unity.multiplayer.center": "1.0.1",
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
     "com.unity.render-pipelines.universal": "17.3.0",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.12",
