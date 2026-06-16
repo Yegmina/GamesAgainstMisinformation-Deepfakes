@@ -20,7 +20,7 @@ public class Interactable : MonoBehaviour
     {
         if (ShouldOpenComputerOverlay())
         {
-            ComputerOverlayController.PreloadComputer();
+            ComputerOverlayController.PreloadComputer(sitPoint);
         }
     }
 
@@ -30,7 +30,7 @@ public class Interactable : MonoBehaviour
         if (ShouldOpenComputerOverlay())
         {
             Debug.Log($"Opening computer overlay from {gameObject.name}");
-            ComputerOverlayController.OpenComputer();
+            ComputerOverlayController.OpenComputer(sitPoint);
             return;
         }
 

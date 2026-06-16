@@ -74,6 +74,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private Quaternion savedCameraRotation;
     private float savedCameraFov;
     private Coroutine focusTransitionRoutine;
+    private Transform focusAnchor;
 
     private GameObject canvasObject;
     private Canvas canvas;
@@ -97,7 +98,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     public static void OpenComputer()
     {
-        EnsureInstance().Open();
+        EnsureInstance().Open(null);
+    }
+
+    public static void OpenComputer(Transform anchor)
+    {
+        EnsureInstance().Open(anchor);
     }
 
     public static void CloseComputer()
@@ -110,7 +116,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     public static void PreloadComputer()
     {
-        EnsureInstance().Preload();
+        EnsureInstance().Preload(null);
+    }
+
+    public static void PreloadComputer(Transform anchor)
+    {
+        EnsureInstance().Preload(anchor);
     }
 
     private static ComputerOverlayController EnsureInstance()
@@ -142,9 +153,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
     }
 
-    private void Open()
+    private void Open(Transform anchor)
     {
         Debug.Log("[ComputerOverlay] Open requested.");
+        SetFocusAnchor(anchor);
+
         if (canvasObject == null)
         {
             BuildUi();
@@ -167,8 +180,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
     }
 
-    private void Preload()
+    private void Preload(Transform anchor)
     {
+        SetFocusAnchor(anchor);
+
         if (canvasObject == null)
         {
             BuildUi();
@@ -666,12 +681,19 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         Bounds bounds;
         bool hasBounds = TryGetRendererBounds(monitor, out bounds);
-        Vector3 surfaceForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
+        Vector3 monitorForward = monitor.forward.sqrMagnitude > 0.001f ? monitor.forward.normalized : Vector3.forward;
         Vector3 surfaceUp = Vector3.Dot(monitor.up, Vector3.up) > 0.1f ? monitor.up.normalized : Vector3.up;
         Vector3 surfaceCenter = hasBounds ? bounds.center + surfaceUp * (bounds.size.y * MonitorScreenVerticalOffsetRatio) : monitor.position;
+        Vector3 viewDirection = GetPreferredViewDirection(surfaceCenter);
+        Vector3 screenNormal = monitorForward;
+        if (viewDirection.sqrMagnitude > 0.001f && Vector3.Dot(screenNormal, viewDirection) < 0f)
+        {
+            screenNormal = -screenNormal;
+        }
+
         float worldWidth = hasBounds ? Mathf.Clamp(bounds.size.x * MonitorScreenWidthRatio, 3.2f, 8.2f) : MonitorFallbackWorldWidth;
         float worldScale = worldWidth / CanvasReferenceWidth;
-        float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, surfaceForward) : 0f;
+        float forwardHalfDepth = hasBounds ? ProjectBoundsExtent(bounds.extents, screenNormal) : 0f;
 
         canvasRect.anchorMin = new Vector2(0.5f, 0.5f);
         canvasRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -680,8 +702,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         canvasRect.anchoredPosition = Vector2.zero;
 
         canvasObject.transform.SetParent(null, false);
-        canvasObject.transform.position = surfaceCenter - surfaceForward * (forwardHalfDepth + MonitorSurfaceOffset);
-        canvasObject.transform.rotation = Quaternion.LookRotation(surfaceForward, surfaceUp);
+        canvasObject.transform.position = surfaceCenter + screenNormal * (forwardHalfDepth + MonitorSurfaceOffset);
+        canvasObject.transform.rotation = Quaternion.LookRotation(-screenNormal, surfaceUp);
         canvasObject.transform.localScale = Vector3.one * worldScale;
         usingWorldMonitor = true;
     }
@@ -792,8 +814,48 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         float focusDistance = GetFocusDistance(camera);
         Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
-        targetPosition = canvasObject.transform.position - canvasObject.transform.forward * focusDistance + Vector3.up * FocusHeightOffset;
+        Vector3 viewDirection = GetPreferredViewDirection(canvasObject.transform.position);
+        if (viewDirection.sqrMagnitude < 0.001f)
+        {
+            viewDirection = -canvasObject.transform.forward;
+        }
+
+        targetPosition = canvasObject.transform.position + viewDirection.normalized * focusDistance + Vector3.up * FocusHeightOffset;
         targetRotation = Quaternion.LookRotation((target - targetPosition).normalized, Vector3.up);
+    }
+
+    private void SetFocusAnchor(Transform anchor)
+    {
+        if (anchor != null)
+        {
+            focusAnchor = anchor;
+        }
+    }
+
+    private Vector3 GetPreferredViewDirection(Vector3 origin)
+    {
+        if (focusAnchor != null)
+        {
+            Vector3 toAnchor = focusAnchor.position - origin;
+            toAnchor.y = 0f;
+            if (toAnchor.sqrMagnitude > 0.001f)
+            {
+                return toAnchor.normalized;
+            }
+        }
+
+        Camera camera = Camera.main;
+        if (camera != null)
+        {
+            Vector3 toCamera = camera.transform.position - origin;
+            toCamera.y = 0f;
+            if (toCamera.sqrMagnitude > 0.001f)
+            {
+                return toCamera.normalized;
+            }
+        }
+
+        return Vector3.zero;
     }
 
     private void StartFocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
