@@ -24,12 +24,19 @@ public class PlayerInteraction : MonoBehaviour
             playerInputHandler.OnInteract += HandleInteraction;
             playerInputHandler.OnExit += HandleExit;
         }
+
+        ComputerOverlayController.ReturnToApartmentRequested += HandleComputerReturnToApartment;
     }
 
     private void OnDisable()
     {
-        playerInputHandler.OnInteract -= HandleInteraction;
-        playerInputHandler.OnExit -= HandleExit;
+        if (playerInputHandler != null)
+        {
+            playerInputHandler.OnInteract -= HandleInteraction;
+            playerInputHandler.OnExit -= HandleExit;
+        }
+
+        ComputerOverlayController.ReturnToApartmentRequested -= HandleComputerReturnToApartment;
     }
 
     private void HandleInteraction()
@@ -59,6 +66,17 @@ public class PlayerInteraction : MonoBehaviour
         uiController.ShowInteraction(activeInteraction.InteractionText);
 
         activeInteraction = null;
+    }
+
+    private void HandleComputerReturnToApartment()
+    {
+        if (activeInteraction != null)
+        {
+            HandleExit();
+            return;
+        }
+
+        ComputerOverlayController.CloseComputer();
     }
 
     private void OnTriggerEnter(Collider other)
