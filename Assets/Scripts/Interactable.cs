@@ -11,6 +11,7 @@ public class Interactable : MonoBehaviour
     public Transform SitPoint => sitPoint;
     public string InteractionText => interactionText;
     public string ExitText => exitText;
+    public bool OpensComputerOverlay => ShouldOpenComputerOverlay();
 
     [SerializeField]
     private Transform sitPoint;

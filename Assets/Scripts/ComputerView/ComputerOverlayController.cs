@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -26,6 +27,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float FocusDistance = 6.2f;
     private const float FocusHeightOffset = 0.1f;
     private const float FocusFov = 34f;
+    private const float FocusEnterTransitionDuration = 1f;
+    private const float FocusExitTransitionDuration = 0.65f;
     private const float TopbarHeight = 76f;
     private const float BottomDockHeight = 88f;
     private const float ActiveMissionsHomeHeight = 292f;
@@ -66,9 +69,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool busy;
     private bool usingWorldMonitor;
     private bool focusActive;
+    private bool focusTransitioning;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private float savedCameraFov;
+    private Coroutine focusTransitionRoutine;
 
     private GameObject canvasObject;
     private Canvas canvas;
@@ -88,6 +93,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private RectTransform tabHost;
 
     public static event Action ReturnToApartmentRequested;
+    public static bool IsTransitioning => instance != null && instance.focusTransitioning;
 
     public static void OpenComputer()
     {
@@ -122,7 +128,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void OnDestroy()
     {
-        ExitFocusMode();
+        ExitFocusModeImmediate();
 
         if (instance == this)
         {
@@ -178,10 +184,19 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void Close()
     {
-        ExitFocusMode();
-
-        if (canvasObject != null)
+        if (canvasObject == null)
         {
+            ExitFocusModeImmediate();
+            return;
+        }
+
+        if (focusActive && usingWorldMonitor)
+        {
+            ExitFocusMode();
+        }
+        else
+        {
+            ExitFocusModeImmediate();
             canvasObject.SetActive(false);
         }
     }
@@ -695,7 +710,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void EnterFocusMode()
     {
-        if (!usingWorldMonitor || canvasObject == null || focusActive)
+        if (!usingWorldMonitor || canvasObject == null)
         {
             return;
         }
@@ -706,18 +721,24 @@ public sealed class ComputerOverlayController : MonoBehaviour
             return;
         }
 
-        savedCameraPosition = camera.transform.position;
-        savedCameraRotation = camera.transform.rotation;
-        savedCameraFov = camera.fieldOfView;
-        focusActive = true;
+        if (focusActive && !focusTransitioning)
+        {
+            return;
+        }
+
+        if (!focusActive)
+        {
+            savedCameraPosition = camera.transform.position;
+            savedCameraRotation = camera.transform.rotation;
+            savedCameraFov = camera.fieldOfView;
+            focusActive = true;
+        }
 
         canvas.worldCamera = camera;
-        float focusDistance = GetFocusDistance(camera);
-        Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
-        Vector3 cameraPosition = canvasObject.transform.position - canvasObject.transform.forward * focusDistance + Vector3.up * FocusHeightOffset;
-        camera.transform.position = cameraPosition;
-        camera.transform.rotation = Quaternion.LookRotation((target - cameraPosition).normalized, Vector3.up);
-        camera.fieldOfView = FocusFov;
+        Vector3 targetPosition;
+        Quaternion targetRotation;
+        GetFocusPose(camera, out targetPosition, out targetRotation);
+        StartFocusTransition(camera, targetPosition, targetRotation, FocusFov, FocusEnterTransitionDuration, false, false);
     }
 
     private void ExitFocusMode()
@@ -730,12 +751,116 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Camera camera = Camera.main;
         if (camera != null)
         {
-            camera.transform.position = savedCameraPosition;
-            camera.transform.rotation = savedCameraRotation;
-            camera.fieldOfView = savedCameraFov;
+            StartFocusTransition(camera, savedCameraPosition, savedCameraRotation, savedCameraFov, FocusExitTransitionDuration, true, true);
+            return;
         }
 
         focusActive = false;
+        focusTransitioning = false;
+
+        if (canvasObject != null)
+        {
+            canvasObject.SetActive(false);
+        }
+    }
+
+    private void ExitFocusModeImmediate()
+    {
+        if (focusTransitionRoutine != null)
+        {
+            StopCoroutine(focusTransitionRoutine);
+            focusTransitionRoutine = null;
+        }
+
+        if (focusActive)
+        {
+            Camera camera = Camera.main;
+            if (camera != null)
+            {
+                camera.transform.position = savedCameraPosition;
+                camera.transform.rotation = savedCameraRotation;
+                camera.fieldOfView = savedCameraFov;
+            }
+        }
+
+        focusActive = false;
+        focusTransitioning = false;
+        SetCanvasInteractive(true);
+    }
+
+    private void GetFocusPose(Camera camera, out Vector3 targetPosition, out Quaternion targetRotation)
+    {
+        float focusDistance = GetFocusDistance(camera);
+        Vector3 target = canvasObject.transform.position + Vector3.up * FocusHeightOffset;
+        targetPosition = canvasObject.transform.position - canvasObject.transform.forward * focusDistance + Vector3.up * FocusHeightOffset;
+        targetRotation = Quaternion.LookRotation((target - targetPosition).normalized, Vector3.up);
+    }
+
+    private void StartFocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
+    {
+        if (focusTransitionRoutine != null)
+        {
+            StopCoroutine(focusTransitionRoutine);
+        }
+
+        focusTransitionRoutine = StartCoroutine(FocusTransition(camera, targetPosition, targetRotation, targetFov, duration, hideCanvasOnComplete, clearFocusOnComplete));
+    }
+
+    private IEnumerator FocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
+    {
+        focusTransitioning = true;
+        SetCanvasInteractive(false);
+
+        Vector3 startPosition = camera.transform.position;
+        Quaternion startRotation = camera.transform.rotation;
+        float startFov = camera.fieldOfView;
+        float elapsed = 0f;
+        float transitionDuration = Mathf.Max(duration, 0.01f);
+
+        while (elapsed < transitionDuration && camera != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float progress = Mathf.Clamp01(elapsed / transitionDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+
+            camera.transform.position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            camera.transform.rotation = Quaternion.Slerp(startRotation, targetRotation, easedProgress);
+            camera.fieldOfView = Mathf.Lerp(startFov, targetFov, easedProgress);
+
+            yield return null;
+        }
+
+        if (camera != null)
+        {
+            camera.transform.position = targetPosition;
+            camera.transform.rotation = targetRotation;
+            camera.fieldOfView = targetFov;
+        }
+
+        if (hideCanvasOnComplete && canvasObject != null)
+        {
+            canvasObject.SetActive(false);
+        }
+
+        if (clearFocusOnComplete)
+        {
+            focusActive = false;
+        }
+
+        focusTransitioning = false;
+        focusTransitionRoutine = null;
+        SetCanvasInteractive(true);
+    }
+
+    private void SetCanvasInteractive(bool interactive)
+    {
+        if (canvasGroup == null)
+        {
+            return;
+        }
+
+        canvasGroup.interactable = interactive;
+        canvasGroup.blocksRaycasts = interactive;
     }
 
     private static Transform FindMonitorTransform()
