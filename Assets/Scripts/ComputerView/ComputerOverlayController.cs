@@ -1011,6 +1011,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
 
+        backButton = Button(topbar.transform, "Back", PanelSoft, Ink, BackToApartmentClicked, 92f, 54f);
+
         GameObject copy = Element(parent: topbar.transform, name: "TitleCopy");
         Layout(copy, -1f, -1f, 1f, 1f);
         VerticalLayoutGroup copyLayout = copy.AddComponent<VerticalLayoutGroup>();
@@ -1085,8 +1087,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         actionLayout.childControlHeight = true;
         actionLayout.childForceExpandHeight = false;
 
-        backButton = Button(actions.transform, "Back", PanelSoft, Ink, BackToApartmentClicked, 92f, 54f);
-
         GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", PanelRaised);
         Layout(scoreBox, 104f, 58f, 0f, 0f);
         VerticalLayoutGroup scoreLayout = scoreBox.AddComponent<VerticalLayoutGroup>();
@@ -1136,6 +1136,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
             }
             statusText.text = DisplayText(agent);
         }
+
+        if (backButton != null)
+        {
+            backButton.interactable = true;
+        }
     }
 
     private bool ShouldShowAgentStatus()
@@ -1163,11 +1168,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (scoreText != null)
         {
             scoreText.text = currentGame != null ? currentGame.score.ToString() : "0";
-        }
-
-        if (backButton != null)
-        {
-            backButton.interactable = true;
         }
 
         if (advanceButton != null)
