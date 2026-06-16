@@ -4,6 +4,7 @@
   user: JSON.parse(localStorage.getItem("dd_user") || "null"),
   game: null,
   games: [],
+  activeTab: "news",
   activeEmailId: "",
   actionPending: false,
 };
@@ -282,6 +283,22 @@ function setActionControlsDisabled(disabled) {
   });
 }
 
+function scrollBelowTopbar(element) {
+  if (!element) return;
+  const topbar = $(".topbar");
+  const offset = (topbar?.getBoundingClientRect().height || 0) + 18;
+  const top = element.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+}
+
+function focusTelegramThread(threadId) {
+  if (!threadId) return;
+  requestAnimationFrame(() => {
+    const safeId = window.CSS?.escape ? CSS.escape(threadId) : String(threadId).replace(/"/g, '\\"');
+    scrollBelowTopbar(document.querySelector(`[data-telegram-id="${safeId}"]`));
+  });
+}
+
 function restoreTopbarActions() {
   const advance = $("#advance-world");
   if (advance && state.game) {
@@ -477,7 +494,7 @@ function renderEmails() {
 }
 function renderTelegram() {
   $("#tab-telegram").innerHTML = `<div class="grid">${state.game.telegram_threads.map((thread) => `
-    <article class="card">
+    <article class="card" data-telegram-id="${thread.id}">
       <div class="meta">
         <span class="pill">${thread.contact}</span>
         <span class="pill">${thread.relationship}</span>
@@ -538,6 +555,7 @@ function renderGame() {
   renderEmails();
   renderTelegram();
   renderBriefing();
+  switchTab(state.activeTab);
 }
 
 async function generateGame() {
@@ -565,6 +583,11 @@ async function generateGame() {
 
 async function sendAction(button) {
   if (state.actionPending) return;
+  const surface = button.dataset.action;
+  const itemId = button.dataset.id;
+  if (["news", "email", "telegram"].includes(surface)) {
+    state.activeTab = surface;
+  }
   state.actionPending = true;
   setActionControlsDisabled(true);
   let succeeded = false;
@@ -572,13 +595,14 @@ async function sendAction(button) {
     const data = await api(`/api/game/${currentGameId()}/action`, {
       method: "POST",
       body: JSON.stringify({
-        surface: button.dataset.action,
-        item_id: button.dataset.id,
+        surface,
+        item_id: itemId,
         choice: button.dataset.choice,
       }),
     });
     setCurrentGame(data.game);
     renderGame();
+    if (surface === "telegram") focusTelegramThread(itemId);
     loadSessions();
     succeeded = true;
   } catch (error) {
@@ -599,6 +623,9 @@ async function sendCustomReply(form) {
   setActionControlsDisabled(true);
   let succeeded = false;
   if (form.dataset.customSurface === "email") state.activeEmailId = form.dataset.customId;
+  if (["email", "telegram"].includes(form.dataset.customSurface)) {
+    state.activeTab = form.dataset.customSurface;
+  }
   try {
     const data = await api(`/api/game/${currentGameId()}/action`, {
       method: "POST",
@@ -611,6 +638,7 @@ async function sendCustomReply(form) {
     });
     setCurrentGame(data.game);
     renderGame();
+    if (form.dataset.customSurface === "telegram") focusTelegramThread(form.dataset.customId);
     loadSessions();
     succeeded = true;
   } catch (error) {
@@ -647,6 +675,7 @@ async function advanceWorld() {
 }
 
 function switchTab(tabName) {
+  state.activeTab = tabName;
   $$(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tabName));
   $$(".tab-panel").forEach((panel) => panel.classList.add("hidden"));
   $(`#tab-${tabName}`).classList.remove("hidden");

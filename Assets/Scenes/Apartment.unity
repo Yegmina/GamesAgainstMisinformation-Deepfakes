@@ -831,7 +831,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 0.49056602, g: 0.49056602, b: 0.49056602, a: 1}
-  m_Intensity: 1
+  m_Intensity: 0.2
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 30
@@ -4458,7 +4458,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Interactable
   interactionText: Press E to use the computer
   exitText: Esc to exit
-  sceneToLoad: SampleScene
+  sceneToLoad: 
+  openComputerOverlay: 1
   sitPoint: {fileID: 168970057}
 --- !u!1 &7742780738051876068
 GameObject:
@@ -5148,6 +5149,7 @@ MonoBehaviour:
   interactionText: Press E to use the phone
   exitText: Esc to exit
   sceneToLoad: SampleScene
+  openComputerOverlay: 0
   sitPoint: {fileID: 1382169355}
 --- !u!23 &9039637510118680883
 MeshRenderer:

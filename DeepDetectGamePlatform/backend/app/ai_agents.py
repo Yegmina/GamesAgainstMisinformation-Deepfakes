@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
 
