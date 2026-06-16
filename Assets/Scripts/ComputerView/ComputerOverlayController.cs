@@ -68,6 +68,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool initializing;
     private bool busy;
     private bool usingWorldMonitor;
+    private bool computerOpen;
     private bool focusActive;
     private bool focusTransitioning;
     private Vector3 savedCameraPosition;
@@ -157,6 +158,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         Debug.Log("[ComputerOverlay] Open requested.");
         SetFocusAnchor(anchor);
+        computerOpen = true;
 
         if (canvasObject == null)
         {
@@ -165,6 +167,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         AttachCanvasToComputerSurface();
         canvasObject.SetActive(true);
+        RefreshCanvasInteractivity();
         EnterFocusMode();
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
@@ -190,7 +193,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
 
         AttachCanvasToComputerSurface();
-        canvasObject.SetActive(false);
+        canvasObject.SetActive(usingWorldMonitor);
+        RenderAll();
+        RefreshCanvasInteractivity();
+
         if (!initialized && !initializing)
         {
             _ = InitializeAsync();
@@ -199,6 +205,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void Close()
     {
+        computerOpen = false;
+        RefreshCanvasInteractivity();
+
         if (canvasObject == null)
         {
             ExitFocusModeImmediate();
@@ -212,7 +221,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         else
         {
             ExitFocusModeImmediate();
-            canvasObject.SetActive(false);
+            canvasObject.SetActive(usingWorldMonitor);
+            RefreshCanvasInteractivity();
         }
     }
 
@@ -635,8 +645,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         canvasObject.AddComponent<GraphicRaycaster>();
         canvasGroup = canvasObject.AddComponent<CanvasGroup>();
         canvasGroup.alpha = 1f;
-        canvasGroup.blocksRaycasts = true;
-        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
 
         GameObject shell = PanelObject(canvasObject.transform, "ComputerShell", Paper);
         Stretch(shell.GetComponent<RectTransform>());
@@ -773,17 +783,13 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Camera camera = Camera.main;
         if (camera != null)
         {
-            StartFocusTransition(camera, savedCameraPosition, savedCameraRotation, savedCameraFov, FocusExitTransitionDuration, true, true);
+            StartFocusTransition(camera, savedCameraPosition, savedCameraRotation, savedCameraFov, FocusExitTransitionDuration, false, true);
             return;
         }
 
         focusActive = false;
         focusTransitioning = false;
-
-        if (canvasObject != null)
-        {
-            canvasObject.SetActive(false);
-        }
+        RefreshCanvasInteractivity();
     }
 
     private void ExitFocusModeImmediate()
@@ -807,7 +813,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         focusActive = false;
         focusTransitioning = false;
-        SetCanvasInteractive(true);
+        RefreshCanvasInteractivity();
     }
 
     private void GetFocusPose(Camera camera, out Vector3 targetPosition, out Quaternion targetRotation)
@@ -871,7 +877,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private IEnumerator FocusTransition(Camera camera, Vector3 targetPosition, Quaternion targetRotation, float targetFov, float duration, bool hideCanvasOnComplete, bool clearFocusOnComplete)
     {
         focusTransitioning = true;
-        SetCanvasInteractive(false);
+        RefreshCanvasInteractivity();
 
         Vector3 startPosition = camera.transform.position;
         Quaternion startRotation = camera.transform.rotation;
@@ -911,16 +917,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         focusTransitioning = false;
         focusTransitionRoutine = null;
-        SetCanvasInteractive(true);
+        RefreshCanvasInteractivity();
     }
 
-    private void SetCanvasInteractive(bool interactive)
+    private void RefreshCanvasInteractivity()
     {
         if (canvasGroup == null)
         {
             return;
         }
 
+        bool interactive = computerOpen && !busy && !focusTransitioning && (focusActive || !usingWorldMonitor);
         canvasGroup.interactable = interactive;
         canvasGroup.blocksRaycasts = interactive;
     }
@@ -1004,6 +1011,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
 
+        backButton = Button(topbar.transform, "Back", PanelSoft, Ink, BackToApartmentClicked, 92f, 54f);
+
         GameObject copy = Element(parent: topbar.transform, name: "TitleCopy");
         Layout(copy, -1f, -1f, 1f, 1f);
         VerticalLayoutGroup copyLayout = copy.AddComponent<VerticalLayoutGroup>();
@@ -1078,8 +1087,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         actionLayout.childControlHeight = true;
         actionLayout.childForceExpandHeight = false;
 
-        backButton = Button(actions.transform, "Back", PanelSoft, Ink, BackToApartmentClicked, 92f, 54f);
-
         GameObject scoreBox = PanelObject(actions.transform, "ScoreBox", PanelRaised);
         Layout(scoreBox, 104f, 58f, 0f, 0f);
         VerticalLayoutGroup scoreLayout = scoreBox.AddComponent<VerticalLayoutGroup>();
@@ -1129,6 +1136,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
             }
             statusText.text = DisplayText(agent);
         }
+
+        if (backButton != null)
+        {
+            backButton.interactable = true;
+        }
     }
 
     private bool ShouldShowAgentStatus()
@@ -1156,11 +1168,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (scoreText != null)
         {
             scoreText.text = currentGame != null ? currentGame.score.ToString() : "0";
-        }
-
-        if (backButton != null)
-        {
-            backButton.interactable = true;
         }
 
         if (advanceButton != null)
@@ -2049,10 +2056,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void SetBusy(bool value, string message)
     {
         busy = value;
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = !value;
-        }
+        RefreshCanvasInteractivity();
         SetStatus(message);
         RenderTopbar();
         RenderBottomDock();
