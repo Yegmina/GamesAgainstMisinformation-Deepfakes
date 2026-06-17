@@ -30,7 +30,7 @@ The top HUD is part of the game, not just decoration. Mission goals track requir
 - **Community care** rises when private conversations slow down rumors without humiliating people.
 - **Newsroom momentum** changes as the desk moves or stalls under pressure.
 
-When `OPENAI_API_KEY` is configured, the visible badge shows the live runtime, for example `Agent runtime: openai / gpt-5.3-chat-latest`. The shift is no longer static. **Advance World** simulates time passing and lets agents inject fresh news, letters, or Telegram sidequests into the live game state. The game requires this agent runtime for generation, live world events, newsdesk feedback, and chat replies.
+When a live provider is configured with `OPENAI_API_KEY` or `GEMINI_API_KEY`, the visible badge shows the runtime, for example `Agent runtime: openai / gpt-5.3-chat-latest` or `Agent runtime: gemini / gemini-3.1-flash-lite`. The shift is no longer static. **Advance World** simulates time passing and lets agents inject fresh news, letters, or Telegram sidequests into the live game state. The game requires this agent runtime for generation, live world events, newsdesk feedback, and chat replies.
 
 ![Live world tick](file:///C:/Erasmus/DeepDetectGamePlatform/docs/screenshots/06-live-world-tick-5.png)
 

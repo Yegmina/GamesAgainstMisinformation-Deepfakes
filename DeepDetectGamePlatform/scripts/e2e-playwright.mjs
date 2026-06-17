@@ -85,8 +85,14 @@ try {
 
   await page.getByRole("button", { name: "New Session" }).first().click();
   await page.getByText("Agent runtime:", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
-  await page.getByText("gpt-5.3-chat-latest", { exact: false }).waitFor({ state: "visible", timeout: 90000 });
   const activeGameId = await pinActiveGameId();
+  const generatedDebug = await fetchDebugState();
+  if (!["openai", "gemini"].includes(generatedDebug.agent_mode)) {
+    throw new Error(`Expected live agent mode, got ${generatedDebug.agent_mode}`);
+  }
+  if (!generatedDebug.agent_model) {
+    throw new Error("Expected generated game to record an agent model");
+  }
   await page.locator("#session-library .session-card").first().waitFor({ state: "visible", timeout: 90000 });
   await page.locator(`button[data-session-action="load"][data-session-id="${activeGameId}"]`).waitFor({ state: "visible" });
   await page.locator(`button[data-session-action="backup"][data-session-id="${activeGameId}"]`).waitFor({ state: "visible" });

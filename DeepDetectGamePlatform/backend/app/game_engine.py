@@ -214,8 +214,8 @@ def continue_conversation(surface: str, item: dict[str, Any], answer_text: str) 
     min_turns = int(item.get("min_turns", 3))
     max_turns = int(item.get("max_turns", min_turns))
     if not ai_agents.enabled():
-        raise RuntimeError("Agent conversation requires OPENAI_API_KEY; no canned chat fallback is allowed.")
-    result = ai_agents.continue_thread(
+        raise RuntimeError("Agent conversation requires OPENAI_API_KEY or GEMINI_API_KEY; no canned chat fallback is allowed.")
+    agent_result = ai_agents.continue_thread(
         surface,
         item.get("from_name") or item.get("contact") or "Agent",
         item,
@@ -225,10 +225,12 @@ def continue_conversation(surface: str, item: dict[str, Any], answer_text: str) 
         min_turns,
         max_turns,
     )
+    result = dict(agent_result.data)
     if turn_number < min_turns:
         result["resolved"] = False
         result["correct"] = False
-    result["mode"] = "openai"
+    result["mode"] = agent_result.mode
+    result["model"] = agent_result.model
     return result
 
 
@@ -364,17 +366,19 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
     articles = fetch_recent_news()
     generation_log.append(f"NewsScoutAgent: prepared {len(articles)} source stories")
     if not ai_agents.enabled():
-        raise RuntimeError("OPENAI_API_KEY is required because game generation is agentic-only.")
-    agent_mode = "openai"
+        raise RuntimeError("OPENAI_API_KEY or GEMINI_API_KEY is required because game generation is agentic-only.")
     agent_error = ""
     title = "Morning Shift: False Signal"
-    bundle = ai_agents.generate_shift_bundle(articles)
+    bundle_result = ai_agents.generate_shift_bundle(articles)
+    bundle = bundle_result.data
+    agent_mode = bundle_result.mode
+    agent_model = bundle_result.model
     title = str(bundle.get("title") or title)
     news_items = hydrate_news_items(bundle.get("news_items") or [], rng)
     emails = hydrate_emails(bundle.get("emails") or [], news_items)
     telegram = hydrate_telegram(bundle.get("telegram_threads") or [])
     generation_log.extend(str(line) for line in (bundle.get("generation_log") or []))
-    generation_log.append("OpenAIAgentRuntime: live OpenAI generation completed")
+    generation_log.append(f"{agent_mode.title()}AgentRuntime: live {agent_mode} generation completed")
     generation_log.append("MissionDirector: packaged playable shift goals and scoring")
     state = {
         "id": str(uuid.uuid4()),
@@ -382,7 +386,7 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
         "player": {"name": user["name"], "role": "New Media Editor"},
         "created_at": datetime.now(timezone.utc).isoformat(),
         "agent_mode": agent_mode,
-        "agent_model": ai_agents.MODEL,
+        "agent_model": agent_model,
         "agent_error": agent_error,
         "score": 0,
         "complete": False,
@@ -409,7 +413,7 @@ def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str,
     ensure_game_systems(state)
     if surface == "news":
         if not ai_agents.enabled():
-            raise RuntimeError("OPENAI_API_KEY is required because newsdesk feedback is agentic-only.")
+            raise RuntimeError("OPENAI_API_KEY or GEMINI_API_KEY is required because newsdesk feedback is agentic-only.")
         item = next((entry for entry in state["news_items"] if entry["id"] == item_id), None)
         if not item:
             raise ValueError("News item not found")
@@ -419,10 +423,11 @@ def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str,
         item["decision"] = choice
         item["correct"] = choice == correct_choice
         item["points"] = 100 if item["correct"] else -50
-        decision_reply = ai_agents.news_decision_reply(item, choice, item["correct"])
+        decision_result = ai_agents.news_decision_reply(item, choice, item["correct"])
+        decision_reply = decision_result.data
         item["agent_response"] = decision_reply["response"]
         item["agent_reason"] = decision_reply["reason"]
-        item["reply_agent_mode"] = "openai"
+        item["reply_agent_mode"] = decision_result.mode
         state["score"] += item["points"]
         if item["correct"]:
             add_value(state, "public_trust", 6)
@@ -509,7 +514,7 @@ def apply_action(state: dict[str, Any], surface: str, item_id: str, choice: str,
 def advance_world(state: dict[str, Any]) -> dict[str, Any]:
     ensure_game_systems(state)
     if not ai_agents.enabled():
-        raise RuntimeError("OPENAI_API_KEY is required because world simulation is agentic-only.")
+        raise RuntimeError("OPENAI_API_KEY or GEMINI_API_KEY is required because world simulation is agentic-only.")
     tick = int(state.get("world_tick", 0)) + 1
     state["world_tick"] = tick
     add_value(state, "newsroom_momentum", -1)
@@ -517,7 +522,8 @@ def advance_world(state: dict[str, Any]) -> dict[str, Any]:
     state.setdefault("world_feed", [])
     state.setdefault("generation_log", [])
     articles = fetch_recent_news(limit=8)
-    event = ai_agents.world_event(state, articles)
+    event_result = ai_agents.world_event(state, articles)
+    event = event_result.data
     kind = event.get("kind")
     raw_item = event.get("item") or {}
     if kind == "news":
@@ -534,8 +540,8 @@ def advance_world(state: dict[str, Any]) -> dict[str, Any]:
         state["telegram_threads"].insert(0, item)
     else:
         raise ValueError(f"Unknown world event kind: {kind}")
-    line = str(event.get("log") or f"OpenAIWorldDirector: added {kind} event")
-    state["last_world_agent_mode"] = "openai"
+    line = str(event.get("log") or f"{event_result.mode.title()}WorldDirector: added {kind} event")
+    state["last_world_agent_mode"] = event_result.mode
 
     state["world_feed"].insert(0, line)
     state["generation_log"].append(line)
