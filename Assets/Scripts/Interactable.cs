@@ -16,7 +16,7 @@ public class Interactable : MonoBehaviour
     [SerializeField]
     private Transform sitPoint;
 
-    private void Start()
+    protected virtual void Start()
     {
         if (ShouldOpenComputerOverlay())
         {
