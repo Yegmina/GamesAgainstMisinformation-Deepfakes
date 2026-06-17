@@ -111,4 +111,12 @@ public class PhoneUIManager : MonoBehaviour
         chatScreen.SetActive(false);
         homeScreen.SetActive(true);
     }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Apartment");
+        }
+    }
 }

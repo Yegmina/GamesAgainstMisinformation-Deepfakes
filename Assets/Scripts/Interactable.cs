@@ -7,11 +7,13 @@ public class Interactable : MonoBehaviour
     [SerializeField] private string exitText = "Esc to exit";
     [SerializeField] private string sceneToLoad = "";
     [SerializeField] private bool openComputerOverlay = false;
+    [SerializeField] protected bool smoothTransition = false;
 
     public Transform SitPoint => sitPoint;
     public string InteractionText => interactionText;
     public string ExitText => exitText;
     public bool OpensComputerOverlay => ShouldOpenComputerOverlay();
+    public bool SmoothTransition => smoothTransition;
 
     [SerializeField]
     private Transform sitPoint;

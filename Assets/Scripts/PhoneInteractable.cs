@@ -24,6 +24,7 @@ public class PhoneInteractable : Interactable
     private void Start()
     {
         base.Start();
+        smoothTransition = true;
 
         // Find the PhoneScreenQuad renderer
         Transform screenQuad = transform.Find("PhoneScreenQuad");

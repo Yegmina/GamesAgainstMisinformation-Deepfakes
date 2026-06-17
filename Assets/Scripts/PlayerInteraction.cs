@@ -49,10 +49,73 @@ public class PlayerInteraction : MonoBehaviour
 
         activeInteraction = currentInteractable;
         controller.enabled = false;
-        controller.InteractionPoint(activeInteraction.SitPoint);
-        activeInteraction.Interact();
 
-        uiController.ShowInteraction(" "); //activeInteraction.ExitText
+        if (activeInteraction.SmoothTransition)
+        {
+            uiController.ShowInteraction(" ");
+            StartCoroutine(SmoothInteractionTransition(activeInteraction));
+        }
+        else
+        {
+            controller.InteractionPoint(activeInteraction.SitPoint);
+            activeInteraction.Interact();
+            uiController.ShowInteraction(" "); //activeInteraction.ExitText
+        }
+    }
+
+    private IEnumerator SmoothInteractionTransition(Interactable interactable)
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            controller.InteractionPoint(interactable.SitPoint);
+            interactable.Interact();
+            yield break;
+        }
+
+        Transform targetPoint = interactable.SitPoint;
+        if (targetPoint == null)
+        {
+            controller.InteractionPoint(interactable.SitPoint);
+            interactable.Interact();
+            yield break;
+        }
+
+        Vector3 startPos = controller.transform.position;
+        Quaternion startRot = controller.transform.rotation;
+        Quaternion startCamRot = mainCamera.transform.localRotation;
+        float startFov = mainCamera.fieldOfView;
+
+        Vector3 targetPos = targetPoint.position;
+        Quaternion targetRot = Quaternion.Euler(0, targetPoint.eulerAngles.y, 0);
+        Quaternion targetCamRot = Quaternion.Euler(targetPoint.eulerAngles.x, 0, 0);
+        float targetFov = 35f; // Zoom in to focus on the phone
+
+        float elapsed = 0f;
+        float duration = 0.8f; // Beautiful smooth transition duration
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+
+            controller.transform.position = Vector3.Lerp(startPos, targetPos, easedProgress);
+            controller.transform.rotation = Quaternion.Slerp(startRot, targetRot, easedProgress);
+            mainCamera.transform.localRotation = Quaternion.Slerp(startCamRot, targetCamRot, easedProgress);
+            mainCamera.fieldOfView = Mathf.Lerp(startFov, targetFov, easedProgress);
+
+            yield return null;
+        }
+
+        // Snap to exact values
+        controller.transform.position = targetPos;
+        controller.transform.rotation = targetRot;
+        mainCamera.transform.localRotation = targetCamRot;
+        mainCamera.fieldOfView = targetFov;
+
+        // Finally, trigger the interaction
+        interactable.Interact();
     }
 
     private void HandleExit()
