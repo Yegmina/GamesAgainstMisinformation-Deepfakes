@@ -2,25 +2,91 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Generic, TypeVar
 
-from openai import OpenAI
 from dotenv import load_dotenv
+from openai import APIStatusError, OpenAI, RateLimitError
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:  # pragma: no cover - exercised only before dependencies are installed
+    genai = None
+    types = None
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL_AGENT", "gemini-3.1-flash-lite")
+MODEL = OPENAI_MODEL
+DEFAULT_PROVIDER = "auto"
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class AgentResult(Generic[T]):
+    data: T
+    mode: str
+    model: str
+
+
+def configured_provider() -> str:
+    provider = os.getenv("AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+    if provider not in {"auto", "openai", "gemini"}:
+        raise RuntimeError("AI_PROVIDER must be one of: auto, openai, gemini.")
+    return provider
 
 
 def enabled() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
+    provider = configured_provider()
+    if provider == "openai":
+        return bool(os.getenv("OPENAI_API_KEY"))
+    if provider == "gemini":
+        return bool(os.getenv("GEMINI_API_KEY"))
+    return bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))
 
 
-def _text_response(prompt: str, *, max_output_tokens: int = 450) -> str:
+def _provider_order() -> list[str]:
+    provider = configured_provider()
+    if provider in {"openai", "gemini"}:
+        return [provider]
+
+    providers: list[str] = []
+    if os.getenv("OPENAI_API_KEY"):
+        providers.append("openai")
+    if os.getenv("GEMINI_API_KEY"):
+        providers.append("gemini")
+    return providers
+
+
+def _provider_model(provider: str) -> str:
+    return GEMINI_MODEL if provider == "gemini" else OPENAI_MODEL
+
+
+def _openai_quota_exhausted(exc: Exception) -> bool:
+    if isinstance(exc, RateLimitError):
+        return True
+    if isinstance(exc, APIStatusError) and exc.status_code == 429:
+        return True
+    message = str(exc).lower()
+    return "insufficient_quota" in message or "quota" in message
+
+
+def _safe_provider_error(exc: Exception) -> str:
+    message = str(exc).replace(os.getenv("OPENAI_API_KEY") or "", "").replace(os.getenv("GEMINI_API_KEY") or "", "")
+    return " ".join(message.split())[:500]
+
+
+def _openai_text_response(prompt: str, *, max_output_tokens: int) -> str:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
+
     client = OpenAI()
     response = client.responses.create(
-        model=MODEL,
+        model=OPENAI_MODEL,
         input=prompt,
         max_output_tokens=max_output_tokens,
         metadata={"app": "deepdetect-game-platform"},
@@ -28,16 +94,72 @@ def _text_response(prompt: str, *, max_output_tokens: int = 450) -> str:
     return response.output_text.strip()
 
 
-def _json_response(prompt: str, *, max_output_tokens: int = 2200) -> dict[str, Any]:
-    text = _text_response(prompt, max_output_tokens=max_output_tokens)
+def _gemini_text_response(prompt: str, *, max_output_tokens: int) -> str:
+    if not os.getenv("GEMINI_API_KEY"):
+        raise RuntimeError("GEMINI_API_KEY is not configured.")
+    if genai is None or types is None:
+        raise RuntimeError("google-genai is not installed. Run pip install -r requirements.txt.")
+
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=prompt)],
+        )
+    ]
+    config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_level="MINIMAL"),
+        tools=[types.Tool(google_search=types.GoogleSearch())],
+        max_output_tokens=max_output_tokens,
+    )
+
+    chunks: list[str] = []
+    for chunk in client.models.generate_content_stream(
+        model=GEMINI_MODEL,
+        contents=contents,
+        config=config,
+    ):
+        if text := chunk.text:
+            chunks.append(text)
+    return "".join(chunks).strip()
+
+
+def _text_response(prompt: str, *, max_output_tokens: int = 450) -> AgentResult[str]:
+    providers = _provider_order()
+    if not providers:
+        raise RuntimeError("No agent runtime configured. Set OPENAI_API_KEY or GEMINI_API_KEY.")
+
+    fallback_errors: list[str] = []
+    for index, provider in enumerate(providers):
+        try:
+            if provider == "openai":
+                text = _openai_text_response(prompt, max_output_tokens=max_output_tokens)
+            else:
+                text = _gemini_text_response(prompt, max_output_tokens=max_output_tokens)
+            return AgentResult(text, provider, _provider_model(provider))
+        except Exception as exc:
+            can_try_next = index < len(providers) - 1
+            if provider == "openai" and configured_provider() == "auto" and can_try_next and _openai_quota_exhausted(exc):
+                fallback_errors.append("OpenAI quota/rate limit reached; falling back to Gemini.")
+                continue
+            if fallback_errors:
+                raise RuntimeError("; ".join(fallback_errors) + f" Final provider failed: {_safe_provider_error(exc)}") from exc
+            raise RuntimeError(f"{provider.title()} agent request failed: {_safe_provider_error(exc)}") from exc
+
+    raise RuntimeError("; ".join(fallback_errors) or "No agent provider returned a response.")
+
+
+def _json_response(prompt: str, *, max_output_tokens: int = 2200) -> AgentResult[dict[str, Any]]:
+    result = _text_response(prompt, max_output_tokens=max_output_tokens)
+    text = result.data
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1:
-        raise ValueError(f"Agent did not return JSON: {text[:120]}")
-    return json.loads(text[start : end + 1])
+        raise ValueError(f"{result.mode} agent did not return JSON: {text[:120]}")
+    return AgentResult(json.loads(text[start : end + 1]), result.mode, result.model)
 
 
-def generate_shift_bundle(articles: list[dict[str, Any]]) -> dict[str, Any]:
+def generate_shift_bundle(articles: list[dict[str, Any]]) -> AgentResult[dict[str, Any]]:
     compact_articles = [
         {
             "title": item.get("title", ""),
@@ -79,7 +201,7 @@ Recent articles:
     return _json_response(prompt)
 
 
-def judge_and_reply(surface: str, participant: str, prompt_text: str, player_answer: str) -> dict[str, Any]:
+def judge_and_reply(surface: str, participant: str, prompt_text: str, player_answer: str) -> AgentResult[dict[str, Any]]:
     prompt = f"""
 You are an in-world DeepDetect simulation agent. Evaluate the player's custom answer and reply as the character.
 
@@ -94,15 +216,20 @@ Player answer: {player_answer}
 Score correct=true when the player slows misinformation, asks for evidence/source verification, archives links, refuses pressure, or explains why not to share/publish yet.
 Score correct=false when the player amplifies, publishes, forwards, mocks without helping, ignores risk, or accepts unsupported certainty.
 """
-    data = _json_response(prompt, max_output_tokens=500)
-    return {
-        "correct": bool(data.get("correct")),
-        "response": str(data.get("response") or "I need a clearer verification step before moving this forward."),
-        "reason": str(data.get("reason") or ""),
-    }
+    result = _json_response(prompt, max_output_tokens=500)
+    data = result.data
+    return AgentResult(
+        {
+            "correct": bool(data.get("correct")),
+            "response": str(data.get("response") or "I need a clearer verification step before moving this forward."),
+            "reason": str(data.get("reason") or ""),
+        },
+        result.mode,
+        result.model,
+    )
 
 
-def news_decision_reply(item: dict[str, Any], choice: str, correct: bool) -> dict[str, str]:
+def news_decision_reply(item: dict[str, Any], choice: str, correct: bool) -> AgentResult[dict[str, str]]:
     prompt = f"""
 You are the DeepDetect assignment editor. React in-world to a player's newsdesk decision.
 
@@ -128,14 +255,19 @@ Rules:
 - If risky, explain the concrete newsroom risk.
 - If correct, explain what protection or verification value the decision created.
 """
-    data = _json_response(prompt, max_output_tokens=500)
+    result = _json_response(prompt, max_output_tokens=500)
+    data = result.data
     response = str(data.get("response") or "").strip()
     if not response:
         raise ValueError("News decision agent did not return a response")
-    return {
-        "response": response,
-        "reason": str(data.get("reason") or ""),
-    }
+    return AgentResult(
+        {
+            "response": response,
+            "reason": str(data.get("reason") or ""),
+        },
+        result.mode,
+        result.model,
+    )
 
 
 def continue_thread(
@@ -147,7 +279,7 @@ def continue_thread(
     turn_number: int,
     min_turns: int,
     max_turns: int,
-) -> dict[str, Any]:
+) -> AgentResult[dict[str, Any]]:
     compact_messages = [
         {
             "sender": item.get("sender", ""),
@@ -218,7 +350,8 @@ Recent thread:
 Latest player reply:
 {player_answer}
 """
-    data = _json_response(prompt, max_output_tokens=700)
+    result = _json_response(prompt, max_output_tokens=700)
+    data = result.data
     if turn_number >= max_turns and not bool(data.get("resolved")):
         repair_prompt = f"""
 Your previous DeepDetect conversation JSON violated the max-turn rule by leaving resolved=false at turn {turn_number}/{max_turns}.
@@ -245,7 +378,8 @@ Recent thread: {json.dumps(compact_messages, ensure_ascii=False)}
 Latest player reply: {player_answer}
 Previous invalid JSON: {json.dumps(data, ensure_ascii=False)}
 """
-        data = _json_response(repair_prompt, max_output_tokens=700)
+        result = _json_response(repair_prompt, max_output_tokens=700)
+        data = result.data
     options = data.get("options") if isinstance(data.get("options"), list) else []
     response = str(data.get("response") or "").strip()
     if not response:
@@ -254,16 +388,20 @@ Previous invalid JSON: {json.dumps(data, ensure_ascii=False)}
         raise ValueError("Conversation agent did not resolve at the configured max turn")
     if len(options) < 3:
         raise ValueError("Conversation agent did not return three suggested options")
-    return {
-        "resolved": bool(data.get("resolved")),
-        "correct": bool(data.get("correct")),
-        "response": response,
-        "reason": str(data.get("reason") or ""),
-        "options": options[:3],
-    }
+    return AgentResult(
+        {
+            "resolved": bool(data.get("resolved")),
+            "correct": bool(data.get("correct")),
+            "response": response,
+            "reason": str(data.get("reason") or ""),
+            "options": options[:3],
+        },
+        result.mode,
+        result.model,
+    )
 
 
-def world_event(state: dict[str, Any], articles: list[dict[str, Any]]) -> dict[str, Any]:
+def world_event(state: dict[str, Any], articles: list[dict[str, Any]]) -> AgentResult[dict[str, Any]]:
     prompt = f"""
 You are WorldDirector for DeepDetect. Continue the live simulation by creating one new event.
 
