@@ -20,7 +20,13 @@ http://127.0.0.1:8765
 
 ## What New Session Does
 
-`New Session` runs an agent pipeline and saves the generated shift to the logged-in account. `OPENAI_API_KEY` is required: the platform uses OpenAI (`OPENAI_MODEL_AGENT`, default `gpt-5.3-chat-latest`) for shift generation, newsdesk feedback, multi-turn email/Telegram conversations, and world simulation. The app does not synthesize canned local chat replies when the agent runtime is unavailable.
+`New Session` runs an agent pipeline and saves the generated shift to the logged-in account. Configure at least one live provider with `OPENAI_API_KEY` or `GEMINI_API_KEY`: the platform uses that provider for shift generation, newsdesk feedback, multi-turn email/Telegram conversations, and world simulation. The app does not synthesize canned local chat replies when the agent runtime is unavailable.
+
+Provider selection is controlled by `AI_PROVIDER`:
+
+- `AI_PROVIDER=auto` (default) uses OpenAI first when `OPENAI_API_KEY` is present, then falls back to Gemini when OpenAI is missing or quota/rate limited.
+- `AI_PROVIDER=openai` forces OpenAI and uses `OPENAI_MODEL_AGENT` (default `gpt-5.3-chat-latest`).
+- `AI_PROVIDER=gemini` forces Gemini and uses `GEMINI_MODEL_AGENT` (default `gemini-3.1-flash-lite`).
 
 - `NewsScoutAgent` fetches recent RSS headlines from public news feeds.
 - `DistortionAgent` creates manipulated variants from some real stories.
