@@ -38,6 +38,10 @@ public class GlobalCanvasPersistent : MonoBehaviour
         gameObject.name = "GlobalCanvas"; // Ensure name is always exactly "GlobalCanvas"
         DontDestroyOnLoad(gameObject);
 
+        // Keep the game (and any ending cutscene VideoPlayer) running even when the
+        // editor/game window loses focus, so cutscenes don't appear to pause.
+        Application.runInBackground = true;
+
         // Force timer to 10 minutes (600 seconds)
         timer = 600f;
 
@@ -65,7 +69,9 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
         // Don't run the timer if we are in an ending scene or start game scene
         string currentScene = SceneManager.GetActiveScene().name;
-        if (currentScene.Contains("Ending_") || currentScene == "StartGame")
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        ApplyHudVisibility(!hideHud);
+        if (hideHud)
         {
             timerRunning = false;
             return;
@@ -100,6 +106,25 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
             Transform pointsTxtTrans = hud.Find("PointsPanel/Content/PointsText");
             if (pointsTxtTrans != null) pointsText = pointsTxtTrans.GetComponent<TMP_Text>();
+        }
+    }
+
+    private bool _hudVisible = true;
+    private Transform _hudTransform;
+
+    private void ApplyHudVisibility(bool visible)
+    {
+        // Only toggle when the state actually changes to avoid redundant calls.
+        if (_hudTransform == null)
+        {
+            _hudTransform = transform.Find("HUD");
+        }
+        if (_hudTransform == null) return;
+
+        if (_hudVisible != visible || _hudTransform.gameObject.activeSelf != visible)
+        {
+            _hudVisible = visible;
+            _hudTransform.gameObject.SetActive(visible);
         }
     }
 
