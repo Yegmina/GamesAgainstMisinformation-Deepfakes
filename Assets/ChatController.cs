@@ -112,6 +112,8 @@ TMP_FontAsset font;
     float broVoiceDuration;
     Coroutine broVoiceRoutine;
 
+    private bool ignoreInternalSetParanoia = false;
+
     int paranoia
     {
         get => GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Paranoia : 0;
@@ -190,7 +192,7 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
         if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
 
-        SetParanoia(0);
+        SetParanoia(paranoia);
         SetAppState("ACTIVE");
         UpdateTimerLabel();
 
@@ -513,7 +515,7 @@ linkObj.transform.SetParent(row, false);
         AddMessage(false, "⚠ MALICIOUS LINK DETECTED", true, "provider");
         AddMessage(false, "⚠ Downloading: virus_core.exe", true, "provider");
         
-        SetParanoia(100);
+        SetParanoia(paranoia + 10);
         StartCoroutine(ShakeRoutine(5f, 20f));
         
         yield return Wait(0.5f);
@@ -1088,7 +1090,7 @@ videoObj.transform.SetParent(row, false);
         };
         
         PlayMomBadEnding();
-        SetParanoia(100);
+        SetParanoia(paranoia + 10);
         SubtractTime(120);
         StartCoroutine(ShakeRoutine(4f, 6f));
 
@@ -1792,7 +1794,32 @@ videoObj.transform.SetParent(row, false);
             if (btn != null)
             {
                 var act = c.act;
-                btn.onClick.AddListener(() => { act(); });
+                int currentStyle = c.style;
+                btn.onClick.AddListener(() => {
+                    ignoreInternalSetParanoia = true;
+
+                    if (currentStyle == 1)
+                    {
+                        // Wrong choice: +10% paranoia
+                        if (GlobalCanvasPersistent.Instance != null)
+                        {
+                            GlobalCanvasPersistent.Instance.AddParanoia(10);
+                        }
+                    }
+                    else if (currentStyle == 0 || currentStyle == 2)
+                    {
+                        // Correct choice: +50 points, -5% paranoia
+                        if (GlobalCanvasPersistent.Instance != null)
+                        {
+                            GlobalCanvasPersistent.Instance.AddPoints(50);
+                            GlobalCanvasPersistent.Instance.SubtractParanoia(5);
+                        }
+                    }
+
+                    act();
+
+                    ignoreInternalSetParanoia = false;
+                });
             }
         }
     }
@@ -1805,22 +1832,43 @@ videoObj.transform.SetParent(row, false);
 
     void SetParanoia(int val)
     {
+        // If it's a game over (100%), always allow it!
+        if (val >= 100)
+        {
+            paranoia = 100;
+            UpdateChatParanoiaUI(100);
+            return;
+        }
+
+        if (ignoreInternalSetParanoia)
+        {
+            // Just update local UI to match global state
+            int currentGlobalParanoia = GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Paranoia : 0;
+            UpdateChatParanoiaUI(currentGlobalParanoia);
+            return;
+        }
+
         paranoia = Mathf.Clamp(val, 0, 100);
+        UpdateChatParanoiaUI(paranoia);
+    }
+
+    void UpdateChatParanoiaUI(int val)
+    {
         if (paranoiaText != null) 
         {
-            paranoiaText.text = paranoia + "%\n<size=10><color=#888888>PARANOIA</color></size>";
+            paranoiaText.text = val + "%\n<size=10><color=#888888>PARANOIA</color></size>";
         }
         if (paranoiaFill != null)
         {
-            paranoiaFill.rectTransform.anchorMax = new Vector2(paranoia / 100f, 1f);
+            paranoiaFill.rectTransform.anchorMax = new Vector2(val / 100f, 1f);
             
             // Linear green-to-red color interpolation for paranoia stackbar
-            Color col = Color.Lerp(new Color(0.3f, 0.75f, 0.3f), new Color(0.9f, 0.25f, 0.25f), paranoia / 100f);
+            Color col = Color.Lerp(new Color(0.3f, 0.75f, 0.3f), new Color(0.9f, 0.25f, 0.25f), val / 100f);
             paranoiaFill.color = col;
         }
 
         // Load ending immediately if 100% paranoia
-        if (paranoia >= 100)
+        if (val >= 100)
         {
             timerRunning = false;
             Debug.Log("Paranoia reached 100%! Loading Ending_100_Paranoia scene.");
