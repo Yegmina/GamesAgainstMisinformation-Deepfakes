@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Serialization;
 using TMPro;
 using UnityEngine.UI;
 
@@ -88,7 +89,14 @@ public class CallerScript : MonoBehaviour
 
     [Header("Audio")]
     public AudioSource audioSource;
-    public AudioClip outgoingRingingClip;
+    [FormerlySerializedAs("outgoingRingingClip")]
+    public AudioClip outgoingRingSound;
+    public AudioClip subscriberUnavailableSound;
+
+    [Header("Legacy Outgoing Calls")]
+    public float outgoingRingDuration = 3f;
+    public float unavailableMessageDuration = 2f;
+    public Color unavailableTextColor = new Color(0.9f, 0.1f, 0.1f, 1f);
 
     public Action OnCallEnded;
     public Action OnCallBadEnding;
@@ -105,28 +113,25 @@ public class CallerScript : MonoBehaviour
     Coroutine nodeFlowRoutine;
     Coroutine badEndingRoutine;
     Coroutine shakeRoutine;
+    Coroutine legacyOutgoingRoutine;
+    Coroutine callingEllipsisRoutine;
     float callUiActivatedAt;
+    bool legacyOutgoingActive;
+    bool outgoingUnavailablePhase;
     Image badEndingOverlayImage;
     RectTransform shakeTarget;
     Vector2 shakeHomePosition;
 
     public bool IsCallActive => callActive;
     public StoryCallId ActiveStoryCallId => activeStoryCallId;
+    public bool IsOutgoingDialingPhase => legacyOutgoingActive && !outgoingUnavailablePhase;
+
+    static readonly Color StandardDialogueTextColor = Color.white;
 
     // #region agent log
     static void AgentLog(string hypothesisId, string location, string message, string dataJson)
     {
-        try
-        {
-            string path = Path.Combine(Application.dataPath, "..", "debug-164d82.log");
-            string line =
-                "{\"sessionId\":\"164d82\",\"hypothesisId\":\"" + hypothesisId +
-                "\",\"location\":\"" + location + "\",\"message\":\"" + message +
-                "\",\"data\":" + dataJson + ",\"timestamp\":" +
-                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n";
-            File.AppendAllText(path, line);
-        }
-        catch { /* ignore logging failures */ }
+        CallDebugLog.Write(hypothesisId, location, message, dataJson);
     }
     // #endregion
 
@@ -190,20 +195,233 @@ public class CallerScript : MonoBehaviour
         return choicesContent;
     }
 
+    void ShowCallerScreenForOutgoing()
+    {
+        if (incomingCallManager != null && incomingCallManager.phoneManager != null)
+        {
+            PhoneUIManager phoneManager = incomingCallManager.phoneManager;
+            if (phoneManager.homeScreen != null) phoneManager.homeScreen.SetActive(false);
+            if (phoneManager.galleryScreen != null) phoneManager.galleryScreen.SetActive(false);
+            if (phoneManager.messagesScreen != null) phoneManager.messagesScreen.SetActive(false);
+            if (phoneManager.callsScreen != null) phoneManager.callsScreen.SetActive(false);
+            if (phoneManager.browserScreen != null) phoneManager.browserScreen.SetActive(false);
+            if (phoneManager.SocialMediaScreen != null) phoneManager.SocialMediaScreen.SetActive(false);
+            if (phoneManager.chatScreen != null) phoneManager.chatScreen.SetActive(false);
+            if (phoneManager.callerScreen != null) phoneManager.callerScreen.SetActive(true);
+        }
+        else if (callerScreen != null)
+            callerScreen.SetActive(true);
+    }
+
+    void ApplyStandardDialogueTextStyle()
+    {
+        if (dialogueText == null)
+            return;
+
+        dialogueText.fontStyle = FontStyles.Normal;
+        dialogueText.color = StandardDialogueTextColor;
+    }
+
+    void RestoreDialogueTextDefaults()
+    {
+        if (dialogueText == null)
+            return;
+
+        ApplyStandardDialogueTextStyle();
+        dialogueText.text = string.Empty;
+    }
+
+    void ShowSubscriberUnavailableText()
+    {
+        if (dialogueText == null)
+            return;
+
+        dialogueText.text = "SUBSCRIBER UNAVAILABLE";
+        dialogueText.fontStyle = FontStyles.Bold;
+        dialogueText.color = unavailableTextColor;
+    }
+
     void PlayOutgoingRinging()
     {
-        if (audioSource != null && outgoingRingingClip != null)
-        {
-            audioSource.clip = outgoingRingingClip;
-            audioSource.loop = true;
-            audioSource.Play();
-        }
+        if (audioSource == null || outgoingRingSound == null)
+            return;
+
+        audioSource.Stop();
+        audioSource.loop = true;
+        audioSource.volume = 1f;
+        audioSource.clip = outgoingRingSound;
+        audioSource.Play();
+
+        // #region agent log
+        CallDebugLog.Write("A", "CallerScript.PlayOutgoingRinging", "Ring started", "{}");
+        // #endregion
+    }
+
+    void PlaySubscriberUnavailableSound()
+    {
+        if (audioSource == null || subscriberUnavailableSound == null)
+            return;
+
+        audioSource.Stop();
+        audioSource.loop = false;
+        audioSource.volume = 1f;
+        audioSource.clip = subscriberUnavailableSound;
+        audioSource.Play();
+    }
+
+    void StopOutgoingRingSoundIfPlaying()
+    {
+        if (audioSource == null || outgoingRingSound == null)
+            return;
+
+        if (audioSource.isPlaying && audioSource.clip == outgoingRingSound)
+            audioSource.Stop();
+    }
+
+    void StopSubscriberUnavailableSoundIfPlaying()
+    {
+        if (audioSource == null || subscriberUnavailableSound == null)
+            return;
+
+        if (audioSource.isPlaying && audioSource.clip == subscriberUnavailableSound)
+            audioSource.Stop();
     }
 
     public void StopOutgoingRinging()
     {
-        if (audioSource != null && audioSource.clip == outgoingRingingClip)
-            audioSource.Stop();
+        StopOutgoingRingSoundIfPlaying();
+    }
+
+    void StopLegacyOutgoingAudio()
+    {
+        StopOutgoingRingSoundIfPlaying();
+        StopSubscriberUnavailableSoundIfPlaying();
+    }
+
+    IEnumerator CallingEllipsisRoutine()
+    {
+        const string baseText = "Calling";
+        int dots = 0;
+
+        while (legacyOutgoingActive && !outgoingUnavailablePhase)
+        {
+            dots = (dots % 3) + 1;
+            if (dialogueText != null)
+            {
+                dialogueText.text = baseText + new string('.', dots);
+                ApplyStandardDialogueTextStyle();
+            }
+
+            yield return new WaitForSecondsRealtime(0.4f);
+        }
+    }
+
+    IEnumerator LegacyOutgoingCallRoutine()
+    {
+        // #region agent log
+        CallDebugLog.Write("A", "CallerScript.LegacyOutgoingCallRoutine", "Dialing started",
+            "{\"duration\":" + outgoingRingDuration + "}");
+        // #endregion
+
+        if (outgoingRingDuration > 0f)
+            yield return new WaitForSecondsRealtime(outgoingRingDuration);
+
+        if (!callActive || outgoingUnavailablePhase)
+            yield break;
+
+        outgoingUnavailablePhase = true;
+        legacyOutgoingActive = false;
+
+        if (callingEllipsisRoutine != null)
+        {
+            StopCoroutine(callingEllipsisRoutine);
+            callingEllipsisRoutine = null;
+        }
+
+        StopOutgoingRingSoundIfPlaying();
+        ShowSubscriberUnavailableText();
+        PlaySubscriberUnavailableSound();
+
+        // #region agent log
+        CallDebugLog.Write("A", "CallerScript.LegacyOutgoingCallRoutine", "Unavailable shown",
+            "{\"holdDuration\":" + unavailableMessageDuration + "}");
+        // #endregion
+
+        if (unavailableMessageDuration > 0f)
+            yield return new WaitForSecondsRealtime(unavailableMessageDuration);
+
+        FinishLegacyOutgoingCall("legacy outgoing ended");
+    }
+
+    void StartLegacyOutgoingCall(string displayName, Sprite avatar)
+    {
+        StopLegacyOutgoingCallEffects();
+
+        ShowCallerScreenForOutgoing();
+        HideBadEndingOverlay();
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+        RestoreDialogueTextDefaults();
+
+        if (callerName != null)
+            callerName.text = displayName;
+        if (callerAvatar != null && avatar != null)
+            callerAvatar.sprite = avatar;
+
+        dialogueActive = false;
+        activeCallData = null;
+        activeStoryCallId = StoryCallId.None;
+        currentNodeIndex = -1;
+        callActive = true;
+        legacyOutgoingActive = true;
+        outgoingUnavailablePhase = false;
+        callUiActivatedAt = Time.unscaledTime;
+
+        if (dialogueText != null)
+            dialogueText.gameObject.SetActive(true);
+
+        PlayOutgoingRinging();
+        callingEllipsisRoutine = StartCoroutine(CallingEllipsisRoutine());
+        legacyOutgoingRoutine = StartCoroutine(LegacyOutgoingCallRoutine());
+
+        // #region agent log
+        CallDebugLog.Write("A", "CallerScript.StartLegacyOutgoingCall", "Outgoing started",
+            "{\"name\":\"" + displayName + "\"}");
+        // #endregion
+    }
+
+    void StopLegacyOutgoingCallEffects()
+    {
+        legacyOutgoingActive = false;
+        outgoingUnavailablePhase = false;
+
+        if (legacyOutgoingRoutine != null)
+        {
+            StopCoroutine(legacyOutgoingRoutine);
+            legacyOutgoingRoutine = null;
+        }
+
+        if (callingEllipsisRoutine != null)
+        {
+            StopCoroutine(callingEllipsisRoutine);
+            callingEllipsisRoutine = null;
+        }
+
+        StopLegacyOutgoingAudio();
+        RestoreDialogueTextDefaults();
+    }
+
+    void FinishLegacyOutgoingCall(string reason)
+    {
+        legacyOutgoingRoutine = null;
+        StopLegacyOutgoingCallEffects();
+
+        // #region agent log
+        CallDebugLog.Write("E", "CallerScript.FinishLegacyOutgoingCall", "Finishing outgoing",
+            "{\"reason\":\"" + reason + "\"}");
+        // #endregion
+
+        CloseCaller(reason);
     }
 
     float PlayNodeVoice(AudioClip clip)
@@ -218,41 +436,10 @@ public class CallerScript : MonoBehaviour
     }
 
     // Legacy outgoing calls (no story dialogue).
-    public void OpenMomCall()
-    {
-        callerScreen.SetActive(true);
-        callerName.text = "MOM";
-        callerAvatar.sprite = momAvatar;
-        callActive = true;
-        PlayOutgoingRinging();
-    }
-
-    public void OpenDadCall()
-    {
-        callerScreen.SetActive(true);
-        callerName.text = "DAD";
-        callerAvatar.sprite = dadAvatar;
-        callActive = true;
-        PlayOutgoingRinging();
-    }
-
-    public void OpenSarahCall()
-    {
-        callerScreen.SetActive(true);
-        callerName.text = "SARAH";
-        callerAvatar.sprite = sarahAvatar;
-        callActive = true;
-        PlayOutgoingRinging();
-    }
-
-    public void OpenBrotherCall()
-    {
-        callerScreen.SetActive(true);
-        callerName.text = "BROTHER";
-        callerAvatar.sprite = brotherAvatar;
-        callActive = true;
-        PlayOutgoingRinging();
-    }
+    public void OpenMomCall() => StartLegacyOutgoingCall("MOM", momAvatar);
+    public void OpenDadCall() => StartLegacyOutgoingCall("DAD", dadAvatar);
+    public void OpenSarahCall() => StartLegacyOutgoingCall("SARAH", sarahAvatar);
+    public void OpenBrotherCall() => StartLegacyOutgoingCall("BROTHER", brotherAvatar);
 
     public bool OpenUnknownCall()
     {
@@ -781,6 +968,8 @@ public class CallerScript : MonoBehaviour
             ",\"storyCallId\":\"" + endedStoryCall + "\",\"storyConversationFinished\":" +
             (storyConversationFinished ? "true" : "false") + "}");
 
+        StopLegacyOutgoingCallEffects();
+
         if (nodeFlowRoutine != null)
         {
             StopCoroutine(nodeFlowRoutine);
@@ -803,12 +992,14 @@ public class CallerScript : MonoBehaviour
         ClearDialogueChoices();
         SetChoicesContainerVisible(false);
         HideBadEndingOverlay();
+        RestoreDialogueTextDefaults();
 
         if (callerScreen != null)
             callerScreen.SetActive(false);
 
         callActive = false;
         StopOutgoingRinging();
+        StopSubscriberUnavailableSoundIfPlaying();
 
         if (isBadEnding)
             OnCallBadEnding?.Invoke();
@@ -877,6 +1068,21 @@ public class CallerScript : MonoBehaviour
 
     public void DeclineCall()
     {
+        if (IsOutgoingDialingPhase)
+        {
+            FinishLegacyOutgoingCall("declined");
+            return;
+        }
+
+        if (outgoingUnavailablePhase)
+            return;
+
+        if (callActive && !dialogueActive)
+        {
+            FinishLegacyOutgoingCall("declined");
+            return;
+        }
+
         if (incomingCallManager != null)
             incomingCallManager.DeclineIncoming();
         else

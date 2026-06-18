@@ -55,14 +55,14 @@ public class IncomingCallManager : MonoBehaviour
     public AudioClip incomingRingtoneClip;
 
     [Header("Timing")]
-    [Tooltip("Seconds after game start before the Neighbor call can ring (default 180 = 3 minutes).")]
+    [Tooltip("Seconds after game start before the Neighbor call can ring (default 60 = 1 minute).")]
     public float delaySeconds = 60f;
 
     [Header("Story Call Timing")]
-    [Tooltip("Seconds after Neighbor call ends before Mom call can ring.")]
+    [Tooltip("Seconds after Neighbor call ends before Mom call can ring(default 150s).")]
     public float delayBeforeMom = 150f;
 
-    [Tooltip("Seconds after Mom call ends before Microsoft call can ring (default 240 = 4 minutes).")]
+    [Tooltip("Seconds after Mom call ends before Microsoft call can ring (default 150s).")]
     public float delayBeforeMicrosoft = 150f;
 
     [Header("Button Wiring")]
