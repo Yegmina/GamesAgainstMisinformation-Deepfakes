@@ -227,8 +227,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     public void SetPoints(int val)
     {
-        points = Mathf.Max(0, val);
-        UpdateUI();
+        if (val > points)
+        {
+            points = val;
+            UpdateUI();
+        }
     }
 
     public void AddPoints(int val)
