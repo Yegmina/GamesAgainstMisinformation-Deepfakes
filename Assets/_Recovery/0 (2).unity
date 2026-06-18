@@ -10161,7 +10161,7 @@ MonoBehaviour:
   missionManager: {fileID: 0}
   audioSource: {fileID: 1281711179}
   outgoingRingSound: {fileID: 8300000, guid: 0185fa755a841614f881d43e5758414f, type: 3}
-  subscriberUnavailableSound: {fileID: 8300000, guid: a9d9b24c74d612b4bbfd4394a777fd9a, type: 3}
+  subscriberUnavailableSound: {fileID: 0}
   outgoingRingDuration: 3
   unavailableMessageDuration: 2
   unavailableTextColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
@@ -18196,8 +18196,8 @@ MonoBehaviour:
   ringtoneSource: {fileID: 1995845836}
   incomingRingtoneClip: {fileID: 8300000, guid: 6d7d54e4f9af0034a83b159c0a28e228, type: 3}
   delaySeconds: 60
-  delayBeforeMom: 150
-  delayBeforeMicrosoft: 150
+  delayBeforeMom: 240
+  delayBeforeMicrosoft: 180
   wireIncomingButtonsAtRuntime: 1
 --- !u!82 &1995845836
 AudioSource:
@@ -18506,7 +18506,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 
+  m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
