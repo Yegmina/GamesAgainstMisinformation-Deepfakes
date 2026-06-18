@@ -5,10 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Shows an "incoming call" screen a set number of seconds after the game starts.
-/// GREEN (Answer) opens the existing Caller Screen with the unknown avatar, plays the
-/// ringtone once, and shows Answer/Decline buttons there. RED (Decline) just dismisses.
-/// Either button on the Caller Screen stops the audio and returns to the Home Screen.
+/// Story call timeline: Neighbor -> Mom -> Microsoft.
 /// The call is only shown while the player is idle on the Home Screen (never during a chat).
 /// </summary>
 public class IncomingCallManager : MonoBehaviour
@@ -17,6 +14,8 @@ public class IncomingCallManager : MonoBehaviour
     {
         WaitingForNeighbor,
         NeighborActive,
+        WaitingForMom,
+        MomActive,
         WaitingForMicrosoft,
         MicrosoftActive,
         Complete
@@ -26,6 +25,7 @@ public class IncomingCallManager : MonoBehaviour
     {
         None,
         Neighbor,
+        Mom,
         Microsoft,
         Unknown
     }
@@ -36,30 +36,33 @@ public class IncomingCallManager : MonoBehaviour
 
     [Header("Incoming Call Screen")]
     public GameObject incomingCallScreen;
-    public Button incomingAnswerButton;   // GREEN
-    public Button incomingDeclineButton;  // RED
+    public Button incomingAnswerButton;
+    public Button incomingDeclineButton;
     public TMP_Text incomingCallerName;
     public Image incomingCallerAvatar;
 
     [Header("Caller Screen buttons")]
-    public GameObject callerEndCallButton;   // existing EndCallButton (hidden during this flow)
-    public Button callerAnswerButton;        // GREEN (added to Caller Screen)
-    public Button callerDeclineButton;       // RED (added to Caller Screen)
+    public GameObject callerEndCallButton;
+    public Button callerAnswerButton;
+    public Button callerDeclineButton;
 
     [Header("Audio")]
     public AudioSource audioSource;
-    public AudioClip ringtoneClip;           // getFromTcom sound (plays once on answer)
+    public AudioClip ringtoneClip;
 
     [Header("Incoming Ringtone")]
-    public AudioSource ringtoneSource;       // dedicated source for the looping ringtone
-    public AudioClip incomingRingtoneClip;   // iPhone-style ringtone (loops while ringing)
+    public AudioSource ringtoneSource;
+    public AudioClip incomingRingtoneClip;
 
     [Header("Timing")]
     [Tooltip("Seconds after game start before the Neighbor call can ring (default 180 = 3 minutes).")]
     public float delaySeconds = 180f;
 
     [Header("Story Call Timing")]
-    [Tooltip("Seconds after Neighbor call ends before Microsoft call can ring (default 240 = 4 minutes).")]
+    [Tooltip("Seconds after Neighbor call ends before Mom call can ring.")]
+    public float delayBeforeMom = 180f;
+
+    [Tooltip("Seconds after Mom call ends before Microsoft call can ring (default 240 = 4 minutes).")]
     public float delayBeforeMicrosoft = 240f;
 
     [Header("Button Wiring")]
@@ -99,7 +102,6 @@ public class IncomingCallManager : MonoBehaviour
         audioSource.playOnAwake = false;
         audioSource.loop = false;
 
-        // Dedicated source for the looping ringtone so it never fights the answer sound.
         if (ringtoneSource == null) ringtoneSource = gameObject.AddComponent<AudioSource>();
         ringtoneSource.playOnAwake = false;
         ringtoneSource.loop = true;
@@ -154,6 +156,7 @@ public class IncomingCallManager : MonoBehaviour
         if (callerController != null)
         {
             callerController.OnCallEnded += HandleCallEnded;
+            callerController.OnCallBadEnding += HandleBadCallEnding;
             callerController.OnMicrosoftCallCompleted += HandleMicrosoftStoryCompleted;
             if (callerController.incomingCallManager == null)
                 callerController.incomingCallManager = this;
@@ -169,9 +172,10 @@ public class IncomingCallManager : MonoBehaviour
         callShown = false;
         timersInitialized = true;
 
-        Debug.Log($"[IncomingCallManager] Timers started. Neighbor delay={delaySeconds}s, Microsoft delay={delayBeforeMicrosoft}s, phase={storyPhase}");
+        Debug.Log($"[IncomingCallManager] Timers started. Neighbor={delaySeconds}s, Mom={delayBeforeMom}s, Microsoft={delayBeforeMicrosoft}s, phase={storyPhase}");
         AgentLog("C", "IncomingCallManager.Start", "Timers initialized",
-            "{\"delaySeconds\":" + delaySeconds + ",\"delayBeforeMicrosoft\":" + delayBeforeMicrosoft + ",\"phase\":\"" + storyPhase + "\"}");
+            "{\"delaySeconds\":" + delaySeconds + ",\"delayBeforeMom\":" + delayBeforeMom +
+            ",\"delayBeforeMicrosoft\":" + delayBeforeMicrosoft + ",\"phase\":\"" + storyPhase + "\"}");
     }
 
     void OnDestroy()
@@ -179,6 +183,7 @@ public class IncomingCallManager : MonoBehaviour
         if (callerController != null)
         {
             callerController.OnCallEnded -= HandleCallEnded;
+            callerController.OnCallBadEnding -= HandleBadCallEnding;
             callerController.OnMicrosoftCallCompleted -= HandleMicrosoftStoryCompleted;
         }
     }
@@ -188,16 +193,12 @@ public class IncomingCallManager : MonoBehaviour
         if (!timersInitialized || storyPhase == StoryCallPhase.Complete || callShown)
             return;
 
-        // Timer always ticks in the background, even while the player is in a chat.
         phaseElapsed += Time.deltaTime;
 
-        float requiredDelay = storyPhase == StoryCallPhase.WaitingForNeighbor
-            ? delaySeconds
-            : delayBeforeMicrosoft;
-
+        float requiredDelay = GetRequiredDelayForCurrentPhase();
         if (requiredDelay <= 0f)
         {
-            Debug.LogWarning($"[IncomingCallManager] Required delay is {requiredDelay}. Set delaySeconds / delayBeforeMicrosoft to a positive value.");
+            Debug.LogWarning($"[IncomingCallManager] Required delay is {requiredDelay}. Set timing fields to positive values.");
             return;
         }
 
@@ -209,9 +210,23 @@ public class IncomingCallManager : MonoBehaviour
                 "{\"phase\":\"" + storyPhase + "\",\"phaseElapsed\":" + phaseElapsed + ",\"requiredDelay\":" + requiredDelay + "}");
         }
 
-        // If the timer already finished, ring as soon as the player is idle on Home.
         if (callPending && IsIdleOnHome())
             TriggerPendingCall();
+    }
+
+    float GetRequiredDelayForCurrentPhase()
+    {
+        switch (storyPhase)
+        {
+            case StoryCallPhase.WaitingForNeighbor:
+                return delaySeconds;
+            case StoryCallPhase.WaitingForMom:
+                return delayBeforeMom;
+            case StoryCallPhase.WaitingForMicrosoft:
+                return delayBeforeMicrosoft;
+            default:
+                return float.MaxValue;
+        }
     }
 
     bool IsIdleOnHome()
@@ -245,6 +260,8 @@ public class IncomingCallManager : MonoBehaviour
 
         if (storyPhase == StoryCallPhase.WaitingForNeighbor)
             ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+        else if (storyPhase == StoryCallPhase.WaitingForMom)
+            ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
         else if (storyPhase == StoryCallPhase.WaitingForMicrosoft)
             ShowStoryIncomingCall(StoryCallPhase.MicrosoftActive, ActiveCallType.Microsoft);
     }
@@ -261,6 +278,12 @@ public class IncomingCallManager : MonoBehaviour
                     ? callerController.neighborCallData.displayName
                     : "NEIGHBOR",
                 callerController != null ? callerController.neighborAvatar : null);
+        else if (callType == ActiveCallType.Mom)
+            ApplyIncomingCallPresentation(
+                callerController != null && callerController.momCallData != null
+                    ? callerController.momCallData.displayName
+                    : "MOM",
+                callerController != null ? callerController.momAvatar : null);
         else if (callType == ActiveCallType.Microsoft)
             ApplyIncomingCallPresentation(
                 callerController != null && callerController.microsoftCallData != null
@@ -288,7 +311,6 @@ public class IncomingCallManager : MonoBehaviour
         if (incomingCallScreen != null) incomingCallScreen.SetActive(true);
         EnsureIncomingAnswerButtonVisible();
 
-        // Start the looping ringtone while the phone is ringing.
         if (ringtoneSource != null && incomingRingtoneClip != null)
         {
             ringtoneSource.clip = incomingRingtoneClip;
@@ -299,17 +321,6 @@ public class IncomingCallManager : MonoBehaviour
         Debug.Log($"[IncomingCallManager] Incoming call screen shown. activeCallType={activeCallType}");
         AgentLog("C", "IncomingCallManager.PresentIncomingCallScreen", "Incoming screen shown",
             "{\"activeCallType\":\"" + activeCallType + "\"}");
-    }
-
-    void ShowIncomingCall()
-    {
-        activeCallType = ActiveCallType.Unknown;
-        callShown = true;
-
-        ApplyIncomingCallPresentation("UNKNOWN NUMBER",
-            callerController != null ? callerController.unknownAvatar : null);
-
-        PresentIncomingCallScreen();
     }
 
     bool IsIncomingUiButton(Button button)
@@ -382,7 +393,6 @@ public class IncomingCallManager : MonoBehaviour
         AgentLog("E", "IncomingCallManager.ReturnToIdleHome", "Returned home", "{}");
     }
 
-    // GREEN on incoming call screen — canonical entry point for answering.
     public void AnswerIncoming()
     {
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
@@ -436,6 +446,8 @@ public class IncomingCallManager : MonoBehaviour
         bool storyCallOpened = false;
         if (activeCallType == ActiveCallType.Neighbor)
             storyCallOpened = callerController.OpenNeighborCall();
+        else if (activeCallType == ActiveCallType.Mom)
+            storyCallOpened = callerController.OpenMomStoryCall();
         else if (activeCallType == ActiveCallType.Microsoft)
             storyCallOpened = callerController.OpenMicrosoftCall();
         else
@@ -450,12 +462,10 @@ public class IncomingCallManager : MonoBehaviour
             return;
         }
 
-        // Swap the single end-call button for the Answer/Decline pair on the caller screen only.
         if (callerEndCallButton != null) callerEndCallButton.SetActive(false);
         SetCallerScreenButtonVisible(callerAnswerButton, true);
         SetCallerScreenButtonVisible(callerDeclineButton, true);
 
-        // Play the ringtone once.
         if (audioSource != null && ringtoneClip != null)
         {
             audioSource.clip = ringtoneClip;
@@ -466,7 +476,6 @@ public class IncomingCallManager : MonoBehaviour
         answerTransitionInProgress = false;
     }
 
-    // RED on incoming call screen
     public void DeclineIncoming()
     {
         Debug.Log("[IncomingCallManager] DeclineIncoming");
@@ -481,7 +490,6 @@ public class IncomingCallManager : MonoBehaviour
         AdvanceStoryTimelineAfterCall();
     }
 
-    // Answer or Decline on the Caller Screen: stop audio, close, go Home.
     public void EndCallerScreen()
     {
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
@@ -498,6 +506,12 @@ public class IncomingCallManager : MonoBehaviour
             callerController.CloseCaller();
         else
             HandleCallEnded();
+    }
+
+    void HandleBadCallEnding()
+    {
+        Debug.Log("[IncomingCallManager] Bad call ending detected.");
+        AgentLog("H", "IncomingCallManager.HandleBadCallEnding", "Bad ending event received", "{}");
     }
 
     void HandleMicrosoftStoryCompleted()
@@ -523,12 +537,22 @@ public class IncomingCallManager : MonoBehaviour
     {
         if (activeCallType == ActiveCallType.Neighbor)
         {
+            storyPhase = StoryCallPhase.WaitingForMom;
+            phaseElapsed = 0f;
+            callPending = false;
+            Debug.Log($"[IncomingCallManager] Neighbor call finished. Mom timer reset ({delayBeforeMom}s).");
+            AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
+                "Neighbor finished",
+                "{\"storyPhase\":\"" + storyPhase + "\"}");
+        }
+        else if (activeCallType == ActiveCallType.Mom)
+        {
             storyPhase = StoryCallPhase.WaitingForMicrosoft;
             phaseElapsed = 0f;
             callPending = false;
-            Debug.Log($"[IncomingCallManager] Neighbor call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
+            Debug.Log($"[IncomingCallManager] Mom call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
-                "Neighbor finished",
+                "Mom finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
         }
         else if (activeCallType == ActiveCallType.Microsoft)

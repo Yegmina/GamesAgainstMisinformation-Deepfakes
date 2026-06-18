@@ -19,6 +19,9 @@ public class CallNode
     public AudioClip voiceAudio;
     public CallChoice[] choices;
     public int nextNodeIndex = -1;
+
+    [Tooltip("When true, reaching this node triggers the red horror bad-ending overlay.")]
+    public bool isBadEnding;
 }
 
 [Serializable]
@@ -33,17 +36,16 @@ public enum StoryCallId
 {
     None,
     Neighbor,
+    Mom,
     Microsoft
 }
 
 public class CallerScript : MonoBehaviour
 {
-    // UI элементы
     public TMP_Text callerName;
     public Image callerAvatar;
     public GameObject callerScreen;
 
-    // Аватарки
     public Sprite momAvatar;
     public Sprite dadAvatar;
     public Sprite sarahAvatar;
@@ -54,6 +56,7 @@ public class CallerScript : MonoBehaviour
 
     [Header("Story Calls")]
     public CallData neighborCallData;
+    public CallData momCallData;
     public CallData microsoftCallData;
 
     [Header("Call Dialogue")]
@@ -62,6 +65,22 @@ public class CallerScript : MonoBehaviour
     public Transform choicesContent;
     public GameObject choiceButtonPrefab;
     public float autoAdvanceDelay = 1.5f;
+
+    [Header("Bad Ending")]
+    public GameObject badEndingOverlay;
+    public TextMeshProUGUI wrongChoiceText;
+    [Tooltip("Root UI element to shake during a bad ending (defaults to callerScreen).")]
+    public RectTransform callShakeTarget;
+    [Tooltip("How fast the red overlay alpha flickers (higher = faster).")]
+    public float flashSpeed = 8f;
+    [Tooltip("How long the horror overlay flashes before the call ends.")]
+    public float badEndingDuration = 3f;
+    [Tooltip("Screen-shake magnitude in UI pixels during a bad ending.")]
+    public float shakeIntensity = 25f;
+    [Tooltip("Horror sting played instantly when a bad ending node is reached.")]
+    public AudioClip horrorSound;
+    [Tooltip("Volume fade-out duration when the bad-ending sequence ends.")]
+    public float horrorSoundFadeOut = 0.35f;
 
     [Header("Managers")]
     public IncomingCallManager incomingCallManager;
@@ -72,16 +91,24 @@ public class CallerScript : MonoBehaviour
     public AudioClip outgoingRingingClip;
 
     public Action OnCallEnded;
-    public Action OnMicrosoftCallCompleted;
+    public Action OnCallBadEnding;
     public Action OnNeighborCallCompleted;
+    public Action OnMomCallCompleted;
+    public Action OnMicrosoftCallCompleted;
 
     CallData activeCallData;
     StoryCallId activeStoryCallId = StoryCallId.None;
     int currentNodeIndex = -1;
     bool dialogueActive;
     bool callActive;
+    bool badEndingPlaying;
     Coroutine nodeFlowRoutine;
+    Coroutine badEndingRoutine;
+    Coroutine shakeRoutine;
     float callUiActivatedAt;
+    Image badEndingOverlayImage;
+    RectTransform shakeTarget;
+    Vector2 shakeHomePosition;
 
     public bool IsCallActive => callActive;
     public StoryCallId ActiveStoryCallId => activeStoryCallId;
@@ -103,25 +130,40 @@ public class CallerScript : MonoBehaviour
     }
     // #endregion
 
-    private void Awake()
+    void Awake()
     {
         if (incomingCallManager == null)
             incomingCallManager = FindFirstObjectByType<IncomingCallManager>();
         if (missionManager == null)
             missionManager = FindFirstObjectByType<MissionSidebarManager>();
+
+        HideBadEndingOverlay();
     }
 
-    private void Start()
+    void Start()
     {
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
         audioSource.loop = true;
+
+        if (badEndingOverlay != null)
+            badEndingOverlayImage = badEndingOverlay.GetComponent<Image>();
+
+        CacheShakeTarget();
     }
 
-    /// <summary>
-    /// Hides PhoneIncomingCall and shows PhoneCallScreen without touching the parent canvas.
-    /// </summary>
+    void CacheShakeTarget()
+    {
+        if (callShakeTarget != null)
+            shakeTarget = callShakeTarget;
+        else if (callerScreen != null)
+            shakeTarget = callerScreen.GetComponent<RectTransform>();
+
+        if (shakeTarget != null)
+            shakeHomePosition = shakeTarget.anchoredPosition;
+    }
+
     void ActivateConversationScreen()
     {
         if (incomingCallManager != null && incomingCallManager.incomingCallScreen != null)
@@ -148,7 +190,7 @@ public class CallerScript : MonoBehaviour
         return choicesContent;
     }
 
-    private void PlayOutgoingRinging()
+    void PlayOutgoingRinging()
     {
         if (audioSource != null && outgoingRingingClip != null)
         {
@@ -175,8 +217,7 @@ public class CallerScript : MonoBehaviour
         return clip.length;
     }
 
-    // ===== ОТКРЫТЬ ЗВОНКИ =====
-
+    // Legacy outgoing calls (no story dialogue).
     public void OpenMomCall()
     {
         callerScreen.SetActive(true);
@@ -226,13 +267,17 @@ public class CallerScript : MonoBehaviour
         if (callerAvatar != null && unknownAvatar != null) callerAvatar.sprite = unknownAvatar;
         callActive = true;
         callUiActivatedAt = Time.unscaledTime;
-        // Do not play outgoing ring here, as this is used for incoming calls too.
         return true;
     }
 
     public bool OpenNeighborCall()
     {
         return OpenStoryCall(neighborCallData, neighborAvatar, "neighborCallData", StoryCallId.Neighbor);
+    }
+
+    public bool OpenMomStoryCall()
+    {
+        return OpenStoryCall(momCallData, momAvatar, "momCallData", StoryCallId.Mom);
     }
 
     public bool OpenMicrosoftCall()
@@ -315,6 +360,7 @@ public class CallerScript : MonoBehaviour
         }
 
         ActivateConversationScreen();
+        HideBadEndingOverlay();
 
         if (callerName != null)
             callerName.text = string.IsNullOrEmpty(callData.displayName) ? "UNKNOWN NUMBER" : callData.displayName;
@@ -371,16 +417,10 @@ public class CallerScript : MonoBehaviour
 
     IEnumerator ProcessNodeAfterAudio(CallNode node, int nodeIndex, float voiceDuration, bool hasChoices)
     {
-        // Keep subtitle on screen for the full voice clip length.
         if (voiceDuration > 0f)
-        {
             yield return new WaitForSeconds(voiceDuration);
-        }
-        else if (!hasChoices && autoAdvanceDelay > 0f)
-        {
-            // Auto-advance delay applies only to linear nodes without choices.
+        else if (!hasChoices && !node.isBadEnding && autoAdvanceDelay > 0f)
             yield return new WaitForSeconds(autoAdvanceDelay);
-        }
 
         if (!dialogueActive || !callActive || currentNodeIndex != nodeIndex)
             yield break;
@@ -388,6 +428,12 @@ public class CallerScript : MonoBehaviour
         if (hasChoices)
         {
             SpawnChoiceButtons(node, nodeIndex);
+            yield break;
+        }
+
+        if (node.isBadEnding)
+        {
+            StartBadEndingSequence();
             yield break;
         }
 
@@ -479,6 +525,223 @@ public class CallerScript : MonoBehaviour
         ShowDialogueNode(nextNodeIndex);
     }
 
+    void StartBadEndingSequence()
+    {
+        if (badEndingPlaying)
+            return;
+
+        if (nodeFlowRoutine != null)
+        {
+            StopCoroutine(nodeFlowRoutine);
+            nodeFlowRoutine = null;
+        }
+
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+        badEndingPlaying = true;
+
+        AgentLog("H", "CallerScript.StartBadEndingSequence", "Bad ending started",
+            "{\"storyCallId\":\"" + activeStoryCallId + "\",\"nodeIndex\":" + currentNodeIndex + "}");
+
+        if (badEndingRoutine != null)
+            StopCoroutine(badEndingRoutine);
+
+        badEndingRoutine = StartCoroutine(BadEndingRoutine());
+    }
+
+    IEnumerator BadEndingRoutine()
+    {
+        if (shakeTarget == null)
+            CacheShakeTarget();
+
+        ShowWrongChoiceText();
+        StartCallShake();
+        PlayHorrorSound();
+
+        if (badEndingOverlay != null)
+        {
+            if (badEndingOverlayImage == null)
+                badEndingOverlayImage = badEndingOverlay.GetComponent<Image>();
+
+            badEndingOverlay.SetActive(true);
+
+            Color baseColor = badEndingOverlayImage != null
+                ? badEndingOverlayImage.color
+                : new Color(0.75f, 0f, 0f, 0.45f);
+
+            float peakAlpha = baseColor.a > 0.01f ? baseColor.a : 0.55f;
+            float elapsed = 0f;
+            float noiseSeed = UnityEngine.Random.Range(0f, 100f);
+
+            while (elapsed < badEndingDuration)
+            {
+                elapsed += Time.deltaTime;
+
+                float sine = (Mathf.Sin(elapsed * flashSpeed) + 1f) * 0.5f;
+                float noise = Mathf.PerlinNoise(elapsed * flashSpeed * 0.35f, noiseSeed);
+                float alpha = Mathf.Lerp(0.12f, peakAlpha, sine * 0.55f + noise * 0.45f);
+
+                if (badEndingOverlayImage != null)
+                {
+                    Color c = baseColor;
+                    c.a = alpha;
+                    badEndingOverlayImage.color = c;
+                }
+
+                yield return null;
+            }
+        }
+        else
+        {
+            yield return new WaitForSeconds(badEndingDuration);
+        }
+
+        yield return FadeOutAndStopHorrorSound();
+        StopCallShake();
+        HideWrongChoiceText();
+        badEndingPlaying = false;
+        badEndingRoutine = null;
+        HideBadEndingOverlay();
+        CloseCaller("bad ending");
+    }
+
+    void ShowWrongChoiceText()
+    {
+        if (wrongChoiceText == null)
+            return;
+
+        wrongChoiceText.text = "WRONG CHOICE";
+        wrongChoiceText.fontStyle = FontStyles.Bold;
+        wrongChoiceText.gameObject.SetActive(true);
+    }
+
+    void HideWrongChoiceText()
+    {
+        if (wrongChoiceText == null)
+            return;
+
+        wrongChoiceText.gameObject.SetActive(false);
+    }
+
+    void StartCallShake()
+    {
+        if (shakeTarget == null || shakeIntensity <= 0f)
+            return;
+
+        if (shakeRoutine != null)
+            StopCoroutine(shakeRoutine);
+
+        shakeRoutine = StartCoroutine(ShakeRoutine(badEndingDuration, shakeIntensity));
+    }
+
+    void StopCallShake()
+    {
+        if (shakeRoutine != null)
+        {
+            StopCoroutine(shakeRoutine);
+            shakeRoutine = null;
+        }
+
+        if (shakeTarget != null)
+            shakeTarget.anchoredPosition = shakeHomePosition;
+    }
+
+    IEnumerator ShakeRoutine(float duration, float magnitude)
+    {
+        if (shakeTarget == null)
+            yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            shakeTarget.anchoredPosition = shakeHomePosition + new Vector2(
+                UnityEngine.Random.Range(-magnitude, magnitude),
+                UnityEngine.Random.Range(-magnitude, magnitude));
+            yield return null;
+        }
+
+        shakeTarget.anchoredPosition = shakeHomePosition;
+        shakeRoutine = null;
+    }
+
+    void EnsureAudioSource()
+    {
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+    }
+
+    void PlayHorrorSound()
+    {
+        if (horrorSound == null)
+            return;
+
+        EnsureAudioSource();
+        audioSource.Stop();
+        audioSource.loop = false;
+        audioSource.clip = horrorSound;
+        audioSource.volume = 1f;
+        audioSource.Play();
+
+        AgentLog("H", "CallerScript.PlayHorrorSound", "Horror sound started",
+            "{\"clipLength\":" + horrorSound.length + "}");
+    }
+
+    IEnumerator FadeOutAndStopHorrorSound()
+    {
+        if (audioSource == null || !audioSource.isPlaying)
+            yield break;
+
+        if (horrorSoundFadeOut <= 0f)
+        {
+            StopHorrorSoundImmediate();
+            yield break;
+        }
+
+        float startVolume = audioSource.volume;
+        float elapsed = 0f;
+
+        while (elapsed < horrorSoundFadeOut)
+        {
+            elapsed += Time.deltaTime;
+            audioSource.volume = Mathf.Lerp(startVolume, 0f, elapsed / horrorSoundFadeOut);
+            yield return null;
+        }
+
+        StopHorrorSoundImmediate();
+    }
+
+    void StopHorrorSoundImmediate()
+    {
+        if (audioSource == null)
+            return;
+
+        audioSource.Stop();
+        audioSource.volume = 1f;
+        audioSource.clip = null;
+    }
+
+    void HideBadEndingOverlay()
+    {
+        HideWrongChoiceText();
+
+        if (badEndingOverlay == null)
+            return;
+
+        badEndingOverlay.SetActive(false);
+
+        if (badEndingOverlayImage == null)
+            badEndingOverlayImage = badEndingOverlay.GetComponent<Image>();
+
+        if (badEndingOverlayImage != null)
+        {
+            Color c = badEndingOverlayImage.color;
+            c.a = 0f;
+            badEndingOverlayImage.color = c;
+        }
+    }
+
     void SetChoicesContainerVisible(bool visible)
     {
         if (choicesPanel != null)
@@ -496,8 +759,6 @@ public class CallerScript : MonoBehaviour
             Destroy(container.GetChild(i).gameObject);
     }
 
-    // ===== ДЕЙСТВИЯ СО ЗВОНКОМ =====
-
     public void CloseCaller()
     {
         if (Time.unscaledTime - callUiActivatedAt < 0.35f)
@@ -508,11 +769,12 @@ public class CallerScript : MonoBehaviour
 
     void CloseCaller(string reason)
     {
-        if (!callActive && !dialogueActive)
+        if (!callActive && !dialogueActive && !badEndingPlaying)
             return;
 
         StoryCallId endedStoryCall = activeStoryCallId;
         bool storyConversationFinished = IsStoryConversationFinished(reason);
+        bool isBadEnding = reason == "bad ending";
 
         AgentLog("E", "CallerScript.CloseCaller", reason,
             "{\"callActive\":" + (callActive ? "true" : "false") + ",\"nodeIndex\":" + currentNodeIndex +
@@ -525,18 +787,31 @@ public class CallerScript : MonoBehaviour
             nodeFlowRoutine = null;
         }
 
+        if (badEndingRoutine != null)
+        {
+            StopCoroutine(badEndingRoutine);
+            badEndingRoutine = null;
+        }
+
+        StopCallShake();
+        StopHorrorSoundImmediate();
+        badEndingPlaying = false;
         dialogueActive = false;
         activeCallData = null;
         activeStoryCallId = StoryCallId.None;
         currentNodeIndex = -1;
         ClearDialogueChoices();
         SetChoicesContainerVisible(false);
+        HideBadEndingOverlay();
 
         if (callerScreen != null)
             callerScreen.SetActive(false);
 
         callActive = false;
         StopOutgoingRinging();
+
+        if (isBadEnding)
+            OnCallBadEnding?.Invoke();
 
         if (storyConversationFinished)
             NotifyStoryCallCompleted(endedStoryCall);
@@ -558,6 +833,12 @@ public class CallerScript : MonoBehaviour
             AgentLog("F", "CallerScript.NotifyStoryCallCompleted", "Microsoft story completed", "{}");
             OnMicrosoftCallCompleted?.Invoke();
             ProgressDeepfakeMission();
+            return;
+        }
+
+        if (storyCallId == StoryCallId.Mom)
+        {
+            OnMomCallCompleted?.Invoke();
             return;
         }
 
@@ -583,9 +864,6 @@ public class CallerScript : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Optional Inspector wrapper. Forwards to IncomingCallManager.AnswerIncoming().
-    /// </summary>
     public void AnswerCall()
     {
         if (incomingCallManager == null)
@@ -606,5 +884,4 @@ public class CallerScript : MonoBehaviour
     }
 }
 
-// Keeps existing scene references that still point at CallerController.
 public class CallerController : CallerScript { }
