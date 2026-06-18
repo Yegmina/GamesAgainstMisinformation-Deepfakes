@@ -7,6 +7,12 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
     public float hoverScale = 1.05f;
     public float duration = 0.1f;
     public AudioClip clickSound;
+
+    [Header("Main Menu Visuals (Optional)")]
+    public GameObject frameObject;
+    public UnityEngine.UI.Image textInscriptionImage;
+    public Color normalTextColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+    public Color hoverTextColor = Color.white;
     
     private AudioSource audioSource;
     private Vector3 originalScale;
@@ -26,24 +32,59 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         // ПРИНУДИТЕЛЬНО ВКЛЮЧАЕМ AudioSource
         audioSource.enabled = true;
         audioSource.playOnAwake = false;
+
+        if (textInscriptionImage != null)
+        {
+            textInscriptionImage.color = normalTextColor;
+        }
+        if (frameObject != null)
+        {
+            frameObject.SetActive(false);
+        }
     }
 
     void OnDisable()
     {
         StopScale();
         transform.localScale = originalScale;
+        if (frameObject != null)
+        {
+            frameObject.SetActive(false);
+        }
+        if (textInscriptionImage != null)
+        {
+            textInscriptionImage.color = normalTextColor;
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
         StopScale();
         scaleCoroutine = StartCoroutine(ScaleTo(originalScale * hoverScale));
+
+        if (frameObject != null)
+        {
+            frameObject.SetActive(true);
+        }
+        if (textInscriptionImage != null)
+        {
+            textInscriptionImage.color = hoverTextColor;
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         StopScale();
         scaleCoroutine = StartCoroutine(ScaleTo(originalScale));
+
+        if (frameObject != null)
+        {
+            frameObject.SetActive(false);
+        }
+        if (textInscriptionImage != null)
+        {
+            textInscriptionImage.color = normalTextColor;
+        }
     }
 
     public void OnPointerClick(PointerEventData eventData)
@@ -58,11 +99,11 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
             persistentSource = phoneManager.GetComponent<AudioSource>();
         }
 
-        if (persistentSource != null && persistentSource.enabled)
+        if (persistentSource != null && persistentSource.enabled && persistentSource.gameObject.activeInHierarchy)
         {
             persistentSource.PlayOneShot(clickSound, 0.8f);
         }
-        else if (audioSource != null && audioSource.enabled)
+        else if (audioSource != null && audioSource.enabled && audioSource.gameObject.activeInHierarchy)
         {
             audioSource.PlayOneShot(clickSound, 0.8f);
         }
