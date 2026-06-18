@@ -217,7 +217,42 @@ public class EndingCutscenePlayer : MonoBehaviour
 
     private void ShowEndingUI()
     {
-        if (endingPopup != null) endingPopup.SetActive(true);
+        if (endingPopup != null)
+        {
+            // Dynamically update actual score and paranoia level before showing the UI
+            Transform[] children = endingPopup.GetComponentsInChildren<Transform>(true);
+            foreach (Transform t in children)
+            {
+                if (t.name == "StatRow")
+                {
+                    Transform labelTrans = t.Find("Label");
+                    Transform valueTrans = t.Find("Value");
+                    if (labelTrans != null && valueTrans != null)
+                    {
+                        TMPro.TMP_Text labelTextComp = labelTrans.GetComponent<TMPro.TMP_Text>();
+                        TMPro.TMP_Text valueTextComp = valueTrans.GetComponent<TMPro.TMP_Text>();
+                        if (labelTextComp != null && valueTextComp != null)
+                        {
+                            string labelText = labelTextComp.text;
+                            if (labelText.Contains("Score") || labelText.Contains("score") || labelText.Contains("Final"))
+                            {
+                                int actualPoints = GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Points : 0;
+                                valueTextComp.text = actualPoints.ToString();
+                                Debug.Log($"[EndingCutscenePlayer] Updated Final Score text to: {actualPoints}");
+                            }
+                            else if (labelText.Contains("Paranoia") || labelText.Contains("paranoia"))
+                            {
+                                int actualParanoia = GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.Paranoia : 0;
+                                valueTextComp.text = actualParanoia + "%";
+                                Debug.Log($"[EndingCutscenePlayer] Updated Paranoia Level text to: {actualParanoia}%");
+                            }
+                        }
+                    }
+                }
+            }
+
+            endingPopup.SetActive(true);
+        }
         if (tipCard != null) tipCard.SetActive(true);
         if (overlay != null) overlay.SetActive(true);
         if (background != null) background.SetActive(true);
