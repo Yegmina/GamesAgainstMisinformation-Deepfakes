@@ -56,14 +56,14 @@ public class IncomingCallManager : MonoBehaviour
 
     [Header("Timing")]
     [Tooltip("Seconds after game start before the Neighbor call can ring (default 180 = 3 minutes).")]
-    public float delaySeconds = 180f;
+    public float delaySeconds = 60f;
 
     [Header("Story Call Timing")]
     [Tooltip("Seconds after Neighbor call ends before Mom call can ring.")]
-    public float delayBeforeMom = 180f;
+    public float delayBeforeMom = 150f;
 
     [Tooltip("Seconds after Mom call ends before Microsoft call can ring (default 240 = 4 minutes).")]
-    public float delayBeforeMicrosoft = 240f;
+    public float delayBeforeMicrosoft = 150f;
 
     [Header("Button Wiring")]
     [Tooltip("When enabled, IncomingCallManager wires Answer/Decline at runtime. Clear the button's Inspector On Click() list to avoid double-firing.")]
