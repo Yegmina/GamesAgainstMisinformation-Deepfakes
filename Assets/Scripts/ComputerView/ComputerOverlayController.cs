@@ -138,6 +138,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return instance;
     }
 
+    public static void ResetComputerState()
+    {
+        if (instance != null)
+        {
+            Destroy(instance.gameObject);
+            instance = null;
+        }
+    }
+
     private void OnDestroy()
     {
         ExitFocusModeImmediate();
