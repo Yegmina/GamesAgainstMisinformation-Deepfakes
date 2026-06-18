@@ -16,12 +16,16 @@ except ImportError:  # pragma: no cover - exercised only before dependencies are
     genai = None
     types = None
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+APP_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = APP_ROOT.parent
+
+load_dotenv(REPO_ROOT / ".env")
+load_dotenv(APP_ROOT / ".env", override=True)
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL_AGENT", "gemini-3.1-flash-lite")
 MODEL = OPENAI_MODEL
-DEFAULT_PROVIDER = "auto"
+DEFAULT_PROVIDER = "gemini"
 
 T = TypeVar("T")
 
@@ -55,10 +59,10 @@ def _provider_order() -> list[str]:
         return [provider]
 
     providers: list[str] = []
-    if os.getenv("OPENAI_API_KEY"):
-        providers.append("openai")
     if os.getenv("GEMINI_API_KEY"):
         providers.append("gemini")
+    if os.getenv("OPENAI_API_KEY"):
+        providers.append("openai")
     return providers
 
 
@@ -78,6 +82,17 @@ def _openai_quota_exhausted(exc: Exception) -> bool:
 def _safe_provider_error(exc: Exception) -> str:
     message = str(exc).replace(os.getenv("OPENAI_API_KEY") or "", "").replace(os.getenv("GEMINI_API_KEY") or "", "")
     return " ".join(message.split())[:500]
+
+
+def _gemini_grounding_fallback_allowed(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        "resource_exhausted" in message
+        or "quota" in message
+        or "rate limit" in message
+        or "google_search" in message
+        or "google search" in message
+    )
 
 
 def _openai_text_response(prompt: str, *, max_output_tokens: int) -> str:
@@ -101,27 +116,27 @@ def _gemini_text_response(prompt: str, *, max_output_tokens: int) -> str:
         raise RuntimeError("google-genai is not installed. Run pip install -r requirements.txt.")
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    contents = [
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=prompt)],
-        )
-    ]
-    config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_level="MINIMAL"),
-        tools=[types.Tool(google_search=types.GoogleSearch())],
-        max_output_tokens=max_output_tokens,
-    )
 
-    chunks: list[str] = []
-    for chunk in client.models.generate_content_stream(
-        model=GEMINI_MODEL,
-        contents=contents,
-        config=config,
-    ):
-        if text := chunk.text:
-            chunks.append(text)
-    return "".join(chunks).strip()
+    def generate(*, grounded: bool) -> str:
+        tools = [types.Tool(google_search=types.GoogleSearch())] if grounded else None
+        config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_level="MINIMAL"),
+            tools=tools,
+            max_output_tokens=max_output_tokens,
+        )
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=config,
+        )
+        return (response.text or "").strip()
+
+    try:
+        return generate(grounded=True)
+    except Exception as exc:
+        if not _gemini_grounding_fallback_allowed(exc):
+            raise
+        return generate(grounded=False)
 
 
 def _text_response(prompt: str, *, max_output_tokens: int = 450) -> AgentResult[str]:
@@ -141,6 +156,9 @@ def _text_response(prompt: str, *, max_output_tokens: int = 450) -> AgentResult[
             can_try_next = index < len(providers) - 1
             if provider == "openai" and configured_provider() == "auto" and can_try_next and _openai_quota_exhausted(exc):
                 fallback_errors.append("OpenAI quota/rate limit reached; falling back to Gemini.")
+                continue
+            if provider == "gemini" and configured_provider() == "auto" and can_try_next:
+                fallback_errors.append(f"Gemini request failed; falling back to OpenAI: {_safe_provider_error(exc)}")
                 continue
             if fallback_errors:
                 raise RuntimeError("; ".join(fallback_errors) + f" Final provider failed: {_safe_provider_error(exc)}") from exc
