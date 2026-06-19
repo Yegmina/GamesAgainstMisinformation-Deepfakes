@@ -15,6 +15,13 @@ public class GlobalCanvasPersistent : MonoBehaviour
     [SerializeField] private int paranoia = 0;
     [SerializeField] private int points = 0;
 
+    [Header("Horror Music")]
+    [SerializeField] private AudioSource horrorMusicSource;
+    [SerializeField, Range(0f, 1f)] private float horrorMusicVolume = 0.25f; // Quieter default volume so it doesn't block phone calls
+    [SerializeField] private AudioClip clip0To30;  // 2.wav
+    [SerializeField] private AudioClip clip30To60;  // 3.wav
+    [SerializeField] private AudioClip clip60To100; // Incarceration.wav
+
     [Header("HUD UI Elements")]
     private TMP_Text timerText;
     private TMP_Text paranoiaText;
@@ -71,10 +78,18 @@ public class GlobalCanvasPersistent : MonoBehaviour
         string currentScene = SceneManager.GetActiveScene().name;
         bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
         ApplyHudVisibility(!hideHud);
+
+        // Update horror music state
+        UpdateHorrorMusic(hideHud);
+
         if (hideHud)
         {
             timerRunning = false;
             return;
+        }
+        else if (timer > 0f)
+        {
+            timerRunning = true;
         }
 
         if (timerRunning)
@@ -87,6 +102,59 @@ public class GlobalCanvasPersistent : MonoBehaviour
                 TriggerEnding();
             }
             UpdateUI();
+        }
+    }
+
+    private void UpdateHorrorMusic(bool hideHud)
+    {
+        if (horrorMusicSource == null) return;
+
+        // Apply background music volume
+        horrorMusicSource.volume = horrorMusicVolume;
+
+        if (hideHud)
+        {
+            if (horrorMusicSource.isPlaying)
+            {
+                horrorMusicSource.Stop();
+            }
+            return;
+        }
+
+        AudioClip targetClip = null;
+        if (paranoia < 30)
+        {
+            targetClip = clip0To30;
+        }
+        else if (paranoia >= 30 && paranoia < 60)
+        {
+            targetClip = clip30To60;
+        }
+        else // 60% to 100%
+        {
+            targetClip = clip60To100;
+        }
+
+        if (targetClip != null)
+        {
+            if (horrorMusicSource.clip != targetClip)
+            {
+                horrorMusicSource.clip = targetClip;
+                horrorMusicSource.loop = true;
+                horrorMusicSource.Play();
+            }
+            else if (!horrorMusicSource.isPlaying)
+            {
+                horrorMusicSource.loop = true;
+                horrorMusicSource.Play();
+            }
+        }
+        else
+        {
+            if (horrorMusicSource.isPlaying)
+            {
+                horrorMusicSource.Stop();
+            }
         }
     }
 
@@ -159,8 +227,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     public void SetPoints(int val)
     {
-        points = Mathf.Max(0, val);
-        UpdateUI();
+        if (val > points)
+        {
+            points = val;
+            UpdateUI();
+        }
     }
 
     public void AddPoints(int val)
