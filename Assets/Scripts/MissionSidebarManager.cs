@@ -27,8 +27,25 @@ public class MissionSidebarManager : MonoBehaviour
     public Slider mission2Slider;
     public Slider mission3Slider;
 
+    // Global access point so gameplay systems (e.g. ComputerOverlayController)
+    // can report mission progress without holding a serialized reference.
+    public static MissionSidebarManager Instance { get; private set; }
+
     private Mission[][] missionSets;
     private Mission[] currentMissionSet;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
 
     private void Start()
     {
