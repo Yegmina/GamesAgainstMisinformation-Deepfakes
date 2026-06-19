@@ -434,6 +434,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     // ── WRONG decisions → add paranoia ──────────────────────────────────
     int delta = 0;
+    int newWrong = 0;
     Dictionary<string, ComputerNewsItem> oldNews = new Dictionary<string, ComputerNewsItem>();
     foreach (ComputerNewsItem item in prev.newsItems ?? new List<ComputerNewsItem>())
         if (!string.IsNullOrWhiteSpace(item.id)) oldNews[item.id] = item;
@@ -442,11 +443,18 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (item == null || string.IsNullOrWhiteSpace(item.id) || item.correct != false || string.IsNullOrWhiteSpace(item.decision)) continue;
         ComputerNewsItem old;
         bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
-        if (!wasResolved) delta += 10;
+        if (!wasResolved) { delta += 10; newWrong++; }
     }
-    delta += CountNewWrongThreadResolutions(prev.emails, next.emails) * 6;
-    delta += CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads) * 6;
+    int wrongEmails = CountNewWrongThreadResolutions(prev.emails, next.emails);
+    int wrongTelegram = CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads);
+    newWrong += wrongEmails + wrongTelegram;
+    delta += wrongEmails * 6;
+    delta += wrongTelegram * 6;
     if (delta > 0) GlobalCanvasPersistent.Instance.AddParanoia(delta);
+
+    // Horror event: after every couple of wrong calls, the work window is
+    // overrun by virus pop-ups the player must close before continuing.
+    if (newWrong > 0) RegisterWrongDecisions(newWrong);
 
     // ── CORRECT decisions → add points, reduce paranoia, advance missions ─
     
@@ -2996,5 +3004,161 @@ public sealed class ComputerOverlayController : MonoBehaviour
             default: return null;
         }
         return Resources.Load<Sprite>("UI/desktop/" + spriteName);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  VIRUS POP-UP ATTACK (horror event)
+    // ════════════════════════════════════════════════════════════════════════
+    // After every couple of wrong calls the work window is forced shut and the
+    // desktop is overrun by virus pop-ups (virus1..virus4). Each pop-up has a
+    // close (✕) button in its corner; closing one can spawn another (like a real
+    // infection) up to a hard cap, so the wave always ends and the player can
+    // keep playing once the desktop is clean.
+    private const int   VirusWrongThreshold = 2;     // attack every N wrong calls
+    private const int   VirusInitialCount   = 5;     // pop-ups in the first burst
+    private const int   VirusMaxTotal       = 9;     // hard cap on pop-ups per wave
+    private const float VirusRespawnChance  = 0.65f; // chance a close spawns a new one
+
+    private int  wrongDecisionsSinceVirus;
+    private int  virusSpawnedThisWave;
+    private bool virusActive;
+    private GameObject virusLayer;
+    private readonly List<GameObject> activeVirusPopups = new List<GameObject>();
+
+    private void RegisterWrongDecisions(int count)
+    {
+        if (count <= 0) return;
+        wrongDecisionsSinceVirus += count;
+        if (wrongDecisionsSinceVirus >= VirusWrongThreshold && !virusActive)
+        {
+            wrongDecisionsSinceVirus = 0;
+            TriggerVirusAttack();
+        }
+    }
+
+    private void TriggerVirusAttack()
+    {
+        if (virusActive || canvasObject == null) return;
+        virusActive = true;
+        virusSpawnedThisWave = 0;
+
+        // Force the work window shut → reveal the (now infected) desktop.
+        windowMinimized = true;
+        RenderAll();
+
+        EnsureVirusLayer();
+
+        // Jump-scare audio (the clip is assigned on the GlobalCanvas inspector).
+        if (GlobalCanvasPersistent.Instance != null)
+            GlobalCanvasPersistent.Instance.PlayVirusScream();
+
+        for (int i = 0; i < VirusInitialCount; i++)
+            SpawnVirusPopup();
+
+        Debug.Log("[ComputerOverlay] Virus attack triggered.");
+    }
+
+    private void EnsureVirusLayer()
+    {
+        if (virusLayer != null) return;
+        // Slight dark tint + raycast blocker so the desktop/taskbar can't be used
+        // until every pop-up is closed.
+        virusLayer = PanelObject(canvasObject.transform, "VirusLayer", new Color(0f, 0f, 0f, 0.35f));
+        Stretch(virusLayer.GetComponent<RectTransform>());
+        Image bg = virusLayer.GetComponent<Image>();
+        if (bg != null) bg.raycastTarget = true;
+        virusLayer.transform.SetAsLastSibling();
+    }
+
+    private void SpawnVirusPopup()
+    {
+        if (virusLayer == null || virusSpawnedThisWave >= VirusMaxTotal) return;
+        virusSpawnedThisWave++;
+
+        int idx = UnityEngine.Random.Range(1, 5); // virus1..virus4
+        Sprite sp = Resources.Load<Sprite>("UI/desktop/virus" + idx);
+
+        GameObject popup = PanelObject(virusLayer.transform, "VirusPopup", Color.white);
+        Image img = popup.GetComponent<Image>();
+
+        // virus2 is the "boss" pop-up — almost half the screen; the rest stay small.
+        float w = idx == 2 ? 960f : 440f;
+        float h = idx == 2 ? 700f : 320f;
+        if (sp != null)
+        {
+            img.sprite = sp;
+            img.preserveAspect = true;
+            if (sp.rect.width > 0f) h = w * (sp.rect.height / sp.rect.width);
+        }
+        else
+        {
+            img.color = Html("#10131c");
+        }
+
+        RectTransform r = popup.GetComponent<RectTransform>();
+        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+        r.pivot = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(w, h);
+
+        float maxX = Mathf.Max(0f, (CanvasReferenceWidth  - w) * 0.5f - 40f);
+        float maxY = Mathf.Max(0f, (CanvasReferenceHeight - h) * 0.5f - 40f);
+        r.anchoredPosition = new Vector2(UnityEngine.Random.Range(-maxX, maxX), UnityEngine.Random.Range(-maxY, maxY));
+        r.localRotation    = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-6f, 6f));
+
+        BuildVirusCloseButton(popup.transform, popup);
+        activeVirusPopups.Add(popup);
+    }
+
+    private void BuildVirusCloseButton(Transform parent, GameObject popup)
+    {
+        GameObject go = PanelObject(parent, "VirusClose", WinBtnClose);
+        RectTransform r = go.GetComponent<RectTransform>();
+        r.anchorMin = r.anchorMax = new Vector2(1f, 1f);
+        r.pivot = new Vector2(1f, 1f);
+        r.anchoredPosition = new Vector2(-8f, -8f);
+        r.sizeDelta = new Vector2(40f, 40f);
+
+        Button btn = go.AddComponent<Button>();
+        btn.targetGraphic = go.GetComponent<Image>();
+        ColorBlock cb = btn.colors;
+        cb.normalColor      = WinBtnClose;
+        cb.highlightedColor = Color.Lerp(WinBtnClose, Color.white, 0.2f);
+        cb.pressedColor     = Color.Lerp(WinBtnClose, Color.black, 0.2f);
+        btn.colors = cb;
+        btn.onClick.AddListener(() => CloseVirusPopup(popup));
+
+        // ✕ glyph (two crossed bars)
+        GameObject glyph = Element(go.transform, "Glyph");
+        RectTransform gr = glyph.GetComponent<RectTransform>();
+        gr.anchorMin = gr.anchorMax = new Vector2(0.5f, 0.5f);
+        gr.pivot = new Vector2(0.5f, 0.5f);
+        gr.sizeDelta = new Vector2(16f, 16f);
+        gr.anchoredPosition = Vector2.zero;
+        MakeBar(glyph.transform, new Vector2(18f, 2.2f), Vector2.zero,  45f, Color.white);
+        MakeBar(glyph.transform, new Vector2(18f, 2.2f), Vector2.zero, -45f, Color.white);
+    }
+
+    private void CloseVirusPopup(GameObject popup)
+    {
+        if (popup == null) return;
+        activeVirusPopups.Remove(popup);
+        Destroy(popup);
+
+        // Closing one can spawn another, until the per-wave cap is reached.
+        if (virusSpawnedThisWave < VirusMaxTotal && UnityEngine.Random.value < VirusRespawnChance)
+            SpawnVirusPopup();
+
+        // Desktop is clean → the wave is over and the player can resume.
+        if (activeVirusPopups.Count == 0)
+            EndVirusAttack();
+    }
+
+    private void EndVirusAttack()
+    {
+        virusActive = false;
+        activeVirusPopups.Clear();
+        if (virusLayer != null) { Destroy(virusLayer); virusLayer = null; }
+        // Window stays minimized; the player reopens it via a desktop/taskbar icon.
+        Debug.Log("[ComputerOverlay] Virus attack cleared.");
     }
 }
