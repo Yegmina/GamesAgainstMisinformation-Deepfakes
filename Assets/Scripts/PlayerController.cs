@@ -90,4 +90,22 @@ public class PlayerController : MonoBehaviour
         mainCamera.transform.localRotation =
             Quaternion.Euler(verticalRotation, 0, 0);
     }
+
+    public void ResetGaze()
+    {
+        verticalRotation = 0f;
+        if (mainCamera != null)
+        {
+            mainCamera.transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    public void SetVerticalRotation(float angle)
+    {
+        verticalRotation = Mathf.Clamp(angle, -upDownLookRange, upDownLookRange);
+        if (mainCamera != null)
+        {
+            mainCamera.transform.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
+        }
+    }
 }
