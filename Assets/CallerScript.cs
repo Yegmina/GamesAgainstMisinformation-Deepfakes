@@ -80,6 +80,10 @@ public class CallerScript : MonoBehaviour
     public float shakeIntensity = 25f;
     [Tooltip("Horror sting played instantly when a bad ending node is reached.")]
     public AudioClip horrorSound;
+    [Tooltip("Door-knocking sound played right BEFORE the screamer when the neighbor (Mr. Henderson) call reaches its scary bad ending (e.g. the 'open the door' wrong answer).")]
+    public AudioClip doorKnockingClip;
+    [Tooltip("Safety cap (seconds) on how long to wait for the door knock before the screamer fires.")]
+    public float doorKnockMaxWait = 3.5f;
     [Tooltip("Volume fade-out duration when the bad-ending sequence ends.")]
     public float horrorSoundFadeOut = 0.35f;
 
@@ -107,6 +111,7 @@ public class CallerScript : MonoBehaviour
     CallData activeCallData;
     StoryCallId activeStoryCallId = StoryCallId.None;
     int currentNodeIndex = -1;
+    int previousNodeIndex = -1;
     bool dialogueActive;
     bool callActive;
     bool badEndingPlaying;
@@ -156,6 +161,20 @@ public class CallerScript : MonoBehaviour
             badEndingOverlayImage = badEndingOverlay.GetComponent<Image>();
 
         CacheShakeTarget();
+
+        // Remove the semi-transparent panel background behind the call answer
+        // buttons so the choices are separated by clean empty space instead of an
+        // ugly translucent gray strip showing through the gaps.
+        if (choicesContent != null)
+        {
+            Image choicesBg = choicesContent.GetComponent<Image>();
+            if (choicesBg != null) choicesBg.enabled = false;
+        }
+        if (choicesPanel != null)
+        {
+            Image panelBg = choicesPanel.GetComponent<Image>();
+            if (panelBg != null) panelBg.enabled = false;
+        }
     }
 
     void CacheShakeTarget()
@@ -559,6 +578,7 @@ public class CallerScript : MonoBehaviour
         callActive = true;
         callUiActivatedAt = Time.unscaledTime;
         currentNodeIndex = callData.startNodeIndex;
+        previousNodeIndex = -1;
 
         AgentLog("E", "CallerScript.OpenStoryCall", "Story call started",
             "{\"storyCallId\":\"" + storyCallId + "\",\"startNodeIndex\":" + currentNodeIndex +
@@ -588,6 +608,8 @@ public class CallerScript : MonoBehaviour
             nodeFlowRoutine = null;
         }
 
+        if (nodeIndex != currentNodeIndex)
+            previousNodeIndex = currentNodeIndex;
         currentNodeIndex = nodeIndex;
         CallNode node = activeCallData.nodes[nodeIndex];
         bool hasChoices = node.choices != null && node.choices.Length > 0;
@@ -741,6 +763,31 @@ public class CallerScript : MonoBehaviour
         if (shakeTarget == null)
             CacheShakeTarget();
 
+        // The neighbor (Mr. Henderson) call is the "someone's at your door"
+        // scenario. The screamer ending can be reached through several replies,
+        // but the door knock should ONLY play on the "open the door" path — i.e.
+        // when the node we came from is the one inviting Alex to open the door
+        // ("...Open it wide..."). The "call the police" path must NOT knock.
+        bool cameFromOpenDoor =
+            previousNodeIndex >= 0 &&
+            activeCallData != null && activeCallData.nodes != null &&
+            previousNodeIndex < activeCallData.nodes.Length &&
+            !string.IsNullOrEmpty(activeCallData.nodes[previousNodeIndex].speechText) &&
+            activeCallData.nodes[previousNodeIndex].speechText.IndexOf("open", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        if (activeStoryCallId == StoryCallId.Neighbor && doorKnockingClip != null && cameFromOpenDoor)
+        {
+            PlayDoorKnocking();
+            float wait = doorKnockMaxWait > 0f
+                ? Mathf.Min(doorKnockingClip.length, doorKnockMaxWait)
+                : doorKnockingClip.length;
+            yield return new WaitForSeconds(wait);
+
+            // Bail out if the call was cancelled/closed during the knock.
+            if (!badEndingPlaying)
+                yield break;
+        }
+
         ShowWrongChoiceText();
         StartCallShake();
         PlayHorrorSound();
@@ -857,6 +904,21 @@ public class CallerScript : MonoBehaviour
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
+    }
+
+    void PlayDoorKnocking()
+    {
+        if (doorKnockingClip == null)
+            return;
+
+        EnsureAudioSource();
+        audioSource.Stop();
+        audioSource.loop = false;
+        audioSource.volume = 1f;
+        audioSource.PlayOneShot(doorKnockingClip, 1f);
+
+        AgentLog("H", "CallerScript.PlayDoorKnocking", "Door knock before screamer",
+            "{\"clipLength\":" + doorKnockingClip.length + "}");
     }
 
     void PlayHorrorSound()

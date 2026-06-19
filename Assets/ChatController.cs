@@ -91,6 +91,7 @@ TMP_FontAsset font;
     Coroutine loadingBarCoroutine;
     RenderTexture videoRT;
     AspectRatioFitter videoAspectFitter;
+    AspectRatioFitter photoAspectFitter;
     Coroutine videoWatchdog;
     int videoPrepareAttempts;
     GameObject playIconGO;
@@ -626,7 +627,7 @@ linkObj.transform.SetParent(row, false);
         else if (currentChat == "sarah") finished = sarahFinished;
         else if (currentChat == "provider") finished = providerFinished;
 
-        if (!finished && currentChat != "unknown")
+        if (!finished && currentChat != "unknown" && currentChat != "provider")
         {
             AddSystem("You can't leave now. The conversation isn't over.", currentChat);
             return;
@@ -2091,9 +2092,15 @@ videoObj.transform.SetParent(row, false);
         photoViewerOverlay = NewUI("PhotoViewerOverlay", parent);
         var bg = photoViewerOverlay.AddComponent<Image>();
         bg.color = new Color(0f, 0f, 0f, 0.92f);
+        // Round the overlay's corners and inset it to the phone's screen "glass"
+        // area, so the dark backdrop stays inside the bezel instead of sticking
+        // out past the rounded phone frame as a sharp black rectangle.
+        if (roundedBubbleSprite == null) roundedBubbleSprite = MakeRoundedSprite(28);
+        bg.sprite = roundedBubbleSprite;
+        bg.type = Image.Type.Sliced;
         var bgRect = photoViewerOverlay.GetComponent<RectTransform>();
-        bgRect.anchorMin = Vector2.zero;
-        bgRect.anchorMax = Vector2.one;
+        bgRect.anchorMin = new Vector2(0.03f, 0.015f);
+        bgRect.anchorMax = new Vector2(0.97f, 0.985f);
         bgRect.offsetMin = Vector2.zero;
         bgRect.offsetMax = Vector2.zero;
 
@@ -2102,16 +2109,29 @@ videoObj.transform.SetParent(row, false);
         closeBtn.targetGraphic = bg;
         closeBtn.onClick.AddListener(ClosePhotoViewer);
 
-        // Enlarged photo, centered with margins, preserving aspect.
-        GameObject bigPhoto = NewUI("BigPhoto", photoViewerOverlay.transform);
+        // Inner area (with margins) that the photo fits inside.
+        GameObject photoArea = NewUI("PhotoArea", photoViewerOverlay.transform);
+        var areaRT = photoArea.GetComponent<RectTransform>();
+        areaRT.anchorMin = new Vector2(0.06f, 0.08f);
+        areaRT.anchorMax = new Vector2(0.94f, 0.92f);
+        areaRT.offsetMin = Vector2.zero;
+        areaRT.offsetMax = Vector2.zero;
+
+        // Enlarged photo. An AspectRatioFitter sizes the photo's RectTransform to
+        // the image's exact aspect, so the rect matches the *visible* photo (no
+        // letterbox). That lets the round close button sit precisely in the
+        // photo's top-right corner instead of floating in empty space.
+        GameObject bigPhoto = NewUI("BigPhoto", photoArea.transform);
         photoViewerImage = bigPhoto.AddComponent<Image>();
-        photoViewerImage.preserveAspect = true;
+        photoViewerImage.preserveAspect = false;
         photoViewerImage.raycastTarget = false;
+        photoAspectFitter = bigPhoto.AddComponent<AspectRatioFitter>();
+        photoAspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        photoAspectFitter.aspectRatio = 1f;
         var bpRect = bigPhoto.GetComponent<RectTransform>();
-        bpRect.anchorMin = new Vector2(0.06f, 0.12f);
-        bpRect.anchorMax = new Vector2(0.94f, 0.88f);
-        bpRect.offsetMin = Vector2.zero;
-        bpRect.offsetMax = Vector2.zero;
+        bpRect.anchorMin = new Vector2(0.5f, 0.5f);
+        bpRect.anchorMax = new Vector2(0.5f, 0.5f);
+        bpRect.pivot = new Vector2(0.5f, 0.5f);
 
         // Round close button (white X) anchored to the photo's top-right corner.
         GameObject closeGO = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -2164,6 +2184,8 @@ videoObj.transform.SetParent(row, false);
             photoViewerImage.sprite = photo;
             photoViewerImage.color = Color.white;
         }
+        if (photoAspectFitter != null && photo.rect.height > 0f)
+            photoAspectFitter.aspectRatio = photo.rect.width / photo.rect.height;
         photoViewerOverlay.transform.SetAsLastSibling(); // render on top
         photoViewerOverlay.SetActive(true);
     }
