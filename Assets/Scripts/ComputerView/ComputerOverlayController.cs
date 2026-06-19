@@ -201,6 +201,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return instance;
     }
 
+    public static void ResetComputerState()
+    {
+        if (instance != null)
+        {
+            Destroy(instance.gameObject);
+            instance = null;
+        }
+    }
+
     private void OnDestroy()
     {
         ExitFocusModeImmediate();
@@ -420,77 +429,78 @@ public sealed class ComputerOverlayController : MonoBehaviour
     }
 
     private void ApplyParanoiaDelta(ComputerGameState prev, ComputerGameState next)
+{
+    if (prev == null || next == null || GlobalCanvasPersistent.Instance == null) return;
+
+    // ── WRONG decisions → add paranoia ──────────────────────────────────
+    int delta = 0;
+    Dictionary<string, ComputerNewsItem> oldNews = new Dictionary<string, ComputerNewsItem>();
+    foreach (ComputerNewsItem item in prev.newsItems ?? new List<ComputerNewsItem>())
+        if (!string.IsNullOrWhiteSpace(item.id)) oldNews[item.id] = item;
+    foreach (ComputerNewsItem item in next.newsItems ?? new List<ComputerNewsItem>())
     {
-        if (prev == null || next == null || GlobalCanvasPersistent.Instance == null) return;
+        if (item == null || string.IsNullOrWhiteSpace(item.id) || item.correct != false || string.IsNullOrWhiteSpace(item.decision)) continue;
+        ComputerNewsItem old;
+        bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
+        if (!wasResolved) delta += 10;
+    }
+    delta += CountNewWrongThreadResolutions(prev.emails, next.emails) * 6;
+    delta += CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads) * 6;
+    if (delta > 0) GlobalCanvasPersistent.Instance.AddParanoia(delta);
 
-        // ── WRONG decisions → add paranoia ──────────────────────────────────
-        int delta = 0;
-        Dictionary<string, ComputerNewsItem> oldNews = new Dictionary<string, ComputerNewsItem>();
-        foreach (ComputerNewsItem item in prev.newsItems ?? new List<ComputerNewsItem>())
-            if (!string.IsNullOrWhiteSpace(item.id)) oldNews[item.id] = item;
-        foreach (ComputerNewsItem item in next.newsItems ?? new List<ComputerNewsItem>())
+    // ── CORRECT decisions → add points, reduce paranoia, advance missions ─
+    
+    // 1. News
+    foreach (ComputerNewsItem item in next.newsItems ?? new List<ComputerNewsItem>())
+    {
+        if (item == null || string.IsNullOrWhiteSpace(item.id) || string.IsNullOrWhiteSpace(item.decision)) continue;
+        ComputerNewsItem old;
+        bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
+        if (!wasResolved && item.correct == true)
         {
-            if (item == null || string.IsNullOrWhiteSpace(item.id) || item.correct != false || string.IsNullOrWhiteSpace(item.decision)) continue;
-            ComputerNewsItem old;
-            bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
-            if (!wasResolved) delta += 10;
-        }
-        delta += CountNewWrongThreadResolutions(prev.emails, next.emails) * 6;
-        delta += CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads) * 6;
-        if (delta > 0) GlobalCanvasPersistent.Instance.AddParanoia(delta);
+            GlobalCanvasPersistent.Instance.AddPoints(50);
+            GlobalCanvasPersistent.Instance.SubtractParanoia(5);
 
-        // ── CORRECT decisions → add points, reduce paranoia, advance missions ─
-        // 1. News
-        foreach (ComputerNewsItem item in next.newsItems ?? new List<ComputerNewsItem>())
-        {
-            if (item == null || string.IsNullOrWhiteSpace(item.id) || string.IsNullOrWhiteSpace(item.decision)) continue;
-            ComputerNewsItem old;
-            bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
-            if (!wasResolved && item.correct == true)
+            // Mission progress for correctly publishing a genuine story.
+            if (item.decision == "publish" && item.truthLabel != "manipulated" && MissionSidebarManager.Instance != null)
             {
-                GlobalCanvasPersistent.Instance.AddPoints(50);
-                GlobalCanvasPersistent.Instance.SubtractParanoia(5);
-
-                // Mission progress for correctly publishing a genuine story.
-                if (item.decision == "publish" && item.truthLabel != "manipulated" && MissionSidebarManager.Instance != null)
-                {
-                    MissionSidebarManager.Instance.AddProgress(0);
-                }
-            }
-        }
-
-        // 2. Email threads
-        Dictionary<string, ComputerEmailItem> oldEmails = new Dictionary<string, ComputerEmailItem>();
-        foreach (ComputerEmailItem item in prev.emails ?? new List<ComputerEmailItem>())
-            if (!string.IsNullOrWhiteSpace(item.id)) oldEmails[item.id] = item;
-        foreach (ComputerEmailItem item in next.emails ?? new List<ComputerEmailItem>())
-        {
-            if (item == null || string.IsNullOrWhiteSpace(item.id) || !ThreadResolved(item)) continue;
-            ComputerEmailItem old;
-            bool wasResolved = oldEmails.TryGetValue(item.id, out old) && ThreadResolved(old);
-            if (!wasResolved && item.correct == true)
-            {
-                GlobalCanvasPersistent.Instance.AddPoints(50);
-                GlobalCanvasPersistent.Instance.SubtractParanoia(5);
-            }
-        }
-
-        // 3. Telegram threads
-        Dictionary<string, ComputerTelegramThread> oldTelegrams = new Dictionary<string, ComputerTelegramThread>();
-        foreach (ComputerTelegramThread item in prev.telegramThreads ?? new List<ComputerTelegramThread>())
-            if (!string.IsNullOrWhiteSpace(item.id)) oldTelegrams[item.id] = item;
-        foreach (ComputerTelegramThread item in next.telegramThreads ?? new List<ComputerTelegramThread>())
-        {
-            if (item == null || string.IsNullOrWhiteSpace(item.id) || !ThreadResolved(item)) continue;
-            ComputerTelegramThread old;
-            bool wasResolved = oldTelegrams.TryGetValue(item.id, out old) && ThreadResolved(old);
-            if (!wasResolved && item.correct == true)
-            {
-                GlobalCanvasPersistent.Instance.AddPoints(50);
-                GlobalCanvasPersistent.Instance.SubtractParanoia(5);
+                MissionSidebarManager.Instance.AddProgress(0);
             }
         }
     }
+
+    // 2. Email threads
+    Dictionary<string, ComputerEmailItem> oldEmails = new Dictionary<string, ComputerEmailItem>();
+    foreach (ComputerEmailItem item in prev.emails ?? new List<ComputerEmailItem>())
+        if (!string.IsNullOrWhiteSpace(item.id)) oldEmails[item.id] = item;
+    foreach (ComputerEmailItem item in next.emails ?? new List<ComputerEmailItem>())
+    {
+        if (item == null || string.IsNullOrWhiteSpace(item.id) || !ThreadResolved(item)) continue;
+        ComputerEmailItem old;
+        bool wasResolved = oldEmails.TryGetValue(item.id, out old) && ThreadResolved(old);
+        if (!wasResolved && item.correct == true)
+        {
+            GlobalCanvasPersistent.Instance.AddPoints(50);
+            GlobalCanvasPersistent.Instance.SubtractParanoia(5);
+        }
+    }
+
+    // 3. Telegram threads
+    Dictionary<string, ComputerTelegramThread> oldTelegrams = new Dictionary<string, ComputerTelegramThread>();
+    foreach (ComputerTelegramThread item in prev.telegramThreads ?? new List<ComputerTelegramThread>())
+        if (!string.IsNullOrWhiteSpace(item.id)) oldTelegrams[item.id] = item;
+    foreach (ComputerTelegramThread item in next.telegramThreads ?? new List<ComputerTelegramThread>())
+    {
+        if (item == null || string.IsNullOrWhiteSpace(item.id) || !ThreadResolved(item)) continue;
+        ComputerTelegramThread old;
+        bool wasResolved = oldTelegrams.TryGetValue(item.id, out old) && ThreadResolved(old);
+        if (!wasResolved && item.correct == true)
+        {
+            GlobalCanvasPersistent.Instance.AddPoints(50);
+            GlobalCanvasPersistent.Instance.SubtractParanoia(5);
+        }
+    }
+}
 
     private static int CountNewWrongThreadResolutions<T>(List<T> previous, List<T> next)
     {

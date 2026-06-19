@@ -19,6 +19,16 @@ public class PlayAgainButton : MonoBehaviour
     private void OnPlayAgainClicked()
     {
         Debug.Log($"Loading target scene: {targetSceneName}");
+        
+        // Reset global HUD (timer, paranoia, points)
+        if (GlobalCanvasPersistent.Instance != null)
+        {
+            GlobalCanvasPersistent.Instance.ResetHUD();
+        }
+
+        // Reset Computer AI state so a new game session is generated
+        ComputerOverlayController.ResetComputerState();
+
         SceneManager.LoadScene(targetSceneName);
     }
 }
