@@ -22,6 +22,13 @@ public class GlobalCanvasPersistent : MonoBehaviour
     [SerializeField] private AudioClip clip30To60;  // 3.wav
     [SerializeField] private AudioClip clip60To100; // Incarceration.wav
 
+    [Header("Virus Jump-Scare")]
+    [Tooltip("Drag your scream / jump-scare audio clip here. Played when the virus pop-up attack triggers.")]
+    [SerializeField] private AudioClip virusScreamClip;
+    [Tooltip("Optional dedicated AudioSource for the scream. If left empty, the Horror Music source is used.")]
+    [SerializeField] private AudioSource virusScreamSource;
+    [SerializeField, Range(0f, 1f)] private float virusScreamVolume = 1f;
+
     [Header("HUD UI Elements")]
     private TMP_Text timerText;
     private TMP_Text paranoiaText;
@@ -199,6 +206,13 @@ public class GlobalCanvasPersistent : MonoBehaviour
     public void SetTimerRunning(bool run)
     {
         timerRunning = run;
+    }
+
+    public void PlayVirusScream()
+    {
+        if (virusScreamClip == null) return;
+        AudioSource src = virusScreamSource != null ? virusScreamSource : horrorMusicSource;
+        if (src != null) src.PlayOneShot(virusScreamClip, virusScreamVolume);
     }
 
     public void SetParanoia(int val)
