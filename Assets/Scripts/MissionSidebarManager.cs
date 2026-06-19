@@ -4,12 +4,16 @@ using TMPro;
 
 public class MissionSidebarManager : MonoBehaviour
 {
+    private static MissionSidebarManager instance;
+    public static MissionSidebarManager Instance => instance;
+
     [System.Serializable]
     public class Mission
     {
         public string title;
         public int currentProgress;
         public int targetProgress;
+        public bool pointsAwarded;
     }
 
     public GameObject missionSidebar;
@@ -27,16 +31,46 @@ public class MissionSidebarManager : MonoBehaviour
     public Slider mission2Slider;
     public Slider mission3Slider;
 
-    private Mission[][] missionSets;
     private Mission[] currentMissionSet;
+
+    private Color originalColor1 = Color.white;
+    private Color originalColor2 = Color.white;
+    private Color originalColor3 = Color.white;
+
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        instance = this;
+    }
 
     private void Start()
     {
         missionSidebar.SetActive(true);
         sidebarOpenButton.SetActive(false);
 
+        // Capture original fill colors of sliders
+        if (mission1Slider != null && mission1Slider.fillRect != null)
+        {
+            var img = mission1Slider.fillRect.GetComponent<Image>();
+            if (img != null) originalColor1 = img.color;
+        }
+        if (mission2Slider != null && mission2Slider.fillRect != null)
+        {
+            var img = mission2Slider.fillRect.GetComponent<Image>();
+            if (img != null) originalColor2 = img.color;
+        }
+        if (mission3Slider != null && mission3Slider.fillRect != null)
+        {
+            var img = mission3Slider.fillRect.GetComponent<Image>();
+            if (img != null) originalColor3 = img.color;
+        }
+
         CreateMissionSets();
-        LoadRandomMissionSet();
+        UpdateMissionUI();
     }
 
     public void CollapseSidebar()
@@ -53,93 +87,36 @@ public class MissionSidebarManager : MonoBehaviour
 
     private void CreateMissionSets()
     {
-        missionSets = new Mission[][]
+        currentMissionSet = new Mission[]
         {
-            new Mission[]
+            new Mission
             {
-                new Mission
-                {
-                    title = "Detect Fake News Articles",
-                    currentProgress = 0,
-                    targetProgress = 3
-                },
-
-                new Mission
-                {
-                    title = "Detect Phishing Email",
-                    currentProgress = 0,
-                    targetProgress = 1
-                },
-
-                new Mission
-                {
-                    title = "Detect Deepfake Call",
-                    currentProgress = 0,
-                    targetProgress = 1
-                }
+                title = "Guess 2 real news on desktop",
+                currentProgress = 0,
+                targetProgress = 2,
+                pointsAwarded = false
             },
-
-            new Mission[]
+            new Mission
             {
-                new Mission
-                {
-                    title = "Identify Real News Articles",
-                    currentProgress = 0,
-                    targetProgress = 5
-                },
-
-                new Mission
-                {
-                    title = "Detect Deepfake Calls",
-                    currentProgress = 0,
-                    targetProgress = 2
-                },
-
-                new Mission
-                {
-                    title = "Detect Phishing Conversation",
-                    currentProgress = 0,
-                    targetProgress = 1
-                }
+                title = "Receive 1 call on phone",
+                currentProgress = 0,
+                targetProgress = 1,
+                pointsAwarded = false
             },
-
-            new Mission[]
+            new Mission
             {
-                new Mission
-                {
-                    title = "Identify Legitimate Emails",
-                    currentProgress = 0,
-                    targetProgress = 2
-                },
-
-                new Mission
-                {
-                    title = "Identify Real News Articles",
-                    currentProgress = 0,
-                    targetProgress = 3
-                },
-
-                new Mission
-                {
-                    title = "Detect Fake News Articles",
-                    currentProgress = 0,
-                    targetProgress = 3
-                }
+                title = "Identify 1 phishing message on phone",
+                currentProgress = 0,
+                targetProgress = 1,
+                pointsAwarded = false
             }
         };
     }
 
-    private void LoadRandomMissionSet()
-    {
-        int randomIndex = Random.Range(0, missionSets.Length);
-
-        currentMissionSet = missionSets[randomIndex];
-
-        UpdateMissionUI();
-    }
-
     private void UpdateMissionUI()
     {
+        if (currentMissionSet == null || currentMissionSet.Length < 3) return;
+
         mission1Text.text = currentMissionSet[0].title;
         mission2Text.text = currentMissionSet[1].title;
         mission3Text.text = currentMissionSet[2].title;
@@ -164,11 +141,26 @@ public class MissionSidebarManager : MonoBehaviour
 
         mission3Slider.maxValue = currentMissionSet[2].targetProgress;
         mission3Slider.value = currentMissionSet[2].currentProgress;
+
+        // Apply completed color (green) or original color
+        SetSliderFillColor(mission1Slider, currentMissionSet[0].currentProgress >= currentMissionSet[0].targetProgress, originalColor1);
+        SetSliderFillColor(mission2Slider, currentMissionSet[1].currentProgress >= currentMissionSet[1].targetProgress, originalColor2);
+        SetSliderFillColor(mission3Slider, currentMissionSet[2].currentProgress >= currentMissionSet[2].targetProgress, originalColor3);
+    }
+
+    private void SetSliderFillColor(Slider slider, bool isCompleted, Color originalColor)
+    {
+        if (slider == null || slider.fillRect == null) return;
+        var img = slider.fillRect.GetComponent<Image>();
+        if (img != null)
+        {
+            img.color = isCompleted ? new Color(0.18f, 0.8f, 0.44f, 1f) : originalColor;
+        }
     }
 
     public void AddProgress(int missionIndex)
     {
-        if (missionIndex < 0 || missionIndex > 2)
+        if (currentMissionSet == null || missionIndex < 0 || missionIndex >= currentMissionSet.Length)
             return;
 
         Mission mission = currentMissionSet[missionIndex];
@@ -176,13 +168,23 @@ public class MissionSidebarManager : MonoBehaviour
         if (mission.currentProgress < mission.targetProgress)
         {
             mission.currentProgress++;
+
+            if (mission.currentProgress >= mission.targetProgress && !mission.pointsAwarded)
+            {
+                mission.pointsAwarded = true;
+                if (GlobalCanvasPersistent.Instance != null)
+                {
+                    GlobalCanvasPersistent.Instance.AddPoints(100);
+                }
+            }
+
             UpdateMissionUI();
         }
     }
 
     public string GetMissionTitle(int missionIndex)
     {
-        if (currentMissionSet == null || missionIndex < 0 || missionIndex > 2)
+        if (currentMissionSet == null || missionIndex < 0 || missionIndex >= currentMissionSet.Length)
             return null;
 
         return currentMissionSet[missionIndex].title;

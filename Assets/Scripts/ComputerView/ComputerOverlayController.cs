@@ -551,6 +551,14 @@ public sealed class ComputerOverlayController : MonoBehaviour
                 {
                     GlobalCanvasPersistent.Instance.AddPoints(50);
                     GlobalCanvasPersistent.Instance.SubtractParanoia(5);
+
+                    if (item.decision == "publish" && item.truthLabel != "manipulated")
+                    {
+                        if (MissionSidebarManager.Instance != null)
+                        {
+                            MissionSidebarManager.Instance.AddProgress(0);
+                        }
+                    }
                 }
                 else if (item.correct == false)
                 {
