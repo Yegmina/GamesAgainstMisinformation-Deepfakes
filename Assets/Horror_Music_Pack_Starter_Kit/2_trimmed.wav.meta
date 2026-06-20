@@ -1,13 +1,5 @@
 fileFormatVersion: 2
-guid: b4de52dba92db124fab5f5f6208ed6fe
-AssetOrigin:
-  serializedVersion: 1
-  productId: 374414
-  packageName: Horror Music Pack - Starter Kit
-  packageVersion: 1.0
-  assetPath: Assets/Horror_Music_Pack_Starter_Kit/WAV_ATMOSPHERIC_LOOP_Death_Threat_in
-    Daylight.wav
-  uploadId: 901774
+guid: 3e6239a29e88461408912a2b5a764aae
 AudioImporter:
   externalObjects: {}
   serializedVersion: 8
