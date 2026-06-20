@@ -39,9 +39,10 @@ public class MissionSidebarManager : MonoBehaviour
 
     private void Awake()
     {
-        if (instance != null && instance != this)
+        // If there is already a persistent GlobalCanvas and it is not our root, we are a duplicate and will be destroyed.
+        var persistentCanvas = GlobalCanvasPersistent.Instance;
+        if (persistentCanvas != null && persistentCanvas.gameObject != transform.root.gameObject)
         {
-            Destroy(gameObject);
             return;
         }
         instance = this;
@@ -91,7 +92,7 @@ public class MissionSidebarManager : MonoBehaviour
         {
             new Mission
             {
-                title = "Guess 2 real news on desktop",
+                title = "Publish 2 real news on desktop",
                 currentProgress = 0,
                 targetProgress = 2,
                 pointsAwarded = false
@@ -142,7 +143,7 @@ public class MissionSidebarManager : MonoBehaviour
         mission3Slider.maxValue = currentMissionSet[2].targetProgress;
         mission3Slider.value = currentMissionSet[2].currentProgress;
 
-        // Apply completed color (green) or original color
+        // Apply completed color (green) or progress color (blue)
         SetSliderFillColor(mission1Slider, currentMissionSet[0].currentProgress >= currentMissionSet[0].targetProgress, originalColor1);
         SetSliderFillColor(mission2Slider, currentMissionSet[1].currentProgress >= currentMissionSet[1].targetProgress, originalColor2);
         SetSliderFillColor(mission3Slider, currentMissionSet[2].currentProgress >= currentMissionSet[2].targetProgress, originalColor3);
@@ -154,8 +155,15 @@ public class MissionSidebarManager : MonoBehaviour
         var img = slider.fillRect.GetComponent<Image>();
         if (img != null)
         {
-            img.color = isCompleted ? new Color(0.18f, 0.8f, 0.44f, 1f) : originalColor;
+            // Always use a vibrant green for the progress bar
+            img.color = new Color(0.18f, 0.8f, 0.44f, 1f);
         }
+    }
+
+    public void ResetMissions()
+    {
+        CreateMissionSets();
+        UpdateMissionUI();
     }
 
     public void AddProgress(int missionIndex)

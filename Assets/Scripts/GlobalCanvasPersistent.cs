@@ -266,6 +266,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
         paranoia = 0;
         points = 0;
         UpdateUI();
+
+        if (MissionSidebarManager.Instance != null)
+        {
+            MissionSidebarManager.Instance.ResetMissions();
+        }
     }
 
     public void UpdateUI()

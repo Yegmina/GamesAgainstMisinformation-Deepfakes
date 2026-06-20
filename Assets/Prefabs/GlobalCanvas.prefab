@@ -304,6 +304,9 @@ MonoBehaviour:
   clip0To30: {fileID: 8300000, guid: b4f4b529b9f2a1643b1ce4a6592d0bdc, type: 3}
   clip30To60: {fileID: 8300000, guid: b4de52dba92db124fab5f5f6208ed6fe, type: 3}
   clip60To100: {fileID: 8300000, guid: 5d131c0f0934aa943a79a032e4304b12, type: 3}
+  virusScreamClip: {fileID: 0}
+  virusScreamSource: {fileID: 0}
+  virusScreamVolume: 1
 --- !u!82 &7588790051324415800
 AudioSource:
   m_ObjectHideFlags: 0
@@ -922,8 +925,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 37878cb6dfe69ec4c98de0335ccc5d99, type: 3}
-  m_Type: 1
+  m_Sprite: {fileID: 0}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -997,8 +1000,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 37878cb6dfe69ec4c98de0335ccc5d99, type: 3}
-  m_Type: 1
+  m_Sprite: {fileID: 0}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -8553,8 +8556,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 37878cb6dfe69ec4c98de0335ccc5d99, type: 3}
-  m_Type: 1
+  m_Sprite: {fileID: 0}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
