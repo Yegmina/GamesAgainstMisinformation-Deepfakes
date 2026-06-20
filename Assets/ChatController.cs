@@ -608,6 +608,12 @@ linkObj.transform.SetParent(row, false);
         providerFinished = true;
         AddSystem("You blocked the contact. Your device is safe.", "provider");
         if (providerPreview != null) providerPreview.text = "[Blocked]";
+
+        if (MissionSidebarManager.Instance != null)
+        {
+            MissionSidebarManager.Instance.AddProgress(2);
+        }
+
         StartCoroutine(SafeCloseProviderRoutine());
     }
 
@@ -910,6 +916,12 @@ videoObj.transform.SetParent(row, false);
         if (sarahPreview != null) sarahPreview.text = "Thank you Alex ❤️";
         
         yield return Wait(1.5f);
+
+        if (MissionSidebarManager.Instance != null)
+        {
+            MissionSidebarManager.Instance.AddProgress(2);
+        }
+
         CloseChat();
     }
 
@@ -1074,6 +1086,12 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(1.0f);
         AddSystem("Something felt wrong. You trusted your gut - your address is safe.", "mom");
         yield return Wait(2.0f);
+
+        if (MissionSidebarManager.Instance != null)
+        {
+            MissionSidebarManager.Instance.AddProgress(2);
+        }
+
         CloseChat();
     }
 

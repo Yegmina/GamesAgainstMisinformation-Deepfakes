@@ -427,6 +427,11 @@ public class IncomingCallManager : MonoBehaviour
         AgentLog("A", "IncomingCallManager.AnswerIncoming", "Call answered",
             "{\"activeCallType\":\"" + activeCallType + "\"}");
 
+        if (MissionSidebarManager.Instance != null)
+        {
+            MissionSidebarManager.Instance.AddProgress(1);
+        }
+
         StopRingtone();
         if (incomingCallScreen != null) incomingCallScreen.SetActive(false);
 
