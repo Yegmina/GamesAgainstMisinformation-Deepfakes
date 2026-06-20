@@ -67,6 +67,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
     {
         // Initial UI Update
         UpdateUI();
+
+        // Initialize and start horror music immediately on start of the scene
+        string currentScene = SceneManager.GetActiveScene().name;
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        UpdateHorrorMusic(hideHud);
     }
 
     private void Update()
