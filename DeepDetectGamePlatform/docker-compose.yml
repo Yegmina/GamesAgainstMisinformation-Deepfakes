@@ -1,0 +1,20 @@
+services:
+  deepdetect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_MODEL_AGENT: ${OPENAI_MODEL_AGENT:-gpt-5.3-chat-latest}
+      APP_ENV: ${APP_ENV:-local}
+      COMMIT_SHA: ${COMMIT_SHA:-unknown}
+    restart: unless-stopped
+    volumes:
+      - ${RUNTIME_DIR:-./runtime/local}/data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=5).read()\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
