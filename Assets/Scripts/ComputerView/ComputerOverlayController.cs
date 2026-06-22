@@ -175,6 +175,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private GameObject  bootStateObject;
     private TMP_Text    bootTitleText;
     private TMP_Text    bootBodyText;
+    private Button      bootRetryButton;
+    private string      lastStatusMessage = "Connecting to DeepDetect backend...";
 
     // Notification toast
     private GameObject  notificationToast;
@@ -264,9 +266,13 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private async Task InitializeAsync()
     {
         initializing = true;
-        SetBusy(true, "Connecting to DeepDetect backend...");
+        SetBusy(true, "Starting system network services...");
         string backendUrl  = PlayerPrefs.GetString(BackendUrlKey, DefaultBackendUrl);
-        if (backendUrl == "http://127.0.0.1:8765" || backendUrl == "http://localhost:8765")
+        if (string.IsNullOrEmpty(backendUrl) || 
+            backendUrl == "http://127.0.0.1:8765" || 
+            backendUrl == "http://localhost:8765" || 
+            backendUrl.Contains("127.0.0.1") || 
+            backendUrl.Contains("localhost"))
         {
             backendUrl = DefaultBackendUrl;
             PlayerPrefs.SetString(BackendUrlKey, backendUrl);
@@ -1117,19 +1123,20 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // ── Boot state overlay ──────────────────────────────────────────────────
     private void BuildBootState(Transform parent)
     {
-        bootStateObject = PanelObject(parent, "BootOverlay", Html("#0d1b2af0"));
+        bootStateObject = PanelObject(parent, "BootOverlay", Html("#0d1b2af0")); // original translucent dark blue
         Stretch(bootStateObject.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
         VerticalLayoutGroup vl = bootStateObject.AddComponent<VerticalLayoutGroup>();
-        vl.padding = new RectOffset(0, 0, 200, 0);
-        vl.childAlignment = TextAnchor.UpperCenter;
+        vl.padding = new RectOffset(0, 0, 200, 0); // original center padding
+        vl.childAlignment = TextAnchor.UpperCenter; // original center alignment
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true;
         vl.childForceExpandHeight = false;
 
-        bootTitleText = WinText(bootStateObject.transform, "BootTitle", "DeepDetect", 48, TextPrimary, FontStyles.Bold);
+        bootTitleText = WinText(bootStateObject.transform, "BootTitle", "STARTING UP...", 48, TextPrimary, FontStyles.Bold);
         bootTitleText.alignment = TextAlignmentOptions.Center;
-        bootBodyText  = WinText(bootStateObject.transform, "BootBody", "Connecting to backend...", 18, TextSecondary);
+
+        bootBodyText  = WinText(bootStateObject.transform, "BootBody", "Connecting to system network...", 18, TextSecondary);
         bootBodyText.alignment  = TextAlignmentOptions.Center;
     }
 
@@ -1247,8 +1254,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
         else
         {
-            if (bootTitleText != null) bootTitleText.text = DisplayText(busy ? "DeepDetect" : "DeepDetect");
-            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to backend..." : "Press Refresh if backend is offline.");
+            if (bootTitleText != null) bootTitleText.text = DisplayText("STARTING UP...");
+            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to network services..." : "Network offline. Press Refresh to try starting up again.");
         }
 
         UpdateStatusbar();
