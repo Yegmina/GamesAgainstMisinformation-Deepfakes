@@ -1,0 +1,6 @@
+services:
+  deepdetect:
+    environment:
+      APP_ENV: staging
+    ports:
+      - "8104:8765"
