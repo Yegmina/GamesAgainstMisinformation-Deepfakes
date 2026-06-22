@@ -1,0 +1,6 @@
+services:
+  deepdetect:
+    environment:
+      APP_ENV: ci-cd-test
+    ports:
+      - "8105:8765"

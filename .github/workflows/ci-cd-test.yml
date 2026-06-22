@@ -1,0 +1,44 @@
+name: ci-cd-test
+
+on:
+  push:
+    branches:
+      - ci-cd-test
+  workflow_dispatch:
+
+concurrency:
+  group: deepdetect-ci-cd-test
+  cancel-in-progress: true
+
+jobs:
+  deploy_and_test:
+    runs-on: [self-hosted, linux, x64, deepdetect]
+    environment: serverenv
+    defaults:
+      run:
+        working-directory: repo/DeepDetectGamePlatform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          path: repo
+
+      - name: Ensure Docker is ready
+        run: docker info >/dev/null
+
+      - name: Deploy ci-cd-test environment
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: openai
+          RUNTIME_BASE_DIR: /home/dev/actions-runner-deepdetect/_runtime
+          COMMIT_SHA: ${{ github.sha }}
+        run: ./scripts/deploy_env.sh ci-cd-test docker-compose.cicd-test.yml 3600
+
+      - name: Wait for health
+        run: ./scripts/wait_for_health.sh http://127.0.0.1:8105 300
+
+      - name: Run API smoke test suite
+        env:
+          DEEPDETECT_URL: http://127.0.0.1:8105
+        run: python3 scripts/smoke_deployment.py
