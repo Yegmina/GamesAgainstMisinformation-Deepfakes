@@ -443,13 +443,26 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (item == null || string.IsNullOrWhiteSpace(item.id) || item.correct != false || string.IsNullOrWhiteSpace(item.decision)) continue;
         ComputerNewsItem old;
         bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
-        if (!wasResolved) { delta += 10; newWrong++; }
+        if (!wasResolved)
+        {
+            delta += 10;
+            newWrong++;
+            GlobalCanvasPersistent.Instance.SubtractTime(30);
+        }
     }
     int wrongEmails = CountNewWrongThreadResolutions(prev.emails, next.emails);
     int wrongTelegram = CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads);
     newWrong += wrongEmails + wrongTelegram;
     delta += wrongEmails * 6;
     delta += wrongTelegram * 6;
+    if (wrongEmails > 0)
+    {
+        GlobalCanvasPersistent.Instance.SubtractTime(30 * wrongEmails);
+    }
+    if (wrongTelegram > 0)
+    {
+        GlobalCanvasPersistent.Instance.SubtractTime(30 * wrongTelegram);
+    }
     if (delta > 0) GlobalCanvasPersistent.Instance.AddParanoia(delta);
 
     // Horror event: after every couple of wrong calls, the work window is
