@@ -52,7 +52,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const string BackendUrlKey    = "DeepDetect.BackendUrl";
     private const string TokenKey         = "DeepDetect.UnityToken";
     private const string UserKey          = "DeepDetect.UnityUser";
-    private const string DefaultBackendUrl = "http://127.0.0.1:8765";
+    private const string DefaultBackendUrl = "http://76.13.159.31:8104";
     private const string DefaultName      = "Unity Player";
     private const string DefaultEmail     = "unity.player@deepdetectgame.dev";
     private const string DefaultPassword  = "unity-local-player-2026";
@@ -266,6 +266,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         initializing = true;
         SetBusy(true, "Connecting to DeepDetect backend...");
         string backendUrl  = PlayerPrefs.GetString(BackendUrlKey, DefaultBackendUrl);
+        if (backendUrl == "http://127.0.0.1:8765" || backendUrl == "http://localhost:8765")
+        {
+            backendUrl = DefaultBackendUrl;
+            PlayerPrefs.SetString(BackendUrlKey, backendUrl);
+        }
         string savedToken  = PlayerPrefs.GetString(TokenKey, string.Empty);
         api = new ComputerApiClient(backendUrl, savedToken);
         try
