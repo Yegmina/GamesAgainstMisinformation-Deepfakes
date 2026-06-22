@@ -517,6 +517,7 @@ linkObj.transform.SetParent(row, false);
         AddMessage(false, "⚠ Downloading: virus_core.exe", true, "provider");
         
         SetParanoia(paranoia + 10);
+        SubtractTime(30);
         StartCoroutine(ShakeRoutine(5f, 20f));
         
         yield return Wait(0.5f);
@@ -850,7 +851,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.5f);
         ShowChoices(
             ("\"Block him immediately. Don't respond.\"", 0, SarahAdviceBlock),
-            ("\"Save the video as evidence first. Then block him.\"", 1, SarahAdviceEvidence)
+            ("\"Save the video as evidence first. Then block him.\"", 0, SarahAdviceEvidence)
         );
     }
 
@@ -881,7 +882,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.5f);
         ShowChoices(
             ("\"Some people are just evil. Stay strong.\"", 0, SarahComfortStrong),
-            ("\"I'm here for you. You're not alone.\"", 1, SarahComfortHere)
+            ("\"I'm here for you. You're not alone.\"", 0, SarahComfortHere)
         );
     }
 
@@ -1016,7 +1017,7 @@ videoObj.transform.SetParent(row, false);
         AddMessage(false, "Alex! I need you to type out the FULL home address - in English. Dad's Google Maps keeps resetting. Fast!", false, "mom");
         yield return Wait(0.3f);
         ShowChoices(
-            ("\"Sure, hold on.\"", 0, MomChoice2A),
+            ("\"Sure, hold on.\"", 1, MomChoice2A),
             ("\"Send me a photo first, I'm freaked out.\"", 2, MomChoice2B)
         );
     }
@@ -1024,8 +1025,6 @@ videoObj.transform.SetParent(row, false);
     void MomChoice2A()
     {
         ClearChoices();
-        SubtractTime(60);
-        SetParanoia(paranoia + 5);
         AddMessage(true, "Sure, hold on.", false, "mom");
         StartCoroutine(MomPressure());
     }
@@ -1110,7 +1109,7 @@ videoObj.transform.SetParent(row, false);
         
         PlayMomBadEnding();
         SetParanoia(paranoia + 10);
-        SubtractTime(120);
+        // Note: SubtractTime is omitted because button click of style 1 already subtracted 30 seconds.
         StartCoroutine(ShakeRoutine(4f, 6f));
 
         foreach (var s in spam)
@@ -1186,7 +1185,7 @@ videoObj.transform.SetParent(row, false);
         AddMessage(true, "Sure, sending it now.", false, "bro");
         yield return Wait(1.0f);
 
-        SubtractTime(60);
+        // Note: SubtractTime is omitted because button click of style 1 already subtracted 30 seconds.
         SetParanoia(paranoia + 20);
 
         AddMessage(false, "⚠ TRANSACTION FAILED\nALERT: Account compromised. Remote access detected.", true, "bro");
@@ -1819,11 +1818,12 @@ videoObj.transform.SetParent(row, false);
 
                     if (currentStyle == 1)
                     {
-                        // Wrong choice: +10% paranoia
+                        // Wrong choice: +10% paranoia, subtract 30 seconds from time
                         if (GlobalCanvasPersistent.Instance != null)
                         {
                             GlobalCanvasPersistent.Instance.AddParanoia(10);
                         }
+                        SubtractTime(30);
                     }
                     else if (currentStyle == 0 || currentStyle == 2)
                     {
