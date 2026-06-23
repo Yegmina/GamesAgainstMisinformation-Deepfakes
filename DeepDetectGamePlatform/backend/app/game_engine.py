@@ -54,8 +54,30 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def message(sender: str, text: str, role: str = "agent") -> dict[str, str]:
-    return {"sender": sender, "text": text, "role": role, "at": now_iso()}
+SCAM_LINKS = [
+    {
+        "label": "Open refund form",
+        "url": "https://refund-check.example.invalid/secure-claim",
+        "unsafe": True,
+    },
+    {
+        "label": "Watch the proof video",
+        "url": "https://video-proof.example.invalid/live",
+        "unsafe": True,
+    },
+    {
+        "label": "Verify account now",
+        "url": "https://account-verify.example.invalid/session",
+        "unsafe": True,
+    },
+]
+
+
+def message(sender: str, text: str, role: str = "agent", links: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"sender": sender, "text": text, "role": role, "at": now_iso()}
+    if links:
+        payload["links"] = links
+    return payload
 
 
 def option_label(item: dict[str, Any], choice: str) -> str:
@@ -318,6 +340,8 @@ def hydrate_telegram(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for index, raw in enumerate(items[:3]):
         contact = raw.get("contact") or f"Contact {index + 1}"
         raw_messages = raw.get("messages") if isinstance(raw.get("messages"), list) else ["Is this real?"]
+        if not raw_messages:
+            raw_messages = ["I got this link. Is it real?"]
         options = raw.get("options") if isinstance(raw.get("options"), list) else []
         if len(options) < 3:
             raise ValueError("Telegram agent response must include three generated options")
@@ -326,7 +350,14 @@ def hydrate_telegram(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "id": f"tg-agent-{index + 1}",
                 "contact": contact,
                 "relationship": raw.get("relationship") or "friend",
-                "messages": [message(contact, str(text)) for text in raw_messages[:4]],
+                "messages": [
+                    message(
+                        contact,
+                        str(text),
+                        links=[SCAM_LINKS[index % len(SCAM_LINKS)]] if msg_index == 0 and index < 2 else None,
+                    )
+                    for msg_index, text in enumerate(raw_messages[:4])
+                ],
                 "options": options[:3],
                 "correct_option": raw.get("correct_option") or options[0]["id"],
                 "selected": None,

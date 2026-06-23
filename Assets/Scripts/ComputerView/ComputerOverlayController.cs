@@ -215,6 +215,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void OnDestroy()
     {
         ExitFocusModeImmediate();
+        CancelFakeBrowserSequence();
         if (instance == this) instance = null;
         if (canvasObject != null) { Destroy(canvasObject); canvasObject = null; }
     }
@@ -232,7 +233,6 @@ public sealed class ComputerOverlayController : MonoBehaviour
         EnterFocusMode();
         Cursor.visible    = true;
         Cursor.lockState  = CursorLockMode.None;
-        RenderAll();
         if (!initialized && !initializing) _ = InitializeAsync();
         else RenderAll();
     }
@@ -243,13 +243,14 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (canvasObject == null) BuildUi();
         AttachCanvasToComputerSurface();
         canvasObject.SetActive(usingWorldMonitor);
-        RenderAll();
         RefreshCanvasInteractivity();
         if (!initialized && !initializing) _ = InitializeAsync();
+        else RenderAll();
     }
 
     private void Close()
     {
+        CancelFakeBrowserSequence();
         computerOpen = false;
         RefreshCanvasInteractivity();
         if (canvasObject == null) { ExitFocusModeImmediate(); return; }
@@ -1254,8 +1255,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
         else
         {
-            if (bootTitleText != null) bootTitleText.text = DisplayText("STARTING UP...");
-            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to network services..." : "Network offline. Press Refresh to try starting up again.");
+            if (bootTitleText != null) bootTitleText.text = DisplayText(busy ? "STARTING UP..." : "STARTUP BLOCKED");
+            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to network services..." : BootFailureMessage());
         }
 
         UpdateStatusbar();
@@ -1962,7 +1963,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Layout(contactName.gameObject, -1f, -1f, 1f, 0f);
         TMP_Text meta = WinText(conv.transform, "Meta", $"{Fallback(active.relationship, "relationship")}  ·  {ThreadProgress(active)}", 13, TextSecondary);
         Layout(meta.gameObject, -1f, -1f, 1f, 0f);
-        AddThread(conv.transform, active.messages ?? new List<JToken>(), active.contact);
+        AddThread(conv.transform, active.messages ?? new List<JToken>(), active.contact, true);
         AddResult(conv.transform, active.correct);
         AddOptionButtons(conv.transform, "telegram", active.id, active.options, ThreadResolved(active));
         if (!ThreadResolved(active))
@@ -2138,7 +2139,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     }
 
     // ─── Shared UI helpers ───────────────────────────────────────────────────
-    private void AddThread(Transform parent, List<JToken> messages, string fallbackSender)
+    private void AddThread(Transform parent, List<JToken> messages, string fallbackSender, bool enableUnsafeLinks = false)
     {
         RectTransform content;
         RectTransform scroll = CreateScroll(parent, "Thread", out content, false);
@@ -2183,6 +2184,62 @@ public sealed class ComputerOverlayController : MonoBehaviour
             bodyLbl.overflowMode     = TextOverflowModes.Overflow;
             bodyLbl.lineSpacing      = 5f;
             Layout(bodyLbl.gameObject, -1f, -1f, 1f, 0f);
+
+            AddMessageLinks(bubble.transform, msg, enableUnsafeLinks);
+        }
+    }
+
+    private void AddMessageLinks(Transform parent, JToken message, bool enableUnsafeLinks)
+    {
+        if (!enableUnsafeLinks) return;
+        List<JToken> links = MessageLinks(message);
+        if (links.Count == 0) return;
+
+        GameObject group = Element(parent, "Links");
+        Layout(group, -1f, -1f, 1f, 0f);
+        VerticalLayoutGroup vl = group.AddComponent<VerticalLayoutGroup>();
+        vl.spacing = 6;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+        foreach (JToken link in links)
+        {
+            if (!LinkUnsafe(link)) continue;
+            string label = Fallback(LinkLabel(link), "Open link");
+            string url = Fallback(LinkUrl(link), "about:blank");
+
+            GameObject go = PanelObject(group.transform, "UnsafeLink", Html("#0f766e"));
+            MakeRounded(go, Html("#0f766e"), 8f);
+            Layout(go, -1f, -1f, 1f, 0f);
+            VerticalLayoutGroup bvl = go.AddComponent<VerticalLayoutGroup>();
+            bvl.padding = new RectOffset(12, 12, 8, 8);
+            bvl.spacing = 3;
+            bvl.childControlWidth = bvl.childForceExpandWidth = true;
+            bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
+
+            Button btn = go.AddComponent<Button>();
+            btn.targetGraphic = go.GetComponent<Image>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = Html("#0f766e");
+            cb.highlightedColor = Html("#14b8a6");
+            cb.pressedColor = Html("#0f4f47");
+            cb.disabledColor = Html("#334155");
+            cb.fadeDuration = 0.08f;
+            btn.colors = cb;
+            btn.interactable = !fakeBrowserActive && !virusActive;
+            btn.onClick.AddListener(() => HandleUnsafeTelegramLinkClicked(label, url));
+
+            TMP_Text title = WinText(go.transform, "Label", label, 13, Color.white, FontStyles.Bold);
+            title.textWrappingMode = TextWrappingModes.Normal;
+            title.overflowMode = TextOverflowModes.Overflow;
+            title.raycastTarget = false;
+            Layout(title.gameObject, -1f, -1f, 1f, 0f);
+
+            TMP_Text host = WinText(go.transform, "Url", SourceHost(url, url), 11, Html("#bbf7d0"));
+            host.textWrappingMode = TextWrappingModes.Normal;
+            host.overflowMode = TextOverflowModes.Ellipsis;
+            host.raycastTarget = false;
+            Layout(host.gameObject, -1f, -1f, 1f, 0f);
         }
     }
 
@@ -2572,10 +2629,24 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void SetStatus(string message)
     {
+        lastStatusMessage = string.IsNullOrWhiteSpace(message) ? "Request failed" : message;
         if (statusbarRightText != null)
-            statusbarRightText.text = DisplayText(message);
+            statusbarRightText.text = DisplayText(lastStatusMessage);
         if (bootBodyText != null && currentGame == null)
-            bootBodyText.text = DisplayText(message);
+            bootBodyText.text = DisplayText(lastStatusMessage);
+    }
+
+    private string BootFailureMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(lastStatusMessage) &&
+            lastStatusMessage != "Connecting to DeepDetect backend..." &&
+            lastStatusMessage != "Starting system network services..." &&
+            lastStatusMessage != "Connecting to network services...")
+        {
+            return lastStatusMessage;
+        }
+
+        return "Backend unavailable. Press Refresh to try starting up again.";
     }
 
     private void RefreshCanvasInteractivity()
@@ -2907,6 +2978,25 @@ public sealed class ComputerOverlayController : MonoBehaviour
     }
     private static string MessageSender(JToken m) { if (m==null||m.Type!=JTokenType.Object) return string.Empty; JToken s=m["sender"]; return s!=null?s.Value<string>():string.Empty; }
     private static string MessageRole(JToken m)   { if (m==null||m.Type!=JTokenType.Object) return string.Empty; JToken r=m["role"];   return r!=null?r.Value<string>():string.Empty; }
+    private static List<JToken> MessageLinks(JToken m)
+    {
+        List<JToken> result = new List<JToken>();
+        if (m == null || m.Type != JTokenType.Object) return result;
+        JToken links = m["links"];
+        if (links == null || links.Type != JTokenType.Array) return result;
+        foreach (JToken link in links)
+            if (link != null && link.Type == JTokenType.Object)
+                result.Add(link);
+        return result;
+    }
+    private static string LinkLabel(JToken link) { if (link==null||link.Type!=JTokenType.Object) return string.Empty; JToken l=link["label"]; return l!=null?l.Value<string>():string.Empty; }
+    private static string LinkUrl(JToken link)   { if (link==null||link.Type!=JTokenType.Object) return string.Empty; JToken u=link["url"];   return u!=null?u.Value<string>():string.Empty; }
+    private static bool LinkUnsafe(JToken link)
+    {
+        if (link == null || link.Type != JTokenType.Object) return false;
+        JToken unsafeToken = link["unsafe"];
+        return unsafeToken != null && unsafeToken.Type == JTokenType.Boolean && unsafeToken.Value<bool>();
+    }
 
     private static int OpenNewsCount(List<ComputerNewsItem> items) { int c=0; foreach (var i in items) if (i!=null && string.IsNullOrWhiteSpace(i.decision)) c++; return c; }
     private static int OpenThreadCount<T>(List<T> items) { int c=0; foreach (T i in items??new List<T>()) if (!ThreadResolved(i)) c++; return c; }
@@ -3029,6 +3119,116 @@ public sealed class ComputerOverlayController : MonoBehaviour
             default: return null;
         }
         return Resources.Load<Sprite>("UI/desktop/" + spriteName);
+    }
+
+    // Fake in-game browser used for scam Telegram links. It never opens a real URL.
+    private GameObject fakeBrowserOverlay;
+    private Coroutine fakeBrowserRoutine;
+    private bool fakeBrowserActive;
+
+    private void HandleUnsafeTelegramLinkClicked(string label, string url)
+    {
+        if (fakeBrowserActive || virusActive || canvasObject == null) return;
+        fakeBrowserRoutine = StartCoroutine(FakeBrowserThenVirus(label, url));
+    }
+
+    private IEnumerator FakeBrowserThenVirus(string label, string url)
+    {
+        fakeBrowserActive = true;
+        ShowFakeBrowserOverlay(label, url);
+        yield return new WaitForSecondsRealtime(1.35f);
+        HideFakeBrowserOverlay();
+        fakeBrowserActive = false;
+        fakeBrowserRoutine = null;
+        TriggerVirusAttack();
+    }
+
+    private void ShowFakeBrowserOverlay(string label, string url)
+    {
+        HideFakeBrowserOverlay();
+        if (canvasObject == null) return;
+
+        fakeBrowserOverlay = PanelObject(canvasObject.transform, "FakeBrowserOverlay", new Color(0f, 0f, 0f, 0.42f));
+        Stretch(fakeBrowserOverlay.GetComponent<RectTransform>());
+        Image blocker = fakeBrowserOverlay.GetComponent<Image>();
+        if (blocker != null) blocker.raycastTarget = true;
+        fakeBrowserOverlay.transform.SetAsLastSibling();
+
+        GameObject window = PanelObject(fakeBrowserOverlay.transform, "FakeBrowserWindow", Html("#f8fafc"));
+        MakeRounded(window, Html("#f8fafc"), 12f);
+        RectTransform wr = window.GetComponent<RectTransform>();
+        wr.anchorMin = wr.anchorMax = new Vector2(0.5f, 0.5f);
+        wr.pivot = new Vector2(0.5f, 0.5f);
+        wr.sizeDelta = new Vector2(780f, 360f);
+        wr.anchoredPosition = Vector2.zero;
+        Shadow shadow = window.AddComponent<Shadow>();
+        shadow.effectColor = Html("#00000055");
+        shadow.effectDistance = new Vector2(0f, -6f);
+
+        VerticalLayoutGroup vl = window.AddComponent<VerticalLayoutGroup>();
+        vl.padding = new RectOffset(18, 18, 16, 18);
+        vl.spacing = 12;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true;
+        vl.childForceExpandHeight = false;
+
+        GameObject chrome = PanelObject(window.transform, "Chrome", Html("#e5e7eb"));
+        MakeRounded(chrome, Html("#e5e7eb"), 8f);
+        Layout(chrome, -1f, 46f, 1f, 0f);
+        HorizontalLayoutGroup chl = chrome.AddComponent<HorizontalLayoutGroup>();
+        chl.padding = new RectOffset(12, 12, 6, 6);
+        chl.spacing = 10;
+        chl.childAlignment = TextAnchor.MiddleLeft;
+        chl.childControlWidth = true; chl.childForceExpandWidth = false;
+        chl.childControlHeight = true; chl.childForceExpandHeight = true;
+
+        TMP_Text lockIcon = WinText(chrome.transform, "Lock", "!", 13, AccentAmber, FontStyles.Bold);
+        Layout(lockIcon.gameObject, 22f, -1f, 0f, 1f);
+        TMP_Text address = WinText(chrome.transform, "Address", url, 13, LightTextMuted);
+        address.textWrappingMode = TextWrappingModes.NoWrap;
+        address.overflowMode = TextOverflowModes.Ellipsis;
+        Layout(address.gameObject, -1f, -1f, 1f, 1f);
+
+        TMP_Text title = WinText(window.transform, "Title", Fallback(label, "Opening link..."), 24, LightText, FontStyles.Bold);
+        title.textWrappingMode = TextWrappingModes.Normal;
+        title.overflowMode = TextOverflowModes.Overflow;
+        Layout(title.gameObject, -1f, -1f, 1f, 0f);
+
+        TMP_Text body = WinText(window.transform, "Body", "Checking link...\nLoading remote page...", 17, LightTextSub);
+        body.textWrappingMode = TextWrappingModes.Normal;
+        body.overflowMode = TextOverflowModes.Overflow;
+        body.lineSpacing = 8f;
+        Layout(body.gameObject, -1f, -1f, 1f, 0f);
+
+        GameObject barTrack = PanelObject(window.transform, "LoadTrack", Html("#d1d5db"));
+        MakeRounded(barTrack, Html("#d1d5db"), 8f);
+        Layout(barTrack, -1f, 18f, 1f, 0f);
+        GameObject barFill = PanelObject(barTrack.transform, "LoadFill", AccentAmber);
+        MakeRounded(barFill, AccentAmber, 8f);
+        RectTransform fr = barFill.GetComponent<RectTransform>();
+        fr.anchorMin = new Vector2(0f, 0f);
+        fr.anchorMax = new Vector2(0.72f, 1f);
+        fr.offsetMin = fr.offsetMax = Vector2.zero;
+    }
+
+    private void HideFakeBrowserOverlay()
+    {
+        if (fakeBrowserOverlay != null)
+        {
+            Destroy(fakeBrowserOverlay);
+            fakeBrowserOverlay = null;
+        }
+    }
+
+    private void CancelFakeBrowserSequence()
+    {
+        if (fakeBrowserRoutine != null)
+        {
+            StopCoroutine(fakeBrowserRoutine);
+            fakeBrowserRoutine = null;
+        }
+        fakeBrowserActive = false;
+        HideFakeBrowserOverlay();
     }
 
     // ════════════════════════════════════════════════════════════════════════
