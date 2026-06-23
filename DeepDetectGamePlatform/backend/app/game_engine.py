@@ -57,17 +57,17 @@ def now_iso() -> str:
 SCAM_LINKS = [
     {
         "label": "Open refund form",
-        "url": "https://refund-check.example.invalid/secure-claim",
+        "url": "https://gov-refund-center.test/claim/secure-apply?id=88427",
         "unsafe": True,
     },
     {
         "label": "Watch the proof video",
-        "url": "https://video-proof.example.invalid/live",
+        "url": "https://breaking-video-live.test/watch/incident-4721",
         "unsafe": True,
     },
     {
         "label": "Verify account now",
-        "url": "https://account-verify.example.invalid/session",
+        "url": "https://account-security-check.test/session/verify-login",
         "unsafe": True,
     },
 ]
@@ -302,6 +302,16 @@ def hydrate_news_items(items: list[dict[str, Any]], rng: random.Random) -> list[
             "correct": None,
             "points": 0,
             "agent_generated": bool(raw.get("agent_generated", True)),
+            "article_status": "pending",
+            "article_mode": "real_source" if truth_label == "real" else "synthetic",
+            "article_byline": "",
+            "article_paragraphs": [],
+            "article_image_url": "",
+            "article_image_caption": "",
+            "article_image_credit": "",
+            "article_source_url": raw.get("url") or "",
+            "article_updated_at": "",
+            "article_error": "",
         }
         hydrated.append(item)
     return hydrated

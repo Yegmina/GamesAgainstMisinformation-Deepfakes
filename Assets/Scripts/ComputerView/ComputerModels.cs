@@ -136,6 +136,36 @@ public sealed class ComputerNewsItem
 
     [JsonProperty("agent_reason")]
     public string agentReason;
+
+    [JsonProperty("article_status")]
+    public string articleStatus;
+
+    [JsonProperty("article_mode")]
+    public string articleMode;
+
+    [JsonProperty("article_byline")]
+    public string articleByline;
+
+    [JsonProperty("article_paragraphs")]
+    public List<string> articleParagraphs = new List<string>();
+
+    [JsonProperty("article_image_url")]
+    public string articleImageUrl;
+
+    [JsonProperty("article_image_caption")]
+    public string articleImageCaption;
+
+    [JsonProperty("article_image_credit")]
+    public string articleImageCredit;
+
+    [JsonProperty("article_source_url")]
+    public string articleSourceUrl;
+
+    [JsonProperty("article_updated_at")]
+    public string articleUpdatedAt;
+
+    [JsonProperty("article_error")]
+    public string articleError;
 }
 
 public sealed class ComputerEmailItem

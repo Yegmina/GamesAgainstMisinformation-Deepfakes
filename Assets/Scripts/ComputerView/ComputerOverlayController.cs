@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 
 public sealed class ComputerOverlayController : MonoBehaviour
@@ -129,6 +130,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private string activeTab         = "home";
     private string activeEmailId     = string.Empty;
     private string activeTelegramId  = string.Empty;
+    private string activeArticleId   = string.Empty;
     private bool   initialized;
     private bool   initializing;
     private bool   busy;
@@ -141,6 +143,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private Quaternion savedCameraRotation;
     private float      savedCameraFov;
     private Coroutine  focusTransitionRoutine;
+    private Coroutine  articlePollRoutine;
+    private readonly Dictionary<string, Sprite> articleImageCache = new Dictionary<string, Sprite>();
+    private readonly HashSet<string> articleImageLoading = new HashSet<string>();
+    private readonly HashSet<string> articleImageFailed = new HashSet<string>();
     private Transform  focusAnchor;
 
     // ─── UI references ──────────────────────────────────────────────────────
@@ -234,7 +240,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Cursor.visible    = true;
         Cursor.lockState  = CursorLockMode.None;
         if (!initialized && !initializing) _ = InitializeAsync();
-        else RenderAll();
+        else { UpdateArticlePolling(); RenderAll(); }
     }
 
     private void Preload(Transform anchor)
@@ -251,6 +257,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void Close()
     {
         CancelFakeBrowserSequence();
+        StopArticlePolling();
         computerOpen = false;
         RefreshCanvasInteractivity();
         if (canvasObject == null) { ExitFocusModeImmediate(); return; }
@@ -435,9 +442,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
             activeEmailId = FirstOpenEmailId();
         if (string.IsNullOrWhiteSpace(activeTelegramId) || !TelegramExists(activeTelegramId))
             activeTelegramId = FirstOpenTelegramId();
+        if (!string.IsNullOrWhiteSpace(activeArticleId) && FindNews(activeArticleId) == null)
+            activeArticleId = string.Empty;
         if (GlobalCanvasPersistent.Instance != null)
             GlobalCanvasPersistent.Instance.SetPoints(Mathf.Max(0, currentGame.score));
         if (evalParanoia) ApplyParanoiaDelta(prev, currentGame);
+        UpdateArticlePolling();
     }
 
     private void ApplyParanoiaDelta(ComputerGameState prev, ComputerGameState next)
@@ -1330,7 +1340,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         btn.colors = cb;
         string capturedTab = tab;
         btn.interactable = !active && !busy && currentGame != null;
-        btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
+        btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; if (capturedTab != "home") activeArticleId = string.Empty; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
 
         HorizontalLayoutGroup hl = row.AddComponent<HorizontalLayoutGroup>();
         hl.padding  = new RectOffset(12, 12, 0, 0);   // constant → stable alignment, a bit more left
@@ -1452,7 +1462,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         btn.colors = cb;
 
         string capturedTab = tab;
-        btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
+        btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; if (capturedTab != "home") activeArticleId = string.Empty; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
 
         // 4. Active accent underline beneath the tab (clean 3px indicator)
         if (active)
@@ -1494,7 +1504,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         switch (activeTab)
         {
-            case "home":      RenderNewsdesk(contentArea); break;
+            case "home":
+                if (!string.IsNullOrWhiteSpace(activeArticleId) && FindNews(activeArticleId) != null) RenderArticleReader(contentArea);
+                else RenderNewsdesk(contentArea);
+                break;
             case "email":     RenderInbox(contentArea); break;
             case "telegram":  RenderTelegram(contentArea); break;
             case "briefing":  RenderBriefing(contentArea); break;
@@ -1641,6 +1654,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
         MakeRounded(card, LightCardBg);
         Layout(card, -1f, -1f, 1f, 0f);
         Shadow o = card.AddComponent<Shadow>(); o.effectColor = LightCardShadow; o.effectDistance = new Vector2(0f, -3f);
+        Button openBtn = card.AddComponent<Button>();
+        openBtn.targetGraphic = card.GetComponent<Image>();
+        ColorBlock openColors = openBtn.colors;
+        openColors.normalColor = LightCardBg;
+        openColors.highlightedColor = Html("#f8fbff");
+        openColors.pressedColor = Html("#e8eefc");
+        openBtn.colors = openColors;
+        string openId = item.id;
+        openBtn.onClick.AddListener(() => OpenArticle(openId));
         VerticalLayoutGroup vl = card.AddComponent<VerticalLayoutGroup>();
         vl.padding = new RectOffset(24, 22, 18, 18);
         vl.spacing = 11;
@@ -1677,6 +1699,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         TMP_Text sourceLbl = WinText(headerRow.transform, "Source", SourceHost(item.url, item.source), 12, LightTextMuted);
         Layout(sourceLbl.gameObject, -1f, -1f, 1f, 1f);
+
+        string articleStatus = ArticleStatusLabel(item);
+        Color articleBg = ArticleReady(item) ? Html("#0596691f") : Html("#3b82f61c");
+        Color articleFg = ArticleReady(item) ? Html("#047857") : Html("#1d4ed8");
+        AddBadge(headerRow.transform, articleStatus, articleBg, articleFg);
 
         if (decided)
         {
@@ -1761,6 +1788,164 @@ public sealed class ComputerOverlayController : MonoBehaviour
             TMP_Text decLabel = WinText(row.transform, "DecLabel", $"-> {item.decision.ToUpperInvariant()}", 13, LightTextMuted, FontStyles.Bold);
             Layout(decLabel.gameObject, -1f, -1f, 1f, 1f);
         }
+    }
+
+    private void OpenArticle(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return;
+        activeArticleId = itemId;
+        activeTab = "home";
+        windowMinimized = false;
+        UpdateArticlePolling();
+        RenderAll();
+    }
+
+    private void CloseArticle()
+    {
+        activeArticleId = string.Empty;
+        RenderAll();
+    }
+
+    private void RenderArticleReader(Transform parent)
+    {
+        ComputerNewsItem item = FindNews(activeArticleId);
+        if (item == null)
+        {
+            activeArticleId = string.Empty;
+            RenderNewsdesk(parent);
+            return;
+        }
+
+        GameObject shell = PanelObject(parent, $"ArticleReader-{item.id}", LightCardBg);
+        MakeRounded(shell, LightCardBg);
+        Layout(shell, -1f, -1f, 1f, 0f);
+        Shadow shadow = shell.AddComponent<Shadow>();
+        shadow.effectColor = LightCardShadow;
+        shadow.effectDistance = new Vector2(0f, -4f);
+
+        VerticalLayoutGroup vl = shell.AddComponent<VerticalLayoutGroup>();
+        vl.padding = new RectOffset(30, 30, 24, 28);
+        vl.spacing = 16;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true;
+        vl.childForceExpandHeight = false;
+
+        GameObject top = Element(shell.transform, "ReaderTop");
+        Layout(top, -1f, 44f, 1f, 0f);
+        HorizontalLayoutGroup th = top.AddComponent<HorizontalLayoutGroup>();
+        th.spacing = 12;
+        th.childAlignment = TextAnchor.MiddleLeft;
+        th.childControlWidth = true; th.childForceExpandWidth = false;
+        th.childControlHeight = true; th.childForceExpandHeight = true;
+
+        Button back = WinButton(top.transform, "Back to wires", Html("#e5e7eb"), LightText, CloseArticle, 150f, 34f);
+        back.interactable = !busy;
+        TMP_Text source = WinText(top.transform, "Source", $"{SourceHost(item.articleSourceUrl, SourceHost(item.url, item.source))}  ·  {ArticleStatusLabel(item)}", 12, LightTextMuted, FontStyles.Bold);
+        Layout(source.gameObject, -1f, -1f, 1f, 1f);
+        AddBadge(top.transform, NewsStatus(item), Html("#f59e0b22"), Html("#b45309"));
+
+        BuildArticleHero(shell.transform, item);
+
+        TMP_Text title = WinText(shell.transform, "ArticleTitle", Fallback(item.title, "Untitled"), 31, LightText, FontStyles.Bold);
+        title.textWrappingMode = TextWrappingModes.Normal;
+        title.overflowMode = TextOverflowModes.Overflow;
+        Layout(title.gameObject, -1f, -1f, 1f, 0f);
+
+        string metaText = $"{Fallback(item.articleByline, "DeepDetect Wire")}  ·  {Fallback(item.publishedAt, "developing")}  ·  {Fallback(item.publicPressure, "editorial review")}";
+        TMP_Text meta = WinText(shell.transform, "ArticleMeta", metaText, 13, LightTextMuted);
+        meta.textWrappingMode = TextWrappingModes.Normal;
+        meta.overflowMode = TextOverflowModes.Overflow;
+        Layout(meta.gameObject, -1f, -1f, 1f, 0f);
+
+        GameObject notePanel = PanelObject(shell.transform, "DeskNote", Html("#eef4ff"));
+        MakeRounded(notePanel, Html("#eef4ff"), 9f);
+        Layout(notePanel, -1f, -1f, 1f, 0f);
+        VerticalLayoutGroup noteVl = notePanel.AddComponent<VerticalLayoutGroup>();
+        noteVl.padding = new RectOffset(16, 16, 12, 12);
+        noteVl.childControlWidth = noteVl.childForceExpandWidth = true;
+        noteVl.childControlHeight = true; noteVl.childForceExpandHeight = false;
+        TMP_Text note = WinText(notePanel.transform, "Note", $"Desk note: {Fallback(item.editorNote, "Verify source and framing before publication.")}", 14, Html("#1d4ed8"), FontStyles.Bold);
+        note.textWrappingMode = TextWrappingModes.Normal;
+        note.overflowMode = TextOverflowModes.Overflow;
+
+        foreach (string paragraph in ArticleParagraphs(item))
+        {
+            TMP_Text p = WinText(shell.transform, "Paragraph", paragraph, 16, LightTextSub);
+            p.textWrappingMode = TextWrappingModes.Normal;
+            p.overflowMode = TextOverflowModes.Overflow;
+            p.lineSpacing = 7f;
+            Layout(p.gameObject, -1f, -1f, 1f, 0f);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.articleError))
+        {
+            TMP_Text err = WinText(shell.transform, "ArticleError", $"Article enrichment note: {item.articleError}", 12, AccentAmber);
+            err.textWrappingMode = TextWrappingModes.Normal;
+            err.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.articleSourceUrl) || !string.IsNullOrWhiteSpace(item.url))
+        {
+            TMP_Text src = WinText(shell.transform, "SourceUrl", $"Source: {SourceHost(item.articleSourceUrl, SourceHost(item.url, item.source))}", 12, LightTextMuted);
+            src.textWrappingMode = TextWrappingModes.Normal;
+            src.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        BuildNewsActions(shell.transform, item);
+        if (item.correct.HasValue)
+            AddResult(shell.transform, item.correct);
+    }
+
+    private void BuildArticleHero(Transform parent, ComputerNewsItem item)
+    {
+        GameObject frame = PanelObject(parent, "HeroImage", Html("#dbe6f4"));
+        MakeRounded(frame, Html("#dbe6f4"), 13f);
+        Layout(frame, -1f, 282f, 1f, 0f);
+        Image image = frame.GetComponent<Image>();
+        image.raycastTarget = false;
+        image.type = Image.Type.Sliced;
+        image.preserveAspect = true;
+
+        string imageUrl = ResolveArticleImageUrl(item);
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            if (articleImageCache.TryGetValue(imageUrl, out Sprite sprite) && sprite != null)
+            {
+                image.sprite = sprite;
+                image.type = Image.Type.Simple;
+                image.color = Color.white;
+            }
+            else
+            {
+                StartArticleImageLoad(imageUrl);
+            }
+        }
+
+        GameObject overlay = PanelObject(frame.transform, "HeroOverlay", Html("#0f172650"));
+        Stretch(overlay.GetComponent<RectTransform>());
+        overlay.GetComponent<Image>().raycastTarget = false;
+
+        GameObject captionBox = Element(frame.transform, "CaptionBox");
+        LayoutElement cle = captionBox.AddComponent<LayoutElement>();
+        cle.ignoreLayout = true;
+        RectTransform cr = captionBox.GetComponent<RectTransform>();
+        cr.anchorMin = new Vector2(0f, 0f);
+        cr.anchorMax = new Vector2(1f, 0f);
+        cr.pivot = new Vector2(0.5f, 0f);
+        cr.offsetMin = new Vector2(18f, 14f);
+        cr.offsetMax = new Vector2(-18f, 82f);
+
+        VerticalLayoutGroup cvl = captionBox.AddComponent<VerticalLayoutGroup>();
+        cvl.childControlWidth = cvl.childForceExpandWidth = true;
+        cvl.childControlHeight = true; cvl.childForceExpandHeight = false;
+        cvl.spacing = 2;
+
+        TMP_Text cap = WinText(captionBox.transform, "Caption", HeroCaption(item), 14, Color.white, FontStyles.Bold);
+        cap.textWrappingMode = TextWrappingModes.Normal;
+        cap.overflowMode = TextOverflowModes.Ellipsis;
+        TMP_Text credit = WinText(captionBox.transform, "Credit", Fallback(item.articleImageCredit, ArticleReady(item) ? "News image" : "Article image loading"), 11, Html("#dbeafe"));
+        credit.textWrappingMode = TextWrappingModes.Normal;
+        credit.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     // ─── Inbox ───────────────────────────────────────────────────────────────
@@ -2889,6 +3074,59 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
     //  GAME STATE HELPERS
     // ════════════════════════════════════════════════════════════════════════
+    private void UpdateArticlePolling()
+    {
+        bool shouldPoll = computerOpen && initialized && api != null && currentGame != null && ArticleEnrichmentPending();
+        if (shouldPoll)
+        {
+            if (articlePollRoutine == null)
+                articlePollRoutine = StartCoroutine(PollArticleEnrichment());
+        }
+        else
+        {
+            StopArticlePolling();
+        }
+    }
+
+    private void StopArticlePolling()
+    {
+        if (articlePollRoutine != null)
+        {
+            StopCoroutine(articlePollRoutine);
+            articlePollRoutine = null;
+        }
+    }
+
+    private bool ArticleEnrichmentPending()
+    {
+        if (currentGame?.newsItems == null) return false;
+        foreach (ComputerNewsItem item in currentGame.newsItems)
+        {
+            if (item == null) continue;
+            string status = (item.articleStatus ?? string.Empty).Trim().ToLowerInvariant();
+            if (status == "pending" || status == "generating") return true;
+        }
+        return false;
+    }
+
+    private IEnumerator PollArticleEnrichment()
+    {
+        while (computerOpen && initialized && api != null && currentGame != null && ArticleEnrichmentPending())
+        {
+            yield return new WaitForSecondsRealtime(2f);
+            if (!computerOpen || currentGame == null || busy) continue;
+
+            Task<ComputerGameResponse> task = api.GetGameAsync(currentGame.id);
+            while (!task.IsCompleted) yield return null;
+            if (task.Status == TaskStatus.RanToCompletion && task.Result != null && task.Result.game != null)
+            {
+                SetCurrentGame(task.Result.game, false);
+                RenderAll();
+            }
+        }
+        articlePollRoutine = null;
+    }
+
     private static ComputerGameState NormalizeGame(ComputerGameState g)
     {
         if (g == null) return null;
@@ -2902,6 +3140,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         g.emails          = g.emails          ?? new List<ComputerEmailItem>();
         g.telegramThreads = g.telegramThreads ?? new List<ComputerTelegramThread>();
         g.actionLog       = g.actionLog       ?? new List<string>();
+        foreach (ComputerNewsItem n in g.newsItems)    { if (n==null) continue; n.articleParagraphs=n.articleParagraphs??new List<string>(); if (string.IsNullOrWhiteSpace(n.articleStatus)) n.articleStatus="pending"; }
         foreach (ComputerEmailItem e in g.emails)       { if (e==null) continue; e.messages=e.messages??new List<JToken>(); e.options=e.options??new List<ComputerOption>(); }
         foreach (ComputerTelegramThread t in g.telegramThreads) { if (t==null) continue; t.messages=t.messages??new List<JToken>(); t.options=t.options??new List<ComputerOption>(); }
         return g;
@@ -2918,6 +3157,14 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private bool   EmailExists(string id)             => FindEmail(id) != null;
     private bool   TelegramExists(string id)          => FindTelegram(id) != null;
+    private bool   NewsExists(string id)              => FindNews(id) != null;
+
+    private ComputerNewsItem FindNews(string id)
+    {
+        if (currentGame?.newsItems == null) return null;
+        foreach (ComputerNewsItem n in currentGame.newsItems) if (n?.id == id) return n;
+        return null;
+    }
 
     private ComputerEmailItem FindEmail(string id)
     {
@@ -2996,6 +3243,87 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (link == null || link.Type != JTokenType.Object) return false;
         JToken unsafeToken = link["unsafe"];
         return unsafeToken != null && unsafeToken.Type == JTokenType.Boolean && unsafeToken.Value<bool>();
+    }
+
+    private List<string> ArticleParagraphs(ComputerNewsItem item)
+    {
+        if (item?.articleParagraphs != null && item.articleParagraphs.Count > 0)
+        {
+            List<string> paragraphs = new List<string>();
+            foreach (string p in item.articleParagraphs)
+                if (!string.IsNullOrWhiteSpace(p)) paragraphs.Add(p);
+            if (paragraphs.Count > 0) return paragraphs;
+        }
+        return new List<string> { Fallback(item?.summary, "This developing story needs editorial review before publication.") };
+    }
+
+    private static bool ArticleReady(ComputerNewsItem item)
+    {
+        return item != null && string.Equals(item.articleStatus, "ready", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ArticleStatusLabel(ComputerNewsItem item)
+    {
+        if (item == null) return "Article pending";
+        string status = (item.articleStatus ?? string.Empty).Trim().ToLowerInvariant();
+        if (status == "ready") return "Full article";
+        if (status == "generating") return "Building article";
+        if (status == "failed") return "Brief only";
+        return "Article pending";
+    }
+
+    private static string HeroCaption(ComputerNewsItem item)
+    {
+        if (!string.IsNullOrWhiteSpace(item?.articleImageCaption)) return item.articleImageCaption;
+        if (ArticleReady(item)) return "Editorial image for this wire.";
+        return "Full article media is loading.";
+    }
+
+    private string ResolveArticleImageUrl(ComputerNewsItem item)
+    {
+        string url = item?.articleImageUrl;
+        if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+        if (Uri.TryCreate(url, UriKind.Absolute, out Uri absolute)) return absolute.ToString();
+        if (url.StartsWith("/") && api != null && !string.IsNullOrWhiteSpace(api.BaseUrl))
+            return api.BaseUrl.TrimEnd('/') + url;
+        return url;
+    }
+
+    private void StartArticleImageLoad(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || articleImageCache.ContainsKey(url) || articleImageLoading.Contains(url) || articleImageFailed.Contains(url))
+            return;
+        articleImageLoading.Add(url);
+        StartCoroutine(LoadArticleImage(url));
+    }
+
+    private IEnumerator LoadArticleImage(string url)
+    {
+        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(url))
+        {
+            request.timeout = 12;
+            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            while (!operation.isDone) yield return null;
+
+            articleImageLoading.Remove(url);
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                articleImageFailed.Add(url);
+                yield break;
+            }
+
+            Texture2D tex = DownloadHandlerTexture.GetContent(request);
+            if (tex == null)
+            {
+                articleImageFailed.Add(url);
+                yield break;
+            }
+
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            articleImageCache[url] = sprite;
+            if (!string.IsNullOrWhiteSpace(activeArticleId))
+                RenderAll();
+        }
     }
 
     private static int OpenNewsCount(List<ComputerNewsItem> items) { int c=0; foreach (var i in items) if (i!=null && string.IsNullOrWhiteSpace(i.decision)) c++; return c; }
