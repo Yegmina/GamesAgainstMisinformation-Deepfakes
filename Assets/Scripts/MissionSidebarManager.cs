@@ -164,6 +164,7 @@ public class MissionSidebarManager : MonoBehaviour
     {
         CreateMissionSets();
         UpdateMissionUI();
+        OpenSidebar();
     }
 
     public void AddProgress(int missionIndex)
