@@ -368,8 +368,11 @@ def continue_conversation(surface: str, item: dict[str, Any], answer_text: str) 
     return result
 
 
-def fetch_recent_news(limit: int = 8) -> list[dict[str, Any]]:
+def fetch_recent_news(limit: int = 8, rng: random.Random | None = None, pool_size: int = 30) -> list[dict[str, Any]]:
     articles: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    seen_titles: set[str] = set()
+    per_feed_limit = max(pool_size, limit)
     for source, url in RSS_FEEDS:
         try:
             response = requests.get(url, timeout=8, headers={"User-Agent": "DeepDetectGamePlatform/1.0"})
@@ -377,23 +380,37 @@ def fetch_recent_news(limit: int = 8) -> list[dict[str, Any]]:
             feed = feedparser.parse(response.content)
         except Exception:
             continue
-        for entry in feed.entries[:5]:
+        for entry in feed.entries[:per_feed_limit]:
             title = _clean(getattr(entry, "title", ""))
             if not title:
                 continue
+            article_url = getattr(entry, "link", url)
+            title_key = title.lower()
+            if article_url in seen_urls or title_key in seen_titles:
+                continue
+            seen_urls.add(article_url)
+            seen_titles.add(title_key)
             summary = _clean(getattr(entry, "summary", "")) or "A breaking story is being reviewed by the newsroom."
             articles.append(
                 {
                     "title": title,
                     "summary": summary[:420],
                     "source": source,
-                    "url": getattr(entry, "link", url),
+                    "url": article_url,
                     "published_at": getattr(entry, "published", ""),
                 }
             )
-            if len(articles) >= limit:
-                return articles
-    return FALLBACK_NEWS[:limit]
+            if len(articles) >= pool_size:
+                break
+    if not articles:
+        articles = FALLBACK_NEWS[:]
+    if rng is None:
+        rng = random.Random()
+    if len(articles) <= limit:
+        shuffled = articles[:]
+        rng.shuffle(shuffled)
+        return shuffled[:limit]
+    return rng.sample(articles, limit)
 
 
 def hydrate_news_items(items: list[dict[str, Any]], rng: random.Random) -> list[dict[str, Any]]:
@@ -520,7 +537,7 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
     generation_log = [
         "NewsScoutAgent: collecting recent public RSS headlines",
     ]
-    articles = fetch_recent_news()
+    articles = fetch_recent_news(rng=rng)
     generation_log.append(f"NewsScoutAgent: prepared {len(articles)} source stories")
     if not ai_agents.enabled():
         raise RuntimeError("OPENAI_API_KEY or GEMINI_API_KEY is required because game generation is agentic-only.")
@@ -678,7 +695,7 @@ def advance_world(state: dict[str, Any]) -> dict[str, Any]:
     rng = random.Random(f"{state['id']}-{tick}")
     state.setdefault("world_feed", [])
     state.setdefault("generation_log", [])
-    articles = fetch_recent_news(limit=8)
+    articles = fetch_recent_news(limit=8, rng=rng)
     event_result = ai_agents.world_event(state, articles)
     event = event_result.data
     kind = event.get("kind")
