@@ -114,7 +114,7 @@ public class PhoneUIManager : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(KeyCode.Q))
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene("Apartment");
         }
