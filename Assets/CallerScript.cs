@@ -761,6 +761,14 @@ public class CallerScript : MonoBehaviour
             fatherChoiceRoutine = null;
         }
 
+        if (branch == (outgoingFatherCallData != null ? outgoingFatherCallData.panicBranch : null))
+        {
+            if (GlobalCanvasPersistent.Instance != null)
+            {
+                GlobalCanvasPersistent.Instance.AddParanoia(10);
+            }
+        }
+
         outgoingNodeRoutine = StartCoroutine(FatherBranchRoutine(branch));
     }
 
