@@ -211,6 +211,7 @@ GameObject:
   - component: {fileID: 3114096248143755513}
   - component: {fileID: 8633419962291302851}
   - component: {fileID: 7588790051324415800}
+  - component: {fileID: 3426478440846744123}
   m_Layer: 5
   m_Name: GlobalCanvas
   m_TagString: Untagged
@@ -441,6 +442,18 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &3426478440846744123
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 245448045458592223}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 259278f83b569d44083cee8d5c7dac09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ParanoiaEffectsController
 --- !u!1 &319229929409305274
 GameObject:
   m_ObjectHideFlags: 0

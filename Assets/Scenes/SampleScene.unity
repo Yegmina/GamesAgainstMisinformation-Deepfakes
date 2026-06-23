@@ -10183,6 +10183,89 @@ MonoBehaviour:
   outgoingRingDuration: 3
   unavailableMessageDuration: 2
   unavailableTextColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
+  outgoingMomCallData:
+    displayName: Mom
+    nodes:
+    - speechText: 
+      voiceAudio: {fileID: 8300000, guid: 9414d7e80c25b324bafb99feb4385717, type: 3}
+      choices: []
+      nextNodeIndex: 0
+      isBadEnding: 0
+  outgoingBrotherCallData:
+    displayName: Brother
+    nodes:
+    - speechText: 
+      voiceAudio: {fileID: 8300000, guid: 7e55bd686b0caa042a6bd643ae617320, type: 3}
+      choices: []
+      nextNodeIndex: 0
+      isBadEnding: 0
+  outgoingContactTimeout: 8
+  outgoingFatherCallData:
+    displayName: Dad
+    initialNodes:
+    - speechText: Dad?! Oh thank god you answered! Something is seriously wrong.
+        I tried calling Mom and my brother, but... but something is deeply wrong
+        with their lines! The voices, the responses... it's like a distorted glitch!
+        I think I'm being hacked, Dad! What is happening?!
+      voiceAudio: {fileID: 8300000, guid: f5b7df8cd2fa0464ebb8adab03eb0d45, type: 3}
+      choices: []
+      nextNodeIndex: -1
+      isBadEnding: 0
+    - speechText: 'Son? Hey, breathe. Calm down. There is a massive spoofing attack
+        on the network right now, they are stealing biometric data. Your screaming
+        is glitching my audio filter, I can barely hear you. Calm your voice and
+        tell me: did they ask you for money or security pins?'
+      voiceAudio: {fileID: 8300000, guid: 6abbc24b74e4eb1479db6aae13cc183d, type: 3}
+      choices: []
+      nextNodeIndex: -1
+      isBadEnding: 0
+    panicBranch:
+      choiceText: 'I don''t care about pins! I''m losing my mind here! Just tell
+        me where you are, should I come over?! '
+      nodes:
+      - speechText: I don't care about pins! I'm losing my mind here! Just tell me
+          where you are, should I come over?! Are you at home?!
+        voiceAudio: {fileID: 8300000, guid: 17215cddd17918241a1103716cc027e1, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 0
+      - speechText: Voice metrics captured. Geolocation pinpointed. Thank you for
+          your cooperation.
+        voiceAudio: {fileID: 8300000, guid: 6ba936ac518d2ff48a60fb8467ced4b2, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 0
+      - speechText: What?! Wait, you're not my dad! Who is this?!
+        voiceAudio: {fileID: 8300000, guid: 880d3c0a1333b724ca67597ff6380f99, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 1
+      disconnectSound: {fileID: 0}
+      hardCutAudioOnEnd: 0
+    calmBranch:
+      choiceText: No, they didn't. Wait... Dad, why does your voice sound so flat?
+        Tell me our dog's name.
+      nodes:
+      - speechText: No, they didn't. Wait... Dad, why does your voice sound so flat?
+          Tell me our dog's name.
+        voiceAudio: {fileID: 8300000, guid: c01b1d529546eb64984b60473e028c98, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 0
+      - speechText: Our... dog's name? Context generation error. Query not found...
+          found... please repeat the query...
+        voiceAudio: {fileID: 8300000, guid: c01b1d529546eb64984b60473e028c98, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 0
+      - speechText: Oh my god... It's not him. You're a deepfake.
+        voiceAudio: {fileID: 8300000, guid: 2e9f448af2d079045b7d7f2c8dc4a343, type: 3}
+        choices: []
+        nextNodeIndex: -1
+        isBadEnding: 0
+      disconnectSound: {fileID: 0}
+      hardCutAudioOnEnd: 1
+    choiceWindowSeconds: 60
 --- !u!82 &1281711179
 AudioSource:
   m_ObjectHideFlags: 0

@@ -78,7 +78,6 @@ public class IncomingCallManager : MonoBehaviour
     ActiveCallType activeCallType = ActiveCallType.None;
     bool answerTransitionInProgress;
     float answerTransitionStartedAt;
-    float lastRingingHeartbeatAt;
 
     public bool IsIncomingStoryCallInProgress =>
         activeCallType == ActiveCallType.Neighbor
@@ -88,7 +87,17 @@ public class IncomingCallManager : MonoBehaviour
     // #region agent log
     static void AgentLog(string hypothesisId, string location, string message, string dataJson)
     {
-        CallDebugLog.Write(hypothesisId, location, message, dataJson);
+        try
+        {
+            string path = Path.Combine(Application.dataPath, "..", "debug-164d82.log");
+            string line =
+                "{\"sessionId\":\"164d82\",\"hypothesisId\":\"" + hypothesisId +
+                "\",\"location\":\"" + location + "\",\"message\":\"" + message +
+                "\",\"data\":" + dataJson + ",\"timestamp\":" +
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n";
+            File.AppendAllText(path, line);
+        }
+        catch { /* ignore logging failures */ }
     }
     // #endregion
 
@@ -187,20 +196,6 @@ public class IncomingCallManager : MonoBehaviour
 
     void Update()
     {
-        if (callShown && incomingCallScreen != null && incomingCallScreen.activeSelf)
-        {
-            if (Time.unscaledTime - lastRingingHeartbeatAt >= 10f)
-            {
-                lastRingingHeartbeatAt = Time.unscaledTime;
-                // #region agent log
-                CallDebugLog.Write("A", "IncomingCallManager.Update", "Incoming ringing heartbeat",
-                    "{\"activeCallType\":\"" + activeCallType + "\",\"screenActive\":true,\"ringtonePlaying\":" +
-                    (ringtoneSource != null && ringtoneSource.isPlaying ? "true" : "false") +
-                    ",\"ringtoneLoop\":" + (ringtoneSource != null && ringtoneSource.loop ? "true" : "false") + "}");
-                // #endregion
-            }
-        }
-
         if (!timersInitialized || storyPhase == StoryCallPhase.Complete || callShown)
             return;
 
@@ -321,7 +316,6 @@ public class IncomingCallManager : MonoBehaviour
 
         if (incomingCallScreen != null) incomingCallScreen.SetActive(true);
         PrepareIncomingRingButtons();
-        lastRingingHeartbeatAt = Time.unscaledTime;
 
         if (ringtoneSource != null && incomingRingtoneClip != null)
         {
@@ -329,15 +323,6 @@ public class IncomingCallManager : MonoBehaviour
             ringtoneSource.loop = true;
             ringtoneSource.Play();
         }
-
-        // #region agent log
-        CallDebugLog.Write("A", "IncomingCallManager.PresentIncomingCallScreen", "Incoming ring presented",
-            "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") +
-            ",\"screenActive\":" + (incomingCallScreen != null && incomingCallScreen.activeSelf ? "true" : "false") +
-            ",\"ringtoneClipAssigned\":" + (incomingRingtoneClip != null ? "true" : "false") +
-            ",\"ringtonePlaying\":" + (ringtoneSource != null && ringtoneSource.isPlaying ? "true" : "false") +
-            ",\"ringtoneLoop\":" + (ringtoneSource != null && ringtoneSource.loop ? "true" : "false") + "}");
-        // #endregion
 
         Debug.Log($"[IncomingCallManager] Incoming call screen shown. activeCallType={activeCallType}");
         AgentLog("C", "IncomingCallManager.PresentIncomingCallScreen", "Incoming screen shown",
@@ -370,13 +355,6 @@ public class IncomingCallManager : MonoBehaviour
             incomingDeclineButton.gameObject.SetActive(true);
             incomingDeclineButton.interactable = !IsIncomingStoryCallInProgress;
         }
-
-        // #region agent log
-        CallDebugLog.Write("B", "IncomingCallManager.PrepareIncomingRingButtons", "Incoming ring buttons prepared",
-            "{\"storyCall\":" + (IsIncomingStoryCallInProgress ? "true" : "false") +
-            ",\"answerInteractable\":" + (incomingAnswerButton != null && incomingAnswerButton.interactable ? "true" : "false") +
-            ",\"declineInteractable\":" + (incomingDeclineButton != null && incomingDeclineButton.interactable ? "true" : "false") + "}");
-        // #endregion
 
         AgentLog("G", "IncomingCallManager.EnsureIncomingAnswerButtonVisible",
             "Incoming answer button state",
@@ -451,14 +429,6 @@ public class IncomingCallManager : MonoBehaviour
 
     public void AnswerIncoming()
     {
-        bool incomingVisibleAtEntry = incomingCallScreen != null && incomingCallScreen.activeSelf;
-        // #region agent log
-        CallDebugLog.Write("C", "IncomingCallManager.AnswerIncoming", "Answer pressed",
-            "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") +
-            ",\"incomingVisible\":" + (incomingVisibleAtEntry ? "true" : "false") +
-            ",\"answerInteractable\":" + (incomingAnswerButton != null && incomingAnswerButton.interactable ? "true" : "false") + "}");
-        // #endregion
-
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
         {
             Debug.LogWarning("[IncomingCallManager] AnswerIncoming ignored: transition already in progress.");
@@ -545,20 +515,8 @@ public class IncomingCallManager : MonoBehaviour
 
     public void DeclineIncoming()
     {
-        // #region agent log
-        CallDebugLog.Write("B", "IncomingCallManager.DeclineIncoming", "Decline pressed",
-            "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") +
-            ",\"incomingVisible\":" + (incomingCallScreen != null && incomingCallScreen.activeSelf ? "true" : "false") + "}");
-        // #endregion
-
         if (IsIncomingStoryCallInProgress)
-        {
-            // #region agent log
-            CallDebugLog.Write("B", "IncomingCallManager.DeclineIncoming", "Blocked story decline",
-                "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") + "}");
-            // #endregion
             return;
-        }
 
         Debug.Log("[IncomingCallManager] DeclineIncoming");
         AgentLog("A", "IncomingCallManager.DeclineIncoming", "Call declined", "{}");
@@ -582,13 +540,7 @@ public class IncomingCallManager : MonoBehaviour
         }
 
         if (IsIncomingStoryCallInProgress)
-        {
-            // #region agent log
-            CallDebugLog.Write("B", "IncomingCallManager.EndCallerScreen", "Blocked story hang-up",
-                "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") + "}");
-            // #endregion
             return;
-        }
 
         Debug.Log("[IncomingCallManager] EndCallerScreen");
         if (audioSource != null) audioSource.Stop();
@@ -619,10 +571,6 @@ public class IncomingCallManager : MonoBehaviour
     void HandleCallEnded()
     {
         Debug.Log("[IncomingCallManager] HandleCallEnded");
-        // #region agent log
-        CallDebugLog.Write("D", "IncomingCallManager.HandleCallEnded", "Conversation ended",
-            "{\"activeCallType\":\"" + activeCallType + "\",\"callShown\":" + (callShown ? "true" : "false") + "}");
-        // #endregion
         ReturnToIdleHome();
         callShown = false;
         AdvanceStoryTimelineAfterCall();
