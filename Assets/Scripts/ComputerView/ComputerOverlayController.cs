@@ -1194,11 +1194,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         hl.childControlHeight   = true;
         hl.childForceExpandHeight = false;
 
-        // "ESC" key-cap
+        // "Q" key-cap
         Color capBg = Html("#1e2535");
-        GameObject cap = PanelObject(hint.transform, "EscCap", capBg);
+        GameObject cap = PanelObject(hint.transform, "QCap", capBg);
         MakeRounded(cap, capBg, 5f);
-        Layout(cap, 34f, 17f, 0f, 0f);
+        Layout(cap, 24f, 17f, 0f, 0f); // Q is narrower than ESC, 24f is perfect!
         cap.GetComponent<Image>().raycastTarget = false;
         HorizontalLayoutGroup capHl = cap.AddComponent<HorizontalLayoutGroup>();
         capHl.childAlignment      = TextAnchor.MiddleCenter;
@@ -1206,7 +1206,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         capHl.childForceExpandWidth  = true;
         capHl.childControlHeight   = true;
         capHl.childForceExpandHeight = true;
-        TMP_Text capTxt = WinText(cap.transform, "ESC", "ESC", 9, TextPrimary, FontStyles.Bold);
+        TMP_Text capTxt = WinText(cap.transform, "Q", "Q", 9, TextPrimary, FontStyles.Bold);
         capTxt.alignment = TextAlignmentOptions.Center;
 
         // Label
