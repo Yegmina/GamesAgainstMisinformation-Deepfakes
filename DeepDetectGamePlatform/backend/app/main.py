@@ -15,7 +15,7 @@ from pydantic import BaseModel, EmailStr, Field
 from .article_enrichment import MEDIA_DIR, ensure_media_dirs, merge_article_fields, schedule_article_enrichment
 from .auth import create_session, current_user, hash_password, verify_password
 from .db import connect, init_db, list_games, load_game, row_to_dict, save_game
-from .game_engine import advance_world, apply_action, generate_game
+from .game_engine import advance_world, apply_action, ensure_teaching_email_attachments, generate_game
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PROJECT_DIR = Path(__file__).resolve().parents[2]
@@ -118,6 +118,8 @@ def get_game(game_id: str, user: dict = Depends(current_user)) -> dict:
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
+    if ensure_teaching_email_attachments(state):
+        save_game(game_id, user["id"], state)
     schedule_article_enrichment(game_id, user["id"])
     return {"game": state}
 
@@ -127,6 +129,8 @@ def backup_game(game_id: str, user: dict = Depends(current_user)) -> dict:
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
+    if ensure_teaching_email_attachments(state):
+        save_game(game_id, user["id"], state)
     backup = copy.deepcopy(state)
     backup_id = str(uuid.uuid4())
     backup["id"] = backup_id
@@ -193,6 +197,7 @@ def action(game_id: str, payload: ActionIn, user: dict = Depends(current_user)) 
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
+    ensure_teaching_email_attachments(state)
     try:
         state = apply_action(state, payload.surface, payload.item_id, payload.choice, payload.custom_text)
     except ValueError as exc:
@@ -210,6 +215,7 @@ def tick(game_id: str, user: dict = Depends(current_user)) -> dict:
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
+    ensure_teaching_email_attachments(state)
     try:
         state = advance_world(state)
     except RuntimeError as exc:

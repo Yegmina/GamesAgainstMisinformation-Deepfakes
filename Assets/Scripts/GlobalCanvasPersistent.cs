@@ -189,7 +189,6 @@ public class GlobalCanvasPersistent : MonoBehaviour
             _hudVisible = visible;
             _hudTransform.gameObject.SetActive(visible);
 
-            // ТВОИ ИЗМЕНЕНИЯ: управление MissionSidebar и SidebarOpenButton
             if (_missionSidebarTransform == null)
             {
                 _missionSidebarTransform = transform.Find("MissionSidebar");
@@ -291,14 +290,12 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             int m = Mathf.FloorToInt(timer / 60f);
             int s = Mathf.FloorToInt(timer % 60f);
-            // ТВОЁ: size=10 вместо 18
             timerText.text = string.Format("{0:00}:{1:00}\n<size=10><color=#888888>TIME LEFT</color></size>", m, s);
             timerText.color = timer < 120f ? new Color(1f, 0.25f, 0.25f) : Color.white;
         }
 
         if (paranoiaText != null)
         {
-            // ТВОЁ: size=10 вместо 18
             paranoiaText.text = paranoia + "%\n<size=10><color=#888888>PARANOIA</color></size>";
         }
 
@@ -311,7 +308,6 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
         if (pointsText != null)
         {
-            // ТВОЁ: size=10 вместо 18
             pointsText.text = points + "\n<size=10><color=#888888>POINTS</color></size>";
         }
     }

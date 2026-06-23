@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+import requests
 from dotenv import load_dotenv
 from openai import APIStatusError, OpenAI, RateLimitError
 
@@ -319,17 +320,38 @@ def generate_article_image(prompt: str) -> AgentResult[bytes]:
         raise RuntimeError("OPENAI_API_KEY is not configured.")
 
     client = OpenAI()
-    response = client.images.generate(
-        model=OPENAI_IMAGE_MODEL,
-        prompt=prompt,
-        response_format="b64_json",
-        size="1536x1024",
-        output_format="png",
-        quality="medium",
-    )
-    if not response.data or not response.data[0].b64_json:
+    request_args: dict[str, Any] = {
+        "model": OPENAI_IMAGE_MODEL,
+        "prompt": prompt,
+    }
+    if OPENAI_IMAGE_MODEL.startswith("dall-e-"):
+        request_args["size"] = "1792x1024" if OPENAI_IMAGE_MODEL == "dall-e-3" else "1024x1024"
+        if OPENAI_IMAGE_MODEL == "dall-e-3":
+            request_args["quality"] = "standard"
+    else:
+        request_args["size"] = "1536x1024"
+        request_args["output_format"] = "png"
+        request_args["quality"] = "medium"
+
+    response = client.images.generate(**request_args)
+    first_image = response.data[0] if response.data else None
+    b64_json = getattr(first_image, "b64_json", None)
+    if b64_json:
+        return AgentResult(base64.b64decode(b64_json), "openai", OPENAI_IMAGE_MODEL)
+
+    image_url = getattr(first_image, "url", None)
+    if image_url:
+        download = requests.get(
+            image_url,
+            timeout=30,
+            headers={"User-Agent": "DeepDetectGamePlatform/1.0"},
+        )
+        download.raise_for_status()
+        return AgentResult(download.content, "openai", OPENAI_IMAGE_MODEL)
+
+    if not first_image:
         raise RuntimeError("OpenAI image response did not include image data.")
-    return AgentResult(base64.b64decode(response.data[0].b64_json), "openai", OPENAI_IMAGE_MODEL)
+    raise RuntimeError("OpenAI image response did not include downloadable image data.")
 
 
 def judge_and_reply(surface: str, participant: str, prompt_text: str, player_answer: str) -> AgentResult[dict[str, Any]]:

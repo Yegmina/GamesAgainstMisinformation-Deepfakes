@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -78,6 +79,10 @@ public class IncomingCallManager : MonoBehaviour
     ActiveCallType activeCallType = ActiveCallType.None;
     bool answerTransitionInProgress;
     float answerTransitionStartedAt;
+    bool phoneLockedByBadEnding;
+    Coroutine vibrationRoutine;
+
+    public bool isPhoneBusy;
 
     public bool IsIncomingStoryCallInProgress =>
         activeCallType == ActiveCallType.Neighbor
@@ -111,6 +116,8 @@ public class IncomingCallManager : MonoBehaviour
         if (ringtoneSource == null) ringtoneSource = gameObject.AddComponent<AudioSource>();
         ringtoneSource.playOnAwake = false;
         ringtoneSource.loop = true;
+
+        StopIncomingDeclineVibration();
 
         WireIncomingButtons();
     }
@@ -196,7 +203,7 @@ public class IncomingCallManager : MonoBehaviour
 
     void Update()
     {
-        if (!timersInitialized || storyPhase == StoryCallPhase.Complete || callShown)
+        if (!timersInitialized || storyPhase == StoryCallPhase.Complete || callShown || isPhoneBusy)
             return;
 
         phaseElapsed += Time.deltaTime;
@@ -237,6 +244,9 @@ public class IncomingCallManager : MonoBehaviour
 
     bool IsIdleOnHome()
     {
+        if (isPhoneBusy)
+            return false;
+
         if (phoneManager == null)
         {
             AgentLog("C", "IncomingCallManager.IsIdleOnHome", "phoneManager null treating as idle", "{}");
@@ -377,6 +387,39 @@ public class IncomingCallManager : MonoBehaviour
         if (ringtoneSource != null) ringtoneSource.Stop();
     }
 
+    void StartIncomingDeclineVibration()
+    {
+        if (vibrationRoutine != null)
+            StopCoroutine(vibrationRoutine);
+
+        vibrationRoutine = StartCoroutine(IncomingDeclineVibrationCoroutine());
+    }
+
+    void StopIncomingDeclineVibration()
+    {
+        if (vibrationRoutine != null)
+        {
+            StopCoroutine(vibrationRoutine);
+            vibrationRoutine = null;
+        }
+    }
+
+    IEnumerator IncomingDeclineVibrationCoroutine()
+    {
+        const float duration = 2f;
+        const float interval = 0.12f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            Handheld.Vibrate();
+            yield return new WaitForSecondsRealtime(interval);
+            elapsed += interval;
+        }
+
+        vibrationRoutine = null;
+    }
+
     void RestoreCallerScreenButtons()
     {
         SetCallerScreenButtonVisible(callerAnswerButton, false);
@@ -402,6 +445,9 @@ public class IncomingCallManager : MonoBehaviour
     void ReturnToIdleHome()
     {
         StopRingtone();
+        StopIncomingDeclineVibration();
+        if (!phoneLockedByBadEnding)
+            isPhoneBusy = false;
 
         if (incomingCallScreen != null) incomingCallScreen.SetActive(false);
 
@@ -429,6 +475,8 @@ public class IncomingCallManager : MonoBehaviour
 
     public void AnswerIncoming()
     {
+        StopIncomingDeclineVibration();
+
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
         {
             Debug.LogWarning("[IncomingCallManager] AnswerIncoming ignored: transition already in progress.");
@@ -516,7 +564,10 @@ public class IncomingCallManager : MonoBehaviour
     public void DeclineIncoming()
     {
         if (IsIncomingStoryCallInProgress)
+        {
+            StartIncomingDeclineVibration();
             return;
+        }
 
         Debug.Log("[IncomingCallManager] DeclineIncoming");
         AgentLog("A", "IncomingCallManager.DeclineIncoming", "Call declined", "{}");
@@ -540,13 +591,16 @@ public class IncomingCallManager : MonoBehaviour
         }
 
         if (IsIncomingStoryCallInProgress)
+        {
+            StartIncomingDeclineVibration();
             return;
+        }
 
         Debug.Log("[IncomingCallManager] EndCallerScreen");
         if (audioSource != null) audioSource.Stop();
 
         if (callerController != null && callerController.IsCallActive)
-            callerController.CloseCaller();
+            callerController.DeclineCall();
         else
             HandleCallEnded();
     }
@@ -554,6 +608,8 @@ public class IncomingCallManager : MonoBehaviour
     void HandleBadCallEnding()
     {
         Debug.Log("[IncomingCallManager] Bad call ending detected.");
+        phoneLockedByBadEnding = true;
+        isPhoneBusy = true;
         AgentLog("H", "IncomingCallManager.HandleBadCallEnding", "Bad ending event received", "{}");
     }
 
