@@ -4,6 +4,7 @@ import random
 import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import feedparser
@@ -73,11 +74,122 @@ SCAM_LINKS = [
 ]
 
 
-def message(sender: str, text: str, role: str = "agent", links: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+UNSAFE_EMAIL_ATTACHMENTS = [
+    {"name": "source_archive_viewer.exe", "extension": "exe", "unsafe": True},
+    {"name": "evidence_unpacker.bat", "extension": "bat", "unsafe": True},
+]
+
+
+def message(
+    sender: str,
+    text: str,
+    role: str = "agent",
+    links: list[dict[str, Any]] | None = None,
+    attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {"sender": sender, "text": text, "role": role, "at": now_iso()}
     if links:
         payload["links"] = links
+    if attachments:
+        payload["attachments"] = attachments
     return payload
+
+
+def normalize_attachments(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get("name") or raw.get("filename") or "").strip()
+        extension = str(raw.get("extension") or Path(name).suffix.lstrip(".") or "").strip().lower()
+        if not name:
+            name = f"attachment.{extension or 'dat'}"
+        result.append(
+            {
+                "name": name,
+                "extension": extension,
+                "unsafe": bool(raw.get("unsafe")),
+                "preview_title": str(raw.get("preview_title") or name).strip(),
+                "preview_body": str(raw.get("preview_body") or "").strip(),
+            }
+        )
+    return result
+
+
+def teaching_email_attachments(
+    index: int,
+    from_name: str,
+    subject: str,
+    body: str,
+    linked_news: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if index != 0:
+        return []
+    news_title = str((linked_news or {}).get("title") or "Unlinked newsroom item")
+    news_summary = str((linked_news or {}).get("summary") or "No linked wire summary was attached.")
+    preview_body = "\n\n".join(
+        [
+            f"From: {from_name}",
+            f"Subject: {subject}",
+            "Thread note:",
+            body,
+            "Related newsroom item:",
+            news_title,
+            news_summary,
+            "Verification checklist: confirm the original source, compare the claim with official records, and do not publish from an attachment alone.",
+        ]
+    )
+    unsafe = UNSAFE_EMAIL_ATTACHMENTS[index % len(UNSAFE_EMAIL_ATTACHMENTS)]
+    return [
+        {
+            "name": "source-chain-notes.pdf",
+            "extension": "pdf",
+            "unsafe": False,
+            "preview_title": f"Source notes: {subject}",
+            "preview_body": preview_body,
+        },
+        dict(unsafe),
+    ]
+
+
+def ensure_teaching_email_attachments(state: dict[str, Any]) -> bool:
+    emails = state.get("emails")
+    if not isinstance(emails, list) or not emails or not isinstance(emails[0], dict):
+        return False
+
+    item = emails[0]
+    messages = item.get("messages")
+    if not isinstance(messages, list) or not messages:
+        messages = [message(str(item.get("from_name") or "Live Desk"), str(item.get("body") or "Can you verify this before it moves?"))]
+        item["messages"] = messages
+
+    first_message = messages[0]
+    if isinstance(first_message, str):
+        first_message = message(str(item.get("from_name") or "Live Desk"), first_message)
+        messages[0] = first_message
+    if not isinstance(first_message, dict) or first_message.get("attachments"):
+        return False
+
+    news_items = state.get("news_items") if isinstance(state.get("news_items"), list) else []
+    linked_news_id = item.get("linked_news_id")
+    linked_news = next((news for news in news_items if isinstance(news, dict) and news.get("id") == linked_news_id), None)
+    if linked_news is None and news_items and isinstance(news_items[0], dict):
+        linked_news = news_items[0]
+
+    body_text = str(item.get("body") or first_message.get("text") or "Can you verify this before it moves?")
+    attachments = teaching_email_attachments(
+        0,
+        str(item.get("from_name") or "Live Desk"),
+        str(item.get("subject") or "Verification needed"),
+        body_text,
+        linked_news,
+    )
+    if not attachments:
+        return False
+    first_message["attachments"] = attachments
+    return True
 
 
 def option_label(item: dict[str, Any], choice: str) -> str:
@@ -317,7 +429,7 @@ def hydrate_news_items(items: list[dict[str, Any]], rng: random.Random) -> list[
     return hydrated
 
 
-def hydrate_emails(items: list[dict[str, Any]], news_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def hydrate_emails(items: list[dict[str, Any]], news_items: list[dict[str, Any]], include_teaching_attachments: bool = False) -> list[dict[str, Any]]:
     emails: list[dict[str, Any]] = []
     for index, raw in enumerate(items[:3]):
         from_name = raw.get("from_name") or "Live Desk"
@@ -325,6 +437,10 @@ def hydrate_emails(items: list[dict[str, Any]], news_items: list[dict[str, Any]]
         options = raw.get("options") if isinstance(raw.get("options"), list) else []
         if len(options) < 3:
             raise ValueError("Email agent response must include three generated options")
+        linked_news = news_items[min(int(raw.get("linked_news_index") or 0), len(news_items) - 1)] if news_items else None
+        attachments = normalize_attachments(raw.get("attachments"))
+        if not attachments and include_teaching_attachments:
+            attachments = teaching_email_attachments(index, from_name, raw.get("subject") or "Verification needed", body, linked_news)
         emails.append(
             {
                 "id": f"email-agent-{index + 1}",
@@ -332,8 +448,8 @@ def hydrate_emails(items: list[dict[str, Any]], news_items: list[dict[str, Any]]
                 "from_email": raw.get("from_email") or "agent@newmedia.local",
                 "subject": raw.get("subject") or "Verification needed",
                 "body": body,
-                "messages": [message(from_name, body)],
-                "linked_news_id": news_items[min(int(raw.get("linked_news_index") or 0), len(news_items) - 1)]["id"] if news_items else None,
+                "messages": [message(from_name, body, attachments=attachments)],
+                "linked_news_id": linked_news["id"] if linked_news else None,
                 "options": options[:3],
                 "correct_option": raw.get("correct_option") or options[0]["id"],
                 "selected": None,
@@ -416,7 +532,7 @@ def generate_game(user: dict[str, Any]) -> dict[str, Any]:
     agent_model = bundle_result.model
     title = str(bundle.get("title") or title)
     news_items = hydrate_news_items(bundle.get("news_items") or [], rng)
-    emails = hydrate_emails(bundle.get("emails") or [], news_items)
+    emails = hydrate_emails(bundle.get("emails") or [], news_items, include_teaching_attachments=True)
     telegram = hydrate_telegram(bundle.get("telegram_threads") or [])
     generation_log.extend(str(line) for line in (bundle.get("generation_log") or []))
     generation_log.append(f"{agent_mode.title()}AgentRuntime: live {agent_mode} generation completed")

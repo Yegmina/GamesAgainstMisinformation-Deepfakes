@@ -157,7 +157,7 @@ def _build_synthetic_article(game_id: str, item: dict[str, Any]) -> dict[str, An
             fields["article_image_url"] = _write_article_image(game_id, str(item.get("id") or "news"), image_result.data)
             fields["article_image_model"] = image_result.model
         except Exception as exc:
-            fields["article_error"] = f"Image generation unavailable: {_safe_error(exc)}"
+            fields["article_error"] = f"Image generation unavailable. {_safe_error(exc)}"
     return fields
 
 
@@ -300,7 +300,17 @@ def _slug(value: str) -> str:
 
 def _safe_error(exc: Exception) -> str:
     message = str(exc).replace(os.getenv("OPENAI_API_KEY") or "", "")
-    return " ".join(message.split())[:260]
+    normalized = " ".join(message.split())
+    lower = normalized.lower()
+    if "unknown parameter" in lower:
+        return "Image request option was not accepted by the image service."
+    if "rate limit" in lower or "rate_limit" in lower or "429" in lower:
+        return "Image service is temporarily rate-limited."
+    if "quota" in lower or "billing" in lower or "insufficient" in lower:
+        return "Image service quota is unavailable."
+    if "401" in lower or "unauthorized" in lower or "api key" in lower:
+        return "Image service is not configured."
+    return normalized[:180]
 
 
 def _now_iso() -> str:
