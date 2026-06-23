@@ -17,15 +17,13 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     [Header("Horror Music")]
     [SerializeField] private AudioSource horrorMusicSource;
-    [SerializeField, Range(0f, 1f)] private float horrorMusicVolume = 0.25f; // Quieter default volume so it doesn't block phone calls
-    [SerializeField] private AudioClip clip0To30;  // 2.wav
-    [SerializeField] private AudioClip clip30To60;  // 3.wav
-    [SerializeField] private AudioClip clip60To100; // Incarceration.wav
+    [SerializeField, Range(0f, 1f)] private float horrorMusicVolume = 0.25f;
+    [SerializeField] private AudioClip clip0To30;
+    [SerializeField] private AudioClip clip30To60;
+    [SerializeField] private AudioClip clip60To100;
 
     [Header("Virus Jump-Scare")]
-    [Tooltip("Drag your scream / jump-scare audio clip here. Played when the virus pop-up attack triggers.")]
     [SerializeField] private AudioClip virusScreamClip;
-    [Tooltip("Optional dedicated AudioSource for the scream. If left empty, the Horror Music source is used.")]
     [SerializeField] private AudioSource virusScreamSource;
     [SerializeField, Range(0f, 1f)] private float virusScreamVolume = 1f;
 
@@ -49,26 +47,16 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
 
         instance = this;
-        gameObject.name = "GlobalCanvas"; // Ensure name is always exactly "GlobalCanvas"
+        gameObject.name = "GlobalCanvas";
         DontDestroyOnLoad(gameObject);
-
-        // Keep the game (and any ending cutscene VideoPlayer) running even when the
-        // editor/game window loses focus, so cutscenes don't appear to pause.
         Application.runInBackground = true;
-
-        // Force timer to 10 minutes (600 seconds)
         timer = 600f;
-
-        // Bind HUD UI components
         BindUIElements();
     }
 
     private void Start()
     {
-        // Initial UI Update
         UpdateUI();
-
-        // Initialize and start horror music immediately on start of the scene
         string currentScene = SceneManager.GetActiveScene().name;
         bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
         UpdateHorrorMusic(hideHud);
@@ -76,7 +64,6 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     private void Update()
     {
-        // Keep cursor unlocked and visible at all times as requested
         if (Cursor.lockState != CursorLockMode.None)
         {
             Cursor.lockState = CursorLockMode.None;
@@ -86,12 +73,9 @@ public class GlobalCanvasPersistent : MonoBehaviour
             Cursor.visible = true;
         }
 
-        // Don't run the timer if we are in an ending scene or start game scene
         string currentScene = SceneManager.GetActiveScene().name;
         bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
         ApplyHudVisibility(!hideHud);
-
-        // Update horror music state
         UpdateHorrorMusic(hideHud);
 
         if (hideHud)
@@ -120,8 +104,6 @@ public class GlobalCanvasPersistent : MonoBehaviour
     private void UpdateHorrorMusic(bool hideHud)
     {
         if (horrorMusicSource == null) return;
-
-        // Apply background music volume
         horrorMusicSource.volume = horrorMusicVolume;
 
         if (hideHud)
@@ -142,7 +124,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             targetClip = clip30To60;
         }
-        else // 60% to 100%
+        else
         {
             targetClip = clip60To100;
         }
@@ -191,10 +173,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     private bool _hudVisible = true;
     private Transform _hudTransform;
+    private Transform _missionSidebarTransform;
+    private Transform _sidebarOpenButtonTransform;
 
     private void ApplyHudVisibility(bool visible)
     {
-        // Only toggle when the state actually changes to avoid redundant calls.
         if (_hudTransform == null)
         {
             _hudTransform = transform.Find("HUD");
@@ -205,6 +188,26 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             _hudVisible = visible;
             _hudTransform.gameObject.SetActive(visible);
+
+            // ТВОИ ИЗМЕНЕНИЯ: управление MissionSidebar и SidebarOpenButton
+            if (_missionSidebarTransform == null)
+            {
+                _missionSidebarTransform = transform.Find("MissionSidebar");
+            }
+            if (_sidebarOpenButtonTransform == null)
+            {
+                _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
+            }
+
+            if (_missionSidebarTransform != null)
+            {
+                _missionSidebarTransform.gameObject.SetActive(visible);
+            }
+
+            if (_sidebarOpenButtonTransform != null)
+            {
+                _sidebarOpenButtonTransform.gameObject.SetActive(false);
+            }
         }
     }
 
@@ -225,7 +228,6 @@ public class GlobalCanvasPersistent : MonoBehaviour
         paranoia = Mathf.Clamp(val, 0, 100);
         UpdateUI();
 
-        // Load ending immediately if paranoia reaches 100%
         if (paranoia >= 100)
         {
             timerRunning = false;
@@ -280,39 +282,36 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
     public void UpdateUI()
     {
-        // Re-bind elements if they are lost or if we re-loaded a scene with a new canvas instance
         if (timerText == null || paranoiaText == null || paranoiaFill == null || pointsText == null)
         {
             BindUIElements();
         }
 
-        // 1. Timer Text Update
         if (timerText != null)
         {
             int m = Mathf.FloorToInt(timer / 60f);
             int s = Mathf.FloorToInt(timer % 60f);
+            // ТВОЁ: size=10 вместо 18
             timerText.text = string.Format("{0:00}:{1:00}\n<size=10><color=#888888>TIME LEFT</color></size>", m, s);
             timerText.color = timer < 120f ? new Color(1f, 0.25f, 0.25f) : Color.white;
         }
 
-        // 2. Paranoia Text & Fill Update
         if (paranoiaText != null)
         {
+            // ТВОЁ: size=10 вместо 18
             paranoiaText.text = paranoia + "%\n<size=10><color=#888888>PARANOIA</color></size>";
         }
 
         if (paranoiaFill != null)
         {
             paranoiaFill.rectTransform.anchorMax = new Vector2(paranoia / 100f, 1f);
-            
-            // Linear green-to-red color interpolation for paranoia stackbar
             Color col = Color.Lerp(new Color(0.3f, 0.75f, 0.3f), new Color(0.9f, 0.25f, 0.25f), paranoia / 100f);
             paranoiaFill.color = col;
         }
 
-        // 3. Points Text Update
         if (pointsText != null)
         {
+            // ТВОЁ: size=10 вместо 18
             pointsText.text = points + "\n<size=10><color=#888888>POINTS</color></size>";
         }
     }
@@ -340,4 +339,3 @@ public class GlobalCanvasPersistent : MonoBehaviour
         SceneManager.LoadScene(endingScene);
     }
 }
-
