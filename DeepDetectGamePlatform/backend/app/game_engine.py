@@ -57,17 +57,17 @@ def now_iso() -> str:
 SCAM_LINKS = [
     {
         "label": "Open refund form",
-        "url": "https://refund-check.example.invalid/secure-claim",
+        "url": "https://gov-refund-center.test/claim/secure-apply?id=88427",
         "unsafe": True,
     },
     {
         "label": "Watch the proof video",
-        "url": "https://video-proof.example.invalid/live",
+        "url": "https://breaking-video-live.test/watch/incident-4721",
         "unsafe": True,
     },
     {
         "label": "Verify account now",
-        "url": "https://account-verify.example.invalid/session",
+        "url": "https://account-security-check.test/session/verify-login",
         "unsafe": True,
     },
 ]
