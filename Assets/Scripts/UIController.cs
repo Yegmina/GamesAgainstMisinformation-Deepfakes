@@ -7,21 +7,24 @@ public class UIController : MonoBehaviour
 {
     [Header("UI Elements")]
     [SerializeField] private TextMeshProUGUI textField;
+
+    private Animator textAnimator;
     
     private void Awake()
     {
-        textField.gameObject.SetActive(false);
+        textAnimator = textField.GetComponent<Animator>();
+
     }
 
     public void ShowInteraction(string text)
     {
         textField.text = text;
-        textField.gameObject.SetActive(true);
+        textAnimator.SetBool("Fade", true);
     }
 
     public void HideInteraction()
     {
-        textField.gameObject.SetActive(false);
+        textAnimator.SetBool("Fade", false);
     }
 
     public void LockCursor()
