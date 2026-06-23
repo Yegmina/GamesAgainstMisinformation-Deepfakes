@@ -33,6 +33,38 @@ public class CallData
     public int startNodeIndex;
 }
 
+[Serializable]
+public class OutgoingCallNodeData
+{
+    public string displayName;
+    public CallNode[] nodes;
+}
+
+[Serializable]
+public class FatherCallBranch
+{
+    public string choiceText;
+    public CallNode[] nodes;
+    public AudioClip disconnectSound;
+    public bool hardCutAudioOnEnd;
+}
+
+[Serializable]
+public class FatherOutgoingCallData
+{
+    public string displayName = "DAD";
+    public CallNode[] initialNodes;
+    public FatherCallBranch panicBranch = new FatherCallBranch
+    {
+        choiceText = "Panic"
+    };
+    public FatherCallBranch calmBranch = new FatherCallBranch
+    {
+        choiceText = "Stay Calm"
+    };
+    public float choiceWindowSeconds = 3f;
+}
+
 public enum StoryCallId
 {
     None,
@@ -102,6 +134,74 @@ public class CallerScript : MonoBehaviour
     public float unavailableMessageDuration = 2f;
     public Color unavailableTextColor = new Color(0.9f, 0.1f, 0.1f, 1f);
 
+    [Header("Outgoing Node Calls")]
+    public OutgoingCallNodeData outgoingMomCallData = new OutgoingCallNodeData
+    {
+        displayName = "MOM"
+    };
+    public OutgoingCallNodeData outgoingBrotherCallData = new OutgoingCallNodeData
+    {
+        displayName = "BROTHER"
+    };
+    public float outgoingContactTimeout = 15f;
+
+    [Header("Outgoing Father Branching Call")]
+    public FatherOutgoingCallData outgoingFatherCallData = new FatherOutgoingCallData
+    {
+        displayName = "DAD",
+        choiceWindowSeconds = 3f,
+        initialNodes = new[]
+        {
+            new CallNode
+            {
+                speechText = "Dad?! Oh thank god you answered! Something is seriously wrong. I tried calling Mom and my brother, but... but something is deeply wrong with their lines! The voices, the responses... it's like a distorted glitch! I think I'm being hacked, Dad! What is happening?!"
+            },
+            new CallNode
+            {
+                speechText = "Son? Hey, breathe. Calm down. There is a massive spoofing attack on the network right now, they are stealing biometric data. Your screaming is glitching my audio filter, I can barely hear you. Calm your voice and tell me: did they ask you for money or security pins?"
+            }
+        },
+        panicBranch = new FatherCallBranch
+        {
+            choiceText = "Panic",
+            nodes = new[]
+            {
+                new CallNode
+                {
+                    speechText = "I don't care about pins! I'm losing my mind here! Just tell me where you are, should I come over?! Are you at home?!"
+                },
+                new CallNode
+                {
+                    speechText = "Voice metrics captured. Geolocation pinpointed. Thank you for your cooperation."
+                },
+                new CallNode
+                {
+                    speechText = "What?! Wait, you're not my dad! Who is this?!"
+                }
+            }
+        },
+        calmBranch = new FatherCallBranch
+        {
+            choiceText = "Stay Calm",
+            hardCutAudioOnEnd = true,
+            nodes = new[]
+            {
+                new CallNode
+                {
+                    speechText = "No, they didn't. Wait... Dad, why does your voice sound so flat? Tell me our dog's name."
+                },
+                new CallNode
+                {
+                    speechText = "Our... dog's name? Context generation error. Query not found... found... please repeat the query..."
+                },
+                new CallNode
+                {
+                    speechText = "Oh my god... It's not him. You're a deepfake."
+                }
+            }
+        }
+    };
+
     public Action OnCallEnded;
     public Action OnCallBadEnding;
     public Action OnNeighborCallCompleted;
@@ -120,9 +220,14 @@ public class CallerScript : MonoBehaviour
     Coroutine shakeRoutine;
     Coroutine legacyOutgoingRoutine;
     Coroutine callingEllipsisRoutine;
+    Coroutine outgoingNodeRoutine;
+    Coroutine outgoingTimeoutRoutine;
+    Coroutine fatherChoiceRoutine;
     float callUiActivatedAt;
     bool legacyOutgoingActive;
     bool outgoingUnavailablePhase;
+    bool outgoingNodeCallActive;
+    bool fatherChoiceActive;
     Image badEndingOverlayImage;
     RectTransform shakeTarget;
     Vector2 shakeHomePosition;
@@ -136,7 +241,17 @@ public class CallerScript : MonoBehaviour
     // #region agent log
     static void AgentLog(string hypothesisId, string location, string message, string dataJson)
     {
-        CallDebugLog.Write(hypothesisId, location, message, dataJson);
+        try
+        {
+            string path = Path.Combine(Application.dataPath, "..", "debug-164d82.log");
+            string line =
+                "{\"sessionId\":\"164d82\",\"hypothesisId\":\"" + hypothesisId +
+                "\",\"location\":\"" + location + "\",\"message\":\"" + message +
+                "\",\"data\":" + dataJson + ",\"timestamp\":" +
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n";
+            File.AppendAllText(path, line);
+        }
+        catch { /* ignore logging failures */ }
     }
     // #endregion
 
@@ -270,10 +385,6 @@ public class CallerScript : MonoBehaviour
         audioSource.volume = 1f;
         audioSource.clip = outgoingRingSound;
         audioSource.Play();
-
-        // #region agent log
-        CallDebugLog.Write("A", "CallerScript.PlayOutgoingRinging", "Ring started", "{}");
-        // #endregion
     }
 
     void PlaySubscriberUnavailableSound()
@@ -337,11 +448,6 @@ public class CallerScript : MonoBehaviour
 
     IEnumerator LegacyOutgoingCallRoutine()
     {
-        // #region agent log
-        CallDebugLog.Write("A", "CallerScript.LegacyOutgoingCallRoutine", "Dialing started",
-            "{\"duration\":" + outgoingRingDuration + "}");
-        // #endregion
-
         if (outgoingRingDuration > 0f)
             yield return new WaitForSecondsRealtime(outgoingRingDuration);
 
@@ -360,11 +466,6 @@ public class CallerScript : MonoBehaviour
         StopOutgoingRingSoundIfPlaying();
         ShowSubscriberUnavailableText();
         PlaySubscriberUnavailableSound();
-
-        // #region agent log
-        CallDebugLog.Write("A", "CallerScript.LegacyOutgoingCallRoutine", "Unavailable shown",
-            "{\"holdDuration\":" + unavailableMessageDuration + "}");
-        // #endregion
 
         if (unavailableMessageDuration > 0f)
             yield return new WaitForSecondsRealtime(unavailableMessageDuration);
@@ -402,11 +503,6 @@ public class CallerScript : MonoBehaviour
         PlayOutgoingRinging();
         callingEllipsisRoutine = StartCoroutine(CallingEllipsisRoutine());
         legacyOutgoingRoutine = StartCoroutine(LegacyOutgoingCallRoutine());
-
-        // #region agent log
-        CallDebugLog.Write("A", "CallerScript.StartLegacyOutgoingCall", "Outgoing started",
-            "{\"name\":\"" + displayName + "\"}");
-        // #endregion
     }
 
     void StopLegacyOutgoingCallEffects()
@@ -435,11 +531,263 @@ public class CallerScript : MonoBehaviour
         legacyOutgoingRoutine = null;
         StopLegacyOutgoingCallEffects();
 
-        // #region agent log
-        CallDebugLog.Write("E", "CallerScript.FinishLegacyOutgoingCall", "Finishing outgoing",
-            "{\"reason\":\"" + reason + "\"}");
-        // #endregion
+        CloseCaller(reason);
+    }
 
+    void StopOutgoingNodeCallEffects()
+    {
+        outgoingNodeCallActive = false;
+        fatherChoiceActive = false;
+
+        if (outgoingNodeRoutine != null)
+        {
+            StopCoroutine(outgoingNodeRoutine);
+            outgoingNodeRoutine = null;
+        }
+
+        if (outgoingTimeoutRoutine != null)
+        {
+            StopCoroutine(outgoingTimeoutRoutine);
+            outgoingTimeoutRoutine = null;
+        }
+
+        if (fatherChoiceRoutine != null)
+        {
+            StopCoroutine(fatherChoiceRoutine);
+            fatherChoiceRoutine = null;
+        }
+
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+        StopLegacyOutgoingAudio();
+    }
+
+    void PrepareOutgoingNodeCall(string displayName, Sprite avatar, bool allowManualHangup)
+    {
+        StopLegacyOutgoingCallEffects();
+        StopOutgoingNodeCallEffects();
+
+        ShowCallerScreenForOutgoing();
+        HideBadEndingOverlay();
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+        RestoreDialogueTextDefaults();
+
+        if (callerName != null)
+            callerName.text = displayName;
+        if (callerAvatar != null && avatar != null)
+            callerAvatar.sprite = avatar;
+
+        dialogueActive = false;
+        activeCallData = null;
+        activeStoryCallId = StoryCallId.None;
+        currentNodeIndex = -1;
+        previousNodeIndex = -1;
+        callActive = true;
+        outgoingNodeCallActive = true;
+        callUiActivatedAt = Time.unscaledTime;
+
+        if (dialogueText != null)
+            dialogueText.gameObject.SetActive(true);
+
+        if (incomingCallManager != null)
+            incomingCallManager.SetCallerEndCallAvailable(allowManualHangup);
+    }
+
+    void StartOutgoingTimedNodeCall(OutgoingCallNodeData callData, Sprite avatar, string fallbackName)
+    {
+        string displayName = callData != null && !string.IsNullOrWhiteSpace(callData.displayName)
+            ? callData.displayName
+            : fallbackName;
+
+        PrepareOutgoingNodeCall(displayName, avatar, true);
+        outgoingNodeRoutine = StartCoroutine(OutgoingTimedNodeCallRoutine(callData));
+        outgoingTimeoutRoutine = StartCoroutine(OutgoingContactTimeoutRoutine());
+    }
+
+    IEnumerator OutgoingTimedNodeCallRoutine(OutgoingCallNodeData callData)
+    {
+        yield return OutgoingDialingDelay();
+
+        if (!outgoingNodeCallActive || !callActive)
+            yield break;
+
+        yield return PlayOutgoingNodeArray(callData != null ? callData.nodes : null);
+    }
+
+    IEnumerator OutgoingContactTimeoutRoutine()
+    {
+        yield return new WaitForSecondsRealtime(outgoingContactTimeout);
+
+        if (outgoingNodeCallActive && callActive)
+            FinishOutgoingNodeCall("outgoing contact timed out");
+    }
+
+    void StartFatherOutgoingCall()
+    {
+        string displayName = outgoingFatherCallData != null && !string.IsNullOrWhiteSpace(outgoingFatherCallData.displayName)
+            ? outgoingFatherCallData.displayName
+            : "DAD";
+
+        PrepareOutgoingNodeCall(displayName, dadAvatar, true);
+        outgoingNodeRoutine = StartCoroutine(FatherOutgoingCallRoutine());
+    }
+
+    IEnumerator FatherOutgoingCallRoutine()
+    {
+        yield return OutgoingDialingDelay();
+
+        if (!outgoingNodeCallActive || !callActive)
+            yield break;
+
+        yield return PlayOutgoingNodeArray(outgoingFatherCallData != null ? outgoingFatherCallData.initialNodes : null);
+
+        if (!outgoingNodeCallActive || !callActive)
+            yield break;
+
+        fatherChoiceRoutine = StartCoroutine(FatherChoiceWindowRoutine());
+    }
+
+    IEnumerator OutgoingDialingDelay()
+    {
+        PlayOutgoingRinging();
+
+        float elapsed = 0f;
+        while (elapsed < outgoingRingDuration)
+        {
+            if (!outgoingNodeCallActive || !callActive)
+                yield break;
+
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        StopOutgoingRingSoundIfPlaying();
+    }
+
+    IEnumerator PlayOutgoingNodeArray(CallNode[] nodes)
+    {
+        if (nodes == null)
+            yield break;
+
+        for (int i = 0; i < nodes.Length; i++)
+        {
+            if (!outgoingNodeCallActive || !callActive)
+                yield break;
+
+            CallNode node = nodes[i];
+            if (dialogueText != null)
+            {
+                dialogueText.text = node != null ? node.speechText ?? string.Empty : string.Empty;
+                ApplyStandardDialogueTextStyle();
+            }
+
+            float voiceDuration = node != null ? PlayNodeVoice(node.voiceAudio) : 0f;
+            if (voiceDuration > 0f)
+                yield return new WaitForSeconds(voiceDuration);
+            else if (autoAdvanceDelay > 0f)
+                yield return new WaitForSeconds(autoAdvanceDelay);
+        }
+    }
+
+    IEnumerator FatherChoiceWindowRoutine()
+    {
+        fatherChoiceActive = true;
+        if (incomingCallManager != null)
+            incomingCallManager.SetCallerEndCallAvailable(false);
+
+        SpawnFatherChoiceButtons();
+
+        float choiceWindow = outgoingFatherCallData != null && outgoingFatherCallData.choiceWindowSeconds > 0f
+            ? outgoingFatherCallData.choiceWindowSeconds
+            : 3f;
+
+        float elapsed = 0f;
+        while (elapsed < choiceWindow && fatherChoiceActive && outgoingNodeCallActive && callActive)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (fatherChoiceActive && outgoingNodeCallActive && callActive)
+            SelectFatherBranch(outgoingFatherCallData != null ? outgoingFatherCallData.panicBranch : null);
+    }
+
+    void SpawnFatherChoiceButtons()
+    {
+        Transform container = GetChoicesContainer();
+        if (container == null || choiceButtonPrefab == null)
+            return;
+
+        SetChoicesContainerVisible(true);
+        ClearDialogueChoices();
+
+        CreateFatherChoiceButton(outgoingFatherCallData != null ? outgoingFatherCallData.panicBranch : null, "Option A / Panic");
+        CreateFatherChoiceButton(outgoingFatherCallData != null ? outgoingFatherCallData.calmBranch : null, "Option B / Calm");
+    }
+
+    void CreateFatherChoiceButton(FatherCallBranch branch, string fallbackText)
+    {
+        Transform container = GetChoicesContainer();
+        if (container == null || choiceButtonPrefab == null)
+            return;
+
+        GameObject buttonObj = Instantiate(choiceButtonPrefab, container);
+        buttonObj.transform.SetParent(container, false);
+
+        TMP_Text label = buttonObj.GetComponentInChildren<TMP_Text>();
+        if (label != null)
+            label.text = branch != null && !string.IsNullOrWhiteSpace(branch.choiceText)
+                ? branch.choiceText
+                : fallbackText;
+
+        Button button = buttonObj.GetComponent<Button>();
+        if (button != null)
+            button.onClick.AddListener(() => SelectFatherBranch(branch));
+    }
+
+    void SelectFatherBranch(FatherCallBranch branch)
+    {
+        if (!fatherChoiceActive || !outgoingNodeCallActive || !callActive)
+            return;
+
+        fatherChoiceActive = false;
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+
+        if (fatherChoiceRoutine != null)
+        {
+            StopCoroutine(fatherChoiceRoutine);
+            fatherChoiceRoutine = null;
+        }
+
+        outgoingNodeRoutine = StartCoroutine(FatherBranchRoutine(branch));
+    }
+
+    IEnumerator FatherBranchRoutine(FatherCallBranch branch)
+    {
+        yield return PlayOutgoingNodeArray(branch != null ? branch.nodes : null);
+
+        if (branch != null && branch.disconnectSound != null && audioSource != null)
+        {
+            audioSource.Stop();
+            audioSource.loop = false;
+            audioSource.clip = branch.disconnectSound;
+            audioSource.Play();
+            yield return new WaitForSeconds(branch.disconnectSound.length);
+        }
+        else if (branch != null && branch.hardCutAudioOnEnd && audioSource != null)
+        {
+            audioSource.Stop();
+        }
+
+        if (outgoingNodeCallActive && callActive)
+            FinishOutgoingNodeCall("father branch ended");
+    }
+
+    void FinishOutgoingNodeCall(string reason)
+    {
+        StopOutgoingNodeCallEffects();
         CloseCaller(reason);
     }
 
@@ -454,11 +802,11 @@ public class CallerScript : MonoBehaviour
         return clip.length;
     }
 
-    // Legacy outgoing calls (no story dialogue).
-    public void OpenMomCall() => StartLegacyOutgoingCall("MOM", momAvatar);
-    public void OpenDadCall() => StartLegacyOutgoingCall("DAD", dadAvatar);
+    // Outgoing calls.
+    public void OpenMomCall() => StartOutgoingTimedNodeCall(outgoingMomCallData, momAvatar, "MOM");
+    public void OpenDadCall() => StartFatherOutgoingCall();
     public void OpenSarahCall() => StartLegacyOutgoingCall("SARAH", sarahAvatar);
-    public void OpenBrotherCall() => StartLegacyOutgoingCall("BROTHER", brotherAvatar);
+    public void OpenBrotherCall() => StartOutgoingTimedNodeCall(outgoingBrotherCallData, brotherAvatar, "BROTHER");
 
     public bool OpenUnknownCall()
     {
@@ -1031,6 +1379,7 @@ public class CallerScript : MonoBehaviour
             (storyConversationFinished ? "true" : "false") + "}");
 
         StopLegacyOutgoingCallEffects();
+        StopOutgoingNodeCallEffects();
 
         if (nodeFlowRoutine != null)
         {
@@ -1135,6 +1484,15 @@ public class CallerScript : MonoBehaviour
             FinishLegacyOutgoingCall("declined");
             return;
         }
+
+        if (outgoingNodeCallActive && !fatherChoiceActive)
+        {
+            FinishOutgoingNodeCall("declined");
+            return;
+        }
+
+        if (fatherChoiceActive)
+            return;
 
         if (outgoingUnavailablePhase)
             return;
