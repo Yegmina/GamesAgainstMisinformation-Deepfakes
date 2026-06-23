@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 public class Interactable : MonoBehaviour
 {
     [SerializeField] private string interactionText = "Press E to use computer";
-    [SerializeField] private string exitText = "Esc to exit";
+    [SerializeField] private string exitText = "Q to exit";
     [SerializeField] private string sceneToLoad = "";
     [SerializeField] private bool openComputerOverlay = false;
     [SerializeField] protected bool smoothTransition = false;
