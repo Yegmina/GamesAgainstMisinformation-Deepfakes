@@ -20,6 +20,7 @@ public sealed class ComputerApiClient
     private readonly string baseUrl;
 
     public string Token { get; set; }
+    public string BaseUrl { get { return baseUrl; } }
 
     public ComputerApiClient(string baseUrl, string token)
     {

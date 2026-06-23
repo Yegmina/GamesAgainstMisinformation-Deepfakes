@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import base64
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
@@ -23,6 +24,7 @@ load_dotenv(REPO_ROOT / ".env")
 load_dotenv(APP_ROOT / ".env", override=True)
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL_AGENT", "gpt-5.3-chat-latest")
+OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL_AGENT", "gemini-3.1-flash-lite")
 MODEL = OPENAI_MODEL
 DEFAULT_PROVIDER = "gemini"
@@ -217,6 +219,117 @@ Recent articles:
 {json.dumps(compact_articles, ensure_ascii=False)}
 """
     return _json_response(prompt)
+
+
+def generate_real_article(item: dict[str, Any], scraped: dict[str, Any]) -> AgentResult[dict[str, Any]]:
+    prompt = f"""
+You are the DeepDetect article desk. Create an original in-game article based on real scraped source material.
+
+Return ONLY valid JSON:
+{{
+  "byline": "short newsroom byline",
+  "paragraphs": ["paragraph 1", "paragraph 2"],
+  "image_caption": "short caption for the source image"
+}}
+
+Rules:
+- Write 500-800 words total across 6-10 paragraphs.
+- Do not copy the source article verbatim. Rewrite in original newsroom language.
+- Stay grounded in the source title, RSS summary, scraped text, source name, and URL.
+- Do not invent named victims, exact numbers, quotes, or outcomes that are not supported by the provided material.
+- Keep the tone like a real wire article for a media-literacy game.
+- The player should have enough detail to decide whether this article should be published.
+
+News item:
+{json.dumps({
+    "title": item.get("title", ""),
+    "summary": item.get("summary", ""),
+    "source": item.get("source", ""),
+    "url": item.get("url", ""),
+    "published_at": item.get("published_at", ""),
+    "editor_note": item.get("editor_note", ""),
+    "public_pressure": item.get("public_pressure", ""),
+}, ensure_ascii=False)}
+
+Scraped source material:
+{json.dumps(scraped, ensure_ascii=False)[:16000]}
+"""
+    result = _json_response(prompt, max_output_tokens=2600)
+    data = result.data
+    paragraphs = data.get("paragraphs") if isinstance(data.get("paragraphs"), list) else []
+    return AgentResult(
+        {
+            "byline": str(data.get("byline") or "DeepDetect Wire"),
+            "paragraphs": [str(p).strip() for p in paragraphs if str(p).strip()],
+            "image_caption": str(data.get("image_caption") or ""),
+        },
+        result.mode,
+        result.model,
+    )
+
+
+def generate_synthetic_article(item: dict[str, Any]) -> AgentResult[dict[str, Any]]:
+    prompt = f"""
+You are the DeepDetect misinformation simulation desk. Create a fictional in-game article for a manipulated news item.
+
+Return ONLY valid JSON:
+{{
+  "byline": "short newsroom byline",
+  "paragraphs": ["paragraph 1", "paragraph 2"],
+  "image_prompt": "photorealistic editorial image prompt",
+  "image_caption": "short caption"
+}}
+
+Rules:
+- Write 500-800 words total across 6-10 paragraphs.
+- The article must feel like a plausible real article, but it is fictional game content.
+- Preserve the item's misinformation premise so rejecting it remains the correct newsroom action.
+- Avoid gore, private personal data, harassment, and claims that target protected classes.
+- Include subtle verification weaknesses a careful player can notice.
+- The image prompt must ask for a safe, non-branded, editorial-style image without visible text, logos, watermarks, or real identifiable people.
+
+News item:
+{json.dumps({
+    "title": item.get("title", ""),
+    "summary": item.get("summary", ""),
+    "source": item.get("source", ""),
+    "url": item.get("url", ""),
+    "published_at": item.get("published_at", ""),
+    "editor_note": item.get("editor_note", ""),
+    "public_pressure": item.get("public_pressure", ""),
+}, ensure_ascii=False)}
+"""
+    result = _json_response(prompt, max_output_tokens=2800)
+    data = result.data
+    paragraphs = data.get("paragraphs") if isinstance(data.get("paragraphs"), list) else []
+    return AgentResult(
+        {
+            "byline": str(data.get("byline") or "DeepDetect Wire"),
+            "paragraphs": [str(p).strip() for p in paragraphs if str(p).strip()],
+            "image_prompt": str(data.get("image_prompt") or ""),
+            "image_caption": str(data.get("image_caption") or ""),
+        },
+        result.mode,
+        result.model,
+    )
+
+
+def generate_article_image(prompt: str) -> AgentResult[bytes]:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
+
+    client = OpenAI()
+    response = client.images.generate(
+        model=OPENAI_IMAGE_MODEL,
+        prompt=prompt,
+        response_format="b64_json",
+        size="1536x1024",
+        output_format="png",
+        quality="medium",
+    )
+    if not response.data or not response.data[0].b64_json:
+        raise RuntimeError("OpenAI image response did not include image data.")
+    return AgentResult(base64.b64decode(response.data[0].b64_json), "openai", OPENAI_IMAGE_MODEL)
 
 
 def judge_and_reply(surface: str, participant: str, prompt_text: str, player_answer: str) -> AgentResult[dict[str, Any]]:
