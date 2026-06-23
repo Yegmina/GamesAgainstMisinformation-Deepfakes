@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr, Field
 
+from .article_enrichment import MEDIA_DIR, ensure_media_dirs, merge_article_fields, schedule_article_enrichment
 from .auth import create_session, current_user, hash_password, verify_password
 from .db import connect, init_db, list_games, load_game, row_to_dict, save_game
 from .game_engine import advance_world, apply_action, generate_game
@@ -19,6 +20,7 @@ from .game_engine import advance_world, apply_action, generate_game
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_DIR / ".env")
+ensure_media_dirs()
 
 app = FastAPI(title="DeepDetect Game Platform")
 app.add_middleware(
@@ -28,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 class RegisterIn(BaseModel):
@@ -106,6 +109,7 @@ def generate(user: dict = Depends(current_user)) -> dict:
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     save_game(state["id"], user["id"], state)
+    schedule_article_enrichment(state["id"], user["id"])
     return {"game": state}
 
 
@@ -114,6 +118,7 @@ def get_game(game_id: str, user: dict = Depends(current_user)) -> dict:
     state = load_game(game_id, user["id"])
     if not state:
         raise HTTPException(status_code=404, detail="Game not found")
+    schedule_article_enrichment(game_id, user["id"])
     return {"game": state}
 
 
@@ -194,7 +199,9 @@ def action(game_id: str, payload: ActionIn, user: dict = Depends(current_user)) 
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    state = merge_article_fields(state, load_game(game_id, user["id"]))
     save_game(game_id, user["id"], state)
+    schedule_article_enrichment(game_id, user["id"])
     return {"game": state}
 
 
@@ -207,5 +214,7 @@ def tick(game_id: str, user: dict = Depends(current_user)) -> dict:
         state = advance_world(state)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    state = merge_article_fields(state, load_game(game_id, user["id"]))
     save_game(game_id, user["id"], state)
+    schedule_article_enrichment(game_id, user["id"])
     return {"game": state}
