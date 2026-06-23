@@ -38,6 +38,8 @@ public class OutgoingCallNodeData
 {
     public string displayName;
     public CallNode[] nodes;
+    [Tooltip("Played when this outgoing call ends manually or by timeout.")]
+    public AudioClip disconnectSound;
 }
 
 [Serializable]
@@ -47,6 +49,8 @@ public class FatherCallBranch
     public CallNode[] nodes;
     public AudioClip disconnectSound;
     public bool hardCutAudioOnEnd;
+    [Tooltip("When enabled, the final node in this branch triggers the bad-ending screamer instead of hanging up.")]
+    public bool triggerBadEndingAfterFinalNode;
 }
 
 [Serializable]
@@ -54,6 +58,8 @@ public class FatherOutgoingCallData
 {
     public string displayName = "DAD";
     public CallNode[] initialNodes;
+    [Tooltip("Played if the Father outgoing call is manually ended before a branch-specific disconnect sound is reached.")]
+    public AudioClip disconnectSound;
     public FatherCallBranch panicBranch = new FatherCallBranch
     {
         choiceText = "Panic"
@@ -164,6 +170,7 @@ public class CallerScript : MonoBehaviour
         panicBranch = new FatherCallBranch
         {
             choiceText = "Panic",
+            triggerBadEndingAfterFinalNode = true,
             nodes = new[]
             {
                 new CallNode
@@ -223,11 +230,14 @@ public class CallerScript : MonoBehaviour
     Coroutine outgoingNodeRoutine;
     Coroutine outgoingTimeoutRoutine;
     Coroutine fatherChoiceRoutine;
+    Coroutine outgoingFinishRoutine;
     float callUiActivatedAt;
     bool legacyOutgoingActive;
     bool outgoingUnavailablePhase;
     bool outgoingNodeCallActive;
     bool fatherChoiceActive;
+    bool outgoingFinishInProgress;
+    AudioClip activeOutgoingDisconnectSound;
     Image badEndingOverlayImage;
     RectTransform shakeTarget;
     Vector2 shakeHomePosition;
@@ -331,6 +341,8 @@ public class CallerScript : MonoBehaviour
 
     void ShowCallerScreenForOutgoing()
     {
+        SetPhoneBusy(true);
+
         if (incomingCallManager != null && incomingCallManager.phoneManager != null)
         {
             PhoneUIManager phoneManager = incomingCallManager.phoneManager;
@@ -345,6 +357,12 @@ public class CallerScript : MonoBehaviour
         }
         else if (callerScreen != null)
             callerScreen.SetActive(true);
+    }
+
+    void SetPhoneBusy(bool busy)
+    {
+        if (incomingCallManager != null)
+            incomingCallManager.isPhoneBusy = busy;
     }
 
     void ApplyStandardDialogueTextStyle()
@@ -538,6 +556,8 @@ public class CallerScript : MonoBehaviour
     {
         outgoingNodeCallActive = false;
         fatherChoiceActive = false;
+        outgoingFinishInProgress = false;
+        activeOutgoingDisconnectSound = null;
 
         if (outgoingNodeRoutine != null)
         {
@@ -557,12 +577,18 @@ public class CallerScript : MonoBehaviour
             fatherChoiceRoutine = null;
         }
 
+        if (outgoingFinishRoutine != null)
+        {
+            StopCoroutine(outgoingFinishRoutine);
+            outgoingFinishRoutine = null;
+        }
+
         ClearDialogueChoices();
         SetChoicesContainerVisible(false);
         StopLegacyOutgoingAudio();
     }
 
-    void PrepareOutgoingNodeCall(string displayName, Sprite avatar, bool allowManualHangup)
+    void PrepareOutgoingNodeCall(string displayName, Sprite avatar, bool allowManualHangup, AudioClip disconnectSound)
     {
         StopLegacyOutgoingCallEffects();
         StopOutgoingNodeCallEffects();
@@ -585,6 +611,7 @@ public class CallerScript : MonoBehaviour
         previousNodeIndex = -1;
         callActive = true;
         outgoingNodeCallActive = true;
+        activeOutgoingDisconnectSound = disconnectSound;
         callUiActivatedAt = Time.unscaledTime;
 
         if (dialogueText != null)
@@ -600,7 +627,7 @@ public class CallerScript : MonoBehaviour
             ? callData.displayName
             : fallbackName;
 
-        PrepareOutgoingNodeCall(displayName, avatar, true);
+        PrepareOutgoingNodeCall(displayName, avatar, true, callData != null ? callData.disconnectSound : null);
         outgoingNodeRoutine = StartCoroutine(OutgoingTimedNodeCallRoutine(callData));
         outgoingTimeoutRoutine = StartCoroutine(OutgoingContactTimeoutRoutine());
     }
@@ -612,7 +639,29 @@ public class CallerScript : MonoBehaviour
         if (!outgoingNodeCallActive || !callActive)
             yield break;
 
-        yield return PlayOutgoingNodeArray(callData != null ? callData.nodes : null);
+        PlayOutgoingLoopingContactNode(callData != null ? callData.nodes : null);
+    }
+
+    void PlayOutgoingLoopingContactNode(CallNode[] nodes)
+    {
+        if (nodes == null || nodes.Length == 0)
+            return;
+
+        CallNode node = nodes[0];
+        if (dialogueText != null)
+        {
+            dialogueText.text = node != null ? node.speechText ?? string.Empty : string.Empty;
+            ApplyStandardDialogueTextStyle();
+        }
+
+        if (audioSource == null || node == null || node.voiceAudio == null)
+            return;
+
+        audioSource.Stop();
+        audioSource.loop = true;
+        audioSource.volume = 1f;
+        audioSource.clip = node.voiceAudio;
+        audioSource.Play();
     }
 
     IEnumerator OutgoingContactTimeoutRoutine()
@@ -620,7 +669,7 @@ public class CallerScript : MonoBehaviour
         yield return new WaitForSecondsRealtime(outgoingContactTimeout);
 
         if (outgoingNodeCallActive && callActive)
-            FinishOutgoingNodeCall("outgoing contact timed out");
+            FinishOutgoingNodeCall("outgoing contact timed out", activeOutgoingDisconnectSound);
     }
 
     void StartFatherOutgoingCall()
@@ -629,7 +678,7 @@ public class CallerScript : MonoBehaviour
             ? outgoingFatherCallData.displayName
             : "DAD";
 
-        PrepareOutgoingNodeCall(displayName, dadAvatar, true);
+        PrepareOutgoingNodeCall(displayName, dadAvatar, true, outgoingFatherCallData != null ? outgoingFatherCallData.disconnectSound : null);
         outgoingNodeRoutine = StartCoroutine(FatherOutgoingCallRoutine());
     }
 
@@ -776,26 +825,106 @@ public class CallerScript : MonoBehaviour
     {
         yield return PlayOutgoingNodeArray(branch != null ? branch.nodes : null);
 
-        if (branch != null && branch.disconnectSound != null && audioSource != null)
+        if (IsFatherPanicBranch(branch))
         {
-            audioSource.Stop();
-            audioSource.loop = false;
-            audioSource.clip = branch.disconnectSound;
-            audioSource.Play();
-            yield return new WaitForSeconds(branch.disconnectSound.length);
+            TriggerFatherPanicBadEnding();
+            yield break;
         }
-        else if (branch != null && branch.hardCutAudioOnEnd && audioSource != null)
+
+        if (branch != null && branch.hardCutAudioOnEnd && branch.disconnectSound == null && audioSource != null)
         {
             audioSource.Stop();
         }
 
         if (outgoingNodeCallActive && callActive)
-            FinishOutgoingNodeCall("father branch ended");
+            FinishOutgoingNodeCall("father branch ended", branch != null ? branch.disconnectSound : null);
     }
 
-    void FinishOutgoingNodeCall(string reason)
+    bool IsFatherPanicBranch(FatherCallBranch branch)
     {
-        StopOutgoingNodeCallEffects();
+        return branch != null && (branch.triggerBadEndingAfterFinalNode
+            || (outgoingFatherCallData != null && branch == outgoingFatherCallData.panicBranch));
+    }
+
+    void TriggerFatherPanicBadEnding()
+    {
+        outgoingNodeCallActive = false;
+        fatherChoiceActive = false;
+        outgoingFinishInProgress = false;
+        activeOutgoingDisconnectSound = null;
+
+        if (outgoingTimeoutRoutine != null)
+        {
+            StopCoroutine(outgoingTimeoutRoutine);
+            outgoingTimeoutRoutine = null;
+        }
+
+        if (fatherChoiceRoutine != null)
+        {
+            StopCoroutine(fatherChoiceRoutine);
+            fatherChoiceRoutine = null;
+        }
+
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+
+        if (audioSource != null)
+            audioSource.Stop();
+
+        SetPhoneBusy(true);
+        StartBadEndingSequence();
+    }
+
+    void FinishOutgoingNodeCall(string reason, AudioClip disconnectSound)
+    {
+        if (outgoingFinishInProgress)
+            return;
+
+        outgoingFinishRoutine = StartCoroutine(FinishOutgoingNodeCallRoutine(reason, disconnectSound));
+    }
+
+    IEnumerator FinishOutgoingNodeCallRoutine(string reason, AudioClip disconnectSound)
+    {
+        outgoingFinishInProgress = true;
+        outgoingNodeCallActive = false;
+        fatherChoiceActive = false;
+
+        if (outgoingNodeRoutine != null)
+        {
+            StopCoroutine(outgoingNodeRoutine);
+            outgoingNodeRoutine = null;
+        }
+
+        if (outgoingTimeoutRoutine != null)
+        {
+            StopCoroutine(outgoingTimeoutRoutine);
+            outgoingTimeoutRoutine = null;
+        }
+
+        if (fatherChoiceRoutine != null)
+        {
+            StopCoroutine(fatherChoiceRoutine);
+            fatherChoiceRoutine = null;
+        }
+
+        ClearDialogueChoices();
+        SetChoicesContainerVisible(false);
+        StopLegacyOutgoingAudio();
+        if (audioSource != null)
+            audioSource.Stop();
+
+        if (disconnectSound != null && audioSource != null)
+        {
+            audioSource.loop = false;
+            audioSource.volume = 1f;
+            audioSource.clip = disconnectSound;
+            audioSource.Play();
+            yield return new WaitForSecondsRealtime(disconnectSound.length);
+        }
+
+        outgoingFinishInProgress = false;
+        outgoingFinishRoutine = null;
+        activeOutgoingDisconnectSound = null;
         CloseCaller(reason);
     }
 
@@ -1487,6 +1616,9 @@ public class CallerScript : MonoBehaviour
 
     public void DeclineCall()
     {
+        if (outgoingFinishInProgress)
+            return;
+
         if (IsOutgoingDialingPhase)
         {
             FinishLegacyOutgoingCall("declined");
@@ -1495,7 +1627,7 @@ public class CallerScript : MonoBehaviour
 
         if (outgoingNodeCallActive && !fatherChoiceActive)
         {
-            FinishOutgoingNodeCall("declined");
+            FinishOutgoingNodeCall("declined", activeOutgoingDisconnectSound);
             return;
         }
 
