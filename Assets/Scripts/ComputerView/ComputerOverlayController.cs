@@ -30,8 +30,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float DesktopIconSpacing         = 16f;
     private const float NewsCardHeight             = 192f;
     private const float NewsLeadCardHeight         = 340f;
-    private const float EmailRowHeight             = 100f;
-    private const float TelegramRowHeight          = 100f;
+    private const float EmailRowHeight             = 115f;
+    private const float TelegramRowHeight          = 115f;
     private const float ThreadViewportHeight       = 320f;
     private const float ChatBodyHeight             = 800f;
     private const float TaskbarAppWidth            = 140f;
@@ -87,17 +87,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // Light (white) card palette — for readable news cards
     private static readonly Color LightCardBg     = Html("#f8fafc");
     private static readonly Color LightCardShadow  = Html("#00000026");
-    private static readonly Color LightText        = Html("#0b1220");
-    private static readonly Color LightTextSub     = Html("#1f2937");
-    private static readonly Color LightTextMuted   = Html("#475569");
+    private static readonly Color LightText        = Html("#000000"); // Pure Black
+    private static readonly Color LightTextSub     = Html("#000000"); // Pure Black
+    private static readonly Color LightTextMuted   = Html("#000000"); // Pure Black
     private static readonly Color CardHover       = Html("#1e2a3e");
     private static readonly Color PanelRaised    = Html("#242f45");
 
     // Text
-    private static readonly Color TextPrimary    = Html("#e2e8f0");
-    private static readonly Color TextSecondary  = Html("#94a3b8");
-    private static readonly Color TextMuted      = Html("#7587a0");
-    private static readonly Color TextDim        = Html("#374151");
+    private static readonly Color TextPrimary    = Html("#ffffff"); // Pure White
+    private static readonly Color TextSecondary  = Html("#f1f5f9"); // Bright Light Gray
+    private static readonly Color TextMuted      = Html("#cbd5e1"); // Bright Gray
+    private static readonly Color TextDim        = Html("#94a3b8"); // Readable Medium Gray
 
     // Accent colors
     private static readonly Color AccentBlue     = Html("#3b82f6");
@@ -135,6 +135,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool   initialized;
     private bool   initializing;
     private bool   busy;
+    private GameObject busyOverlay;
     private bool   usingWorldMonitor;
     private bool   computerOpen;
     private bool   focusActive;
@@ -1971,7 +1972,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         // Left: thread list
         GameObject left = PanelObject(body.transform, "ThreadList", Html("#0f1726"));
         MakeRounded(left, Html("#0f1726"));
-        Layout(left, 264f, -1f, 0f, 1f);
+        Layout(left, 290f, -1f, 0f, 1f);
 
         VerticalLayoutGroup leftVl = left.AddComponent<VerticalLayoutGroup>();
         leftVl.padding = new RectOffset(8,8,8,8);
@@ -1987,9 +1988,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         lhHl.childAlignment = TextAnchor.MiddleLeft;
         lhHl.childControlWidth = true; lhHl.childForceExpandWidth = true;
         lhHl.childControlHeight = true; lhHl.childForceExpandHeight = true;
-        TMP_Text listTitle = WinText(listHeader.transform, "T", "THREADS", 10, TextMuted, FontStyles.Bold);
+        TMP_Text listTitle = WinText(listHeader.transform, "T", "THREADS", 12, TextMuted, FontStyles.Bold);
         Layout(listTitle.gameObject, -1f, -1f, 1f, 1f);
-        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{emails.Count}", 10, AccentBlueSoft, FontStyles.Bold);
+        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{emails.Count}", 12, AccentBlueSoft, FontStyles.Bold);
 
         foreach (ComputerEmailItem item in emails)
             BuildEmailRow(left.transform, item, item.id == active.id);
@@ -2023,10 +2024,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
         bool resolved = ThreadResolved(item);
-        TMP_Text from = WinText(row.transform, "From", Fallback(item.fromName, "Sender"), 13, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
-        TMP_Text subj = WinText(row.transform, "Subject", Fallback(item.subject, "No subject"), 12, TextSecondary);
+        TMP_Text from = WinText(row.transform, "From", Fallback(item.fromName, "Sender"), 15, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
+        TMP_Text subj = WinText(row.transform, "Subject", Fallback(item.subject, "No subject"), 14, TextSecondary);
         subj.overflowMode = TextOverflowModes.Ellipsis;
-        TMP_Text prog = WinText(row.transform, "Progress", ThreadProgress(item), 11, resolved ? AccentGreenSoft : AccentAmberSoft);
+        TMP_Text prog = WinText(row.transform, "Progress", ThreadProgress(item), 13, resolved ? AccentGreenSoft : AccentAmberSoft);
     }
 
     private void BuildEmailReader(Transform parent, ComputerEmailItem active)
@@ -2040,12 +2041,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
-        TMP_Text subj = WinText(reader.transform, "Subject", Fallback(active.subject, "No subject"), 18, TextPrimary, FontStyles.Bold);
+        TMP_Text subj = WinText(reader.transform, "Subject", Fallback(active.subject, "No subject"), 21, TextPrimary, FontStyles.Bold);
         subj.textWrappingMode = TextWrappingModes.Normal;
         subj.overflowMode = TextOverflowModes.Overflow;
         Layout(subj.gameObject, -1f, -1f, 1f, 0f);
 
-        TMP_Text sender = WinText(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")}  <{Fallback(active.fromEmail, "unknown")}>  ·  {ThreadProgress(active)}", 13, TextSecondary);
+        TMP_Text sender = WinText(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")}  <{Fallback(active.fromEmail, "unknown")}>  ·  {ThreadProgress(active)}", 15, TextSecondary);
         Layout(sender.gameObject, -1f, -1f, 1f, 0f);
 
         AddThread(reader.transform, EmailMessages(active), active.fromName, false, true);
@@ -2074,7 +2075,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         // Left list
         GameObject left = PanelObject(body.transform, "ChatList", Html("#0f1726"));
         MakeRounded(left, Html("#0f1726"));
-        Layout(left, 264f, -1f, 0f, 1f);
+        Layout(left, 290f, -1f, 0f, 1f);
         VerticalLayoutGroup leftVl = left.AddComponent<VerticalLayoutGroup>();
         leftVl.padding = new RectOffset(8,8,8,8);
         leftVl.spacing = 6;
@@ -2089,10 +2090,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         lhHl.childAlignment = TextAnchor.MiddleLeft;
         lhHl.childControlWidth = true; lhHl.childForceExpandWidth = true;
         lhHl.childControlHeight = true; lhHl.childForceExpandHeight = true;
-        TMP_Text listTitle = WinText(listHeader.transform, "T", "CHATS", 11, TextMuted, FontStyles.Bold);
+        TMP_Text listTitle = WinText(listHeader.transform, "T", "CHATS", 13, TextMuted, FontStyles.Bold);
         listTitle.characterSpacing = 3f;
         Layout(listTitle.gameObject, -1f, -1f, 1f, 1f);
-        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{threads.Count}", 10, Html("#a78bfa"), FontStyles.Bold);
+        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{threads.Count}", 12, Html("#a78bfa"), FontStyles.Bold);
 
         foreach (ComputerTelegramThread thread in threads)
             BuildTelegramRow(left.transform, thread, thread.id == active.id);
@@ -2131,9 +2132,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
         bool resolved = ThreadResolved(thread);
-        TMP_Text contact = WinText(row.transform, "Contact", Fallback(thread.contact, "Contact"), 13, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
-        TMP_Text rel = WinText(row.transform, "Rel", Fallback(thread.relationship, "relationship"), 12, TextSecondary);
-        TMP_Text prog = WinText(row.transform, "Prog", ThreadProgress(thread), 11, resolved ? AccentGreenSoft : Html("#a78bfa"));
+        TMP_Text contact = WinText(row.transform, "Contact", Fallback(thread.contact, "Contact"), 15, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
+        TMP_Text rel = WinText(row.transform, "Rel", Fallback(thread.relationship, "relationship"), 14, TextSecondary);
+        TMP_Text prog = WinText(row.transform, "Prog", ThreadProgress(thread), 13, resolved ? AccentGreenSoft : Html("#a78bfa"));
     }
 
     private void BuildTelegramConversation(Transform parent, ComputerTelegramThread active)
@@ -2147,9 +2148,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
-        TMP_Text contactName = WinText(conv.transform, "Contact", Fallback(active.contact, "Contact"), 18, TextPrimary, FontStyles.Bold);
+        TMP_Text contactName = WinText(conv.transform, "Contact", Fallback(active.contact, "Contact"), 21, TextPrimary, FontStyles.Bold);
         Layout(contactName.gameObject, -1f, -1f, 1f, 0f);
-        TMP_Text meta = WinText(conv.transform, "Meta", $"{Fallback(active.relationship, "relationship")}  ·  {ThreadProgress(active)}", 13, TextSecondary);
+        TMP_Text meta = WinText(conv.transform, "Meta", $"{Fallback(active.relationship, "relationship")}  ·  {ThreadProgress(active)}", 15, TextSecondary);
         Layout(meta.gameObject, -1f, -1f, 1f, 0f);
         AddThread(conv.transform, active.messages ?? new List<JToken>(), active.contact, true);
         AddResult(conv.transform, active.correct);
@@ -2361,13 +2362,13 @@ public sealed class ComputerOverlayController : MonoBehaviour
             MakeRounded(bubble, bubbleBg);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bvl = bubble.AddComponent<VerticalLayoutGroup>();
-            bvl.padding = new RectOffset(14,14,10,10); bvl.spacing = 4;
+            bvl.padding = new RectOffset(16,16,12,12); bvl.spacing = 4;
             bvl.childControlWidth = bvl.childForceExpandWidth = true;
             bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
 
             string sender = Fallback(MessageSender(msg), player ? "You" : fallbackSender);
-            TMP_Text senderLbl = WinText(bubble.transform, "Sender", sender, 11, player ? Html("#cfe3ff") : Html("#9fb3cc"), FontStyles.Bold);
-            TMP_Text bodyLbl   = WinText(bubble.transform, "Text", MessageText(msg), 14, Color.white);
+            TMP_Text senderLbl = WinText(bubble.transform, "Sender", sender, 13, player ? Html("#cfe3ff") : Html("#9fb3cc"), FontStyles.Bold);
+            TMP_Text bodyLbl   = WinText(bubble.transform, "Text", MessageText(msg), 17, Color.white);
             bodyLbl.textWrappingMode = TextWrappingModes.Normal;
             bodyLbl.overflowMode     = TextOverflowModes.Overflow;
             bodyLbl.lineSpacing      = 5f;
@@ -2520,7 +2521,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         gvl.childControlHeight = true; gvl.childForceExpandHeight = false;
 
         // Small right-aligned caption above the suggestions.
-        TMP_Text caption = WinText(group.transform, "SuggestLabel", "SUGGESTED REPLIES", 10, Html("#7f9bc0"), FontStyles.Bold);
+        TMP_Text caption = WinText(group.transform, "SuggestLabel", "SUGGESTED REPLIES", 12, Html("#7f9bc0"), FontStyles.Bold);
         caption.characterSpacing = 3f;
         caption.alignment = TextAlignmentOptions.Right;
         Layout(caption.gameObject, -1f, 16f, 1f, 0f);
@@ -2546,7 +2547,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             MakeRounded(bubble, bubbleBg);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bvl = bubble.AddComponent<VerticalLayoutGroup>();
-            bvl.padding = new RectOffset(16, 16, 11, 11); bvl.spacing = 2;
+            bvl.padding = new RectOffset(18, 18, 14, 14); bvl.spacing = 2;
             bvl.childControlWidth = bvl.childForceExpandWidth = true;
             bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
 
@@ -2563,7 +2564,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             btn.interactable = enabled;
             btn.onClick.AddListener(() => SendActionClicked(surface, itemId, capturedId));
 
-            TMP_Text body = WinText(bubble.transform, "Text", Fallback(opt.label, opt.id), 14, Color.white, FontStyles.Normal);
+            TMP_Text body = WinText(bubble.transform, "Text", Fallback(opt.label, opt.id), 16, Color.white, FontStyles.Normal);
             body.textWrappingMode = TextWrappingModes.Normal;
             body.overflowMode     = TextOverflowModes.Overflow;
             body.lineSpacing      = 4f;
@@ -2887,6 +2888,85 @@ public sealed class ComputerOverlayController : MonoBehaviour
         RefreshCanvasInteractivity();
         SetStatus(message);
         UpdateStatusbar();
+        UpdateBusyOverlay();
+    }
+
+    private void UpdateBusyOverlay()
+    {
+        if (canvasObject == null) return;
+
+        if (busy)
+        {
+            if (busyOverlay == null)
+            {
+                // Semi-transparent overlay to block interactions and look glassy
+                busyOverlay = PanelObject(canvasObject.transform, "BusyOverlay", new Color(0f, 0f, 0f, 0.45f));
+                Stretch(busyOverlay.GetComponent<RectTransform>());
+                UnityEngine.UI.Image img = busyOverlay.GetComponent<UnityEngine.UI.Image>();
+                if (img != null) img.raycastTarget = true;
+                busyOverlay.transform.SetAsLastSibling();
+
+                // Centered modal box
+                GameObject modal = PanelObject(busyOverlay.transform, "BusyModal", Html("#1e2535"));
+                MakeRounded(modal, Html("#1e2535"), 12f);
+                RectTransform r = modal.GetComponent<RectTransform>();
+                r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.pivot = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = new Vector2(360f, 180f);
+                r.anchoredPosition = Vector2.zero;
+
+                UnityEngine.UI.Shadow shadow = modal.AddComponent<UnityEngine.UI.Shadow>();
+                shadow.effectColor = Html("#00000055");
+                shadow.effectDistance = new Vector2(0f, -4f);
+
+                UnityEngine.UI.VerticalLayoutGroup vl = modal.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+                vl.padding = new RectOffset(20, 20, 24, 20);
+                vl.spacing = 16;
+                vl.childAlignment = TextAnchor.MiddleCenter;
+                vl.childControlWidth = vl.childForceExpandWidth = true;
+                vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+                // Simple loading spinner container
+                GameObject spinner = Element(modal.transform, "Spinner");
+                Layout(spinner, 32f, 32f, 0f, 0f);
+                var spinnerImg = spinner.AddComponent<UnityEngine.UI.Image>();
+                spinnerImg.sprite = Resources.Load<Sprite>("UI/desktop/refresh-icon");
+                if (spinnerImg.sprite == null)
+                {
+                    spinnerImg.color = AccentBlueSoft;
+                }
+                else
+                {
+                    spinnerImg.color = AccentBlueSoft;
+                    spinnerImg.preserveAspect = true;
+                }
+                spinner.AddComponent<BusyRotator>();
+
+                // Loading text label
+                string loadingText = string.IsNullOrWhiteSpace(lastStatusMessage) ? "Processing..." : lastStatusMessage;
+                TMP_Text label = WinText(modal.transform, "Label", loadingText, 14, Color.white, FontStyles.Bold);
+                label.alignment = TextAlignmentOptions.Center;
+                Layout(label.gameObject, -1f, -1f, 1f, 0f);
+            }
+            else
+            {
+                // Update message
+                busyOverlay.transform.SetAsLastSibling();
+                TMP_Text label = busyOverlay.GetComponentInChildren<TMP_Text>();
+                if (label != null)
+                {
+                    label.text = DisplayText(string.IsNullOrWhiteSpace(lastStatusMessage) ? "Processing..." : lastStatusMessage);
+                }
+            }
+        }
+        else
+        {
+            if (busyOverlay != null)
+            {
+                Destroy(busyOverlay);
+                busyOverlay = null;
+            }
+        }
     }
 
     private void SetStatus(string message)
@@ -3881,7 +3961,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const int   VirusWrongThreshold = 2;     // attack every N wrong calls
     private const int   VirusInitialCount   = 5;     // pop-ups in the first burst
     private const int   VirusMaxTotal       = 9;     // hard cap on pop-ups per wave
-    private const float VirusRespawnChance  = 0.65f; // chance a close spawns a new one
+    private const float VirusRespawnChance  = 0f;    // Disabled respawning to make the final virus easily closeable
 
     private int  wrongDecisionsSinceVirus;
     private int  virusSpawnedThisWave;
@@ -3891,13 +3971,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void RegisterWrongDecisions(int count)
     {
-        if (count <= 0) return;
-        wrongDecisionsSinceVirus += count;
-        if (wrongDecisionsSinceVirus >= VirusWrongThreshold && !virusActive)
-        {
-            wrongDecisionsSinceVirus = 0;
-            TriggerVirusAttack();
-        }
+        // Removed as requested: mistakes no longer trigger the virus attack.
+        return;
     }
 
     private void TriggerVirusAttack()
@@ -4024,5 +4099,74 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (virusLayer != null) { Destroy(virusLayer); virusLayer = null; }
         // Window stays minimized; the player reopens it via a desktop/taskbar icon.
         Debug.Log("[ComputerOverlay] Virus attack cleared.");
+    }
+}
+
+internal class BusyRotator : MonoBehaviour
+{
+    private Texture2D generatedTexture;
+    private Sprite generatedSprite;
+
+    private void Start()
+    {
+        var img = GetComponent<UnityEngine.UI.Image>();
+        if (img == null) return;
+
+        int size = 128;
+        generatedTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] cols = new Color[size * size];
+        float cx = size / 2f;
+        float cy = size / 2f;
+        float maxRadius = size / 2f - 2f;
+        float minRadius = maxRadius - 16f; // Perfect ring thickness
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - cx;
+                float dy = y - cy;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                if (dist >= minRadius && dist <= maxRadius)
+                {
+                    float angle = Mathf.Atan2(dy, dx);
+                    if (angle < 0) angle += Mathf.PI * 2f;
+                    float alpha = angle / (Mathf.PI * 2f);
+                    
+                    // Smooth power-falloff for the trailing fade
+                    float fadeFactor = Mathf.Pow(alpha, 1.8f);
+                    cols[y * size + x] = new Color(1f, 1f, 1f, fadeFactor);
+                }
+                else
+                {
+                    cols[y * size + x] = Color.clear;
+                }
+            }
+        }
+
+        generatedTexture.SetPixels(cols);
+        generatedTexture.Apply();
+
+        generatedSprite = Sprite.Create(generatedTexture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        img.sprite = generatedSprite;
+        img.preserveAspect = true;
+    }
+
+    private void Update()
+    {
+        // Smooth classic spinner speed
+        transform.Rotate(0f, 0f, -340f * Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        if (generatedSprite != null)
+        {
+            Destroy(generatedSprite);
+        }
+        if (generatedTexture != null)
+        {
+            Destroy(generatedTexture);
+        }
     }
 }

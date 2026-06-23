@@ -1048,7 +1048,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.816, b: 0.973, a: 0.35}
+  m_Color: {r: 0, g: 0.55, b: 1, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1086,10 +1086,10 @@ MonoBehaviour:
     m_SelectOnRight: {fileID: 0}
   m_Transition: 1
   m_Colors:
-    m_NormalColor: {r: 0, g: 0.816, b: 0.973, a: 0.35}
-    m_HighlightedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_NormalColor: {r: 0, g: 0.55, b: 1, a: 0.85}
+    m_HighlightedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_PressedColor: {r: 1, g: 1, b: 1, a: 1}
-    m_SelectedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_SelectedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_DisabledColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.2}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.12
@@ -2171,7 +2171,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16
+  m_fontSize: 22
   m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -4014,7 +4014,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16
+  m_fontSize: 22
   m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -5285,7 +5285,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.816, b: 0.973, a: 0.35}
+  m_Color: {r: 0, g: 0.55, b: 1, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5323,10 +5323,10 @@ MonoBehaviour:
     m_SelectOnRight: {fileID: 0}
   m_Transition: 1
   m_Colors:
-    m_NormalColor: {r: 0, g: 0.816, b: 0.973, a: 0.35}
-    m_HighlightedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_NormalColor: {r: 0, g: 0.55, b: 1, a: 0.85}
+    m_HighlightedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_PressedColor: {r: 1, g: 1, b: 1, a: 1}
-    m_SelectedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_SelectedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_DisabledColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.2}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.12
@@ -5775,7 +5775,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.816, b: 0.973, a: 0.35}
+  m_Color: {r: 0, g: 0.55, b: 1, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5813,10 +5813,10 @@ MonoBehaviour:
     m_SelectOnRight: {fileID: 0}
   m_Transition: 1
   m_Colors:
-    m_NormalColor: {r: 0, g: 0.816, b: 0.973, a: 0.35}
-    m_HighlightedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_NormalColor: {r: 0, g: 0.55, b: 1, a: 0.85}
+    m_HighlightedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_PressedColor: {r: 1, g: 1, b: 1, a: 1}
-    m_SelectedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_SelectedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_DisabledColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.2}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.12
@@ -6045,7 +6045,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.816, b: 0.973, a: 0.35}
+  m_Color: {r: 0, g: 0.55, b: 1, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -6083,10 +6083,10 @@ MonoBehaviour:
     m_SelectOnRight: {fileID: 0}
   m_Transition: 1
   m_Colors:
-    m_NormalColor: {r: 0, g: 0.816, b: 0.973, a: 0.35}
-    m_HighlightedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_NormalColor: {r: 0, g: 0.55, b: 1, a: 0.85}
+    m_HighlightedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_PressedColor: {r: 1, g: 1, b: 1, a: 1}
-    m_SelectedColor: {r: 0, g: 0.816, b: 0.973, a: 1}
+    m_SelectedColor: {r: 0, g: 0.85, b: 1, a: 1}
     m_DisabledColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.2}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.12
@@ -6321,7 +6321,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 14
+  m_fontSize: 20
   m_fontSizeBase: 14
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -6458,7 +6458,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16
+  m_fontSize: 22
   m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0

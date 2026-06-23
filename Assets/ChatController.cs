@@ -1875,7 +1875,7 @@ videoObj.transform.SetParent(row, false);
     {
         if (paranoiaText != null) 
         {
-            paranoiaText.text = val + "%\n<size=60%><color=#888888>PARANOIA</color></size>";
+            paranoiaText.text = val + "%\n<size=75%><color=#00E5FF><b>PARANOIA</b></color></size>";
         }
         if (paranoiaFill != null)
         {
