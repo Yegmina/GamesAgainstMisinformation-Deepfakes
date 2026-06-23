@@ -291,14 +291,14 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             int m = Mathf.FloorToInt(timer / 60f);
             int s = Mathf.FloorToInt(timer % 60f);
-            timerText.text = string.Format("{0:00}:{1:00}\n<size=10><color=#888888>TIME LEFT</color></size>", m, s);
+            timerText.text = string.Format("{0:00}:{1:00}\n<size=18><color=#888888>TIME LEFT</color></size>", m, s);
             timerText.color = timer < 120f ? new Color(1f, 0.25f, 0.25f) : Color.white;
         }
 
         // 2. Paranoia Text & Fill Update
         if (paranoiaText != null)
         {
-            paranoiaText.text = paranoia + "%\n<size=10><color=#888888>PARANOIA</color></size>";
+            paranoiaText.text = paranoia + "%\n<size=18><color=#888888>PARANOIA</color></size>";
         }
 
         if (paranoiaFill != null)
@@ -313,7 +313,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         // 3. Points Text Update
         if (pointsText != null)
         {
-            pointsText.text = points + "\n<size=10><color=#888888>POINTS</color></size>";
+            pointsText.text = points + "\n<size=18><color=#888888>POINTS</color></size>";
         }
     }
 
