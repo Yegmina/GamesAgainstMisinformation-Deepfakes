@@ -5463,6 +5463,8 @@ GameObject:
   m_Component:
   - component: {fileID: 494533451}
   - component: {fileID: 494533450}
+  - component: {fileID: 494533452}
+  - component: {fileID: 494533453}
   m_Layer: 0
   m_Name: 'BrowserController '
   m_TagString: Untagged
@@ -5483,6 +5485,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   scrollRect: {fileID: 236481352}
+--- !u!114 &494533452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494533449}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82b174ed229304543bce70a9d753a199, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseUrl: http://127.0.0.1:8765
+--- !u!114 &494533453
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494533449}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e66a8545c4026ca42a0a8eb30d125bdd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  backendUrl: http://127.0.0.1:8765
+  tryStartBackendInEditor: 1
+  backendRelativePath: DeepDetectGamePlatform
+  demoName: Unity Editor
+  demoEmail: unity.tester@deepdetectgame.com
+  demoPassword: deepdetect-demo
 --- !u!4 &494533451
 Transform:
   m_ObjectHideFlags: 0
