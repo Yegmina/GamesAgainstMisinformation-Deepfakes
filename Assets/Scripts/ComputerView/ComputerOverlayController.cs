@@ -57,6 +57,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const string DefaultName      = "Unity Player";
     private const string DefaultEmail     = "unity.player@deepdetectgame.dev";
     private const string DefaultPassword  = "unity-local-player-2026";
+    private const float ArticleImageRetryDelay = 15f;
 
     private const string PrimaryMonitorName  = "monitor";
     private const string FallbackMonitorName = "Monitor_27__Curved";
@@ -146,7 +147,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private Coroutine  articlePollRoutine;
     private readonly Dictionary<string, Sprite> articleImageCache = new Dictionary<string, Sprite>();
     private readonly HashSet<string> articleImageLoading = new HashSet<string>();
-    private readonly HashSet<string> articleImageFailed = new HashSet<string>();
+    private readonly Dictionary<string, float> articleImageFailedAt = new Dictionary<string, float>();
     private Transform  focusAnchor;
 
     // ─── UI references ──────────────────────────────────────────────────────
@@ -1942,10 +1943,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cvl.childControlHeight = true; cvl.childForceExpandHeight = false;
         cvl.spacing = 2;
 
-        TMP_Text cap = WinText(captionBox.transform, "Caption", HeroCaption(item), 14, Color.white, FontStyles.Bold);
+        TMP_Text cap = WinText(captionBox.transform, "Caption", HeroCaption(item, imageUrl), 14, Color.white, FontStyles.Bold);
         cap.textWrappingMode = TextWrappingModes.Normal;
         cap.overflowMode = TextOverflowModes.Ellipsis;
-        TMP_Text credit = WinText(captionBox.transform, "Credit", Fallback(item.articleImageCredit, ArticleReady(item) ? "News image" : "Article image loading"), 11, Html("#dbeafe"));
+        TMP_Text credit = WinText(captionBox.transform, "Credit", ArticleImageCredit(item, imageUrl), 11, Html("#dbeafe"));
         credit.textWrappingMode = TextWrappingModes.Normal;
         credit.overflowMode = TextOverflowModes.Ellipsis;
     }
@@ -3181,8 +3182,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
             if (item == null) continue;
             string status = (item.articleStatus ?? string.Empty).Trim().ToLowerInvariant();
             if (status == "pending" || status == "generating") return true;
+            if (ArticleImagePending(item)) return true;
         }
         return false;
+    }
+
+    private static bool ArticleImagePending(ComputerNewsItem item)
+    {
+        if (!ArticleReady(item)) return false;
+        if (!string.Equals(item.articleMode, "synthetic", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.IsNullOrWhiteSpace(item.articleImageUrl)) return false;
+        return string.IsNullOrWhiteSpace(item.articleError);
     }
 
     private IEnumerator PollArticleEnrichment()
@@ -3380,11 +3390,20 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return "Article pending";
     }
 
-    private static string HeroCaption(ComputerNewsItem item)
+    private static string HeroCaption(ComputerNewsItem item, string imageUrl)
     {
         if (!string.IsNullOrWhiteSpace(item?.articleImageCaption)) return item.articleImageCaption;
+        if (ArticleReady(item) && string.IsNullOrWhiteSpace(imageUrl)) return "Article image is still being prepared.";
         if (ArticleReady(item)) return "Editorial image for this wire.";
         return "Full article media is loading.";
+    }
+
+    private string ArticleImageCredit(ComputerNewsItem item, string imageUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(item?.articleImageCredit)) return item.articleImageCredit;
+        if (!string.IsNullOrWhiteSpace(imageUrl) && articleImageFailedAt.ContainsKey(imageUrl)) return "Image retrying";
+        if (ArticleReady(item) && string.IsNullOrWhiteSpace(imageUrl)) return "Image generation pending";
+        return ArticleReady(item) ? "News image" : "Article image loading";
     }
 
     private string ResolveArticleImageUrl(ComputerNewsItem item)
@@ -3399,8 +3418,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void StartArticleImageLoad(string url)
     {
-        if (string.IsNullOrWhiteSpace(url) || articleImageCache.ContainsKey(url) || articleImageLoading.Contains(url) || articleImageFailed.Contains(url))
+        if (string.IsNullOrWhiteSpace(url) || articleImageCache.ContainsKey(url) || articleImageLoading.Contains(url))
             return;
+        if (articleImageFailedAt.TryGetValue(url, out float failedAt) && Time.unscaledTime - failedAt < ArticleImageRetryDelay)
+            return;
+        articleImageFailedAt.Remove(url);
         articleImageLoading.Add(url);
         StartCoroutine(LoadArticleImage(url));
     }
@@ -3416,19 +3438,26 @@ public sealed class ComputerOverlayController : MonoBehaviour
             articleImageLoading.Remove(url);
             if (request.result != UnityWebRequest.Result.Success)
             {
-                articleImageFailed.Add(url);
+                articleImageFailedAt[url] = Time.unscaledTime;
+                Debug.LogWarning($"[ComputerOverlay] Article image load failed: {url} result={request.result} status={request.responseCode} error={request.error}");
+                if (!string.IsNullOrWhiteSpace(activeArticleId))
+                    RenderAll();
                 yield break;
             }
 
             Texture2D tex = DownloadHandlerTexture.GetContent(request);
             if (tex == null)
             {
-                articleImageFailed.Add(url);
+                articleImageFailedAt[url] = Time.unscaledTime;
+                Debug.LogWarning($"[ComputerOverlay] Article image load failed: {url} returned no texture");
+                if (!string.IsNullOrWhiteSpace(activeArticleId))
+                    RenderAll();
                 yield break;
             }
 
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             articleImageCache[url] = sprite;
+            articleImageFailedAt.Remove(url);
             if (!string.IsNullOrWhiteSpace(activeArticleId))
                 RenderAll();
         }

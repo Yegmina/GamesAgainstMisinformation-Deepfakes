@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -19,6 +20,9 @@ from .db import connect, load_game
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 MEDIA_DIR = PROJECT_DIR / "data" / "media"
 NEWS_MEDIA_DIR = MEDIA_DIR / "news"
+ARTICLE_GENERATING_STALE_SECONDS = 300
+
+logger = logging.getLogger(__name__)
 
 ARTICLE_FIELDS = {
     "article_status",
@@ -53,13 +57,17 @@ def schedule_article_enrichment(game_id: str, user_id: int) -> None:
         if not isinstance(item, dict):
             continue
         item_id = str(item.get("id") or "")
-        if not item_id or item.get("article_status") != "pending":
+        status = str(item.get("article_status") or "").strip().lower()
+        stale_generating = status == "generating" and _article_generation_is_stale(item)
+        if not item_id or (status != "pending" and not stale_generating):
             continue
         key = (game_id, int(user_id), item_id)
         with _jobs_lock:
             if key in _active_jobs:
                 continue
             _active_jobs.add(key)
+        if stale_generating:
+            logger.warning("Retrying stale article generation game_id=%s item_id=%s", game_id, item_id)
         _pool().submit(_run_article_job, game_id, int(user_id), item_id)
 
 
@@ -104,13 +112,20 @@ def _run_article_job(game_id: str, user_id: int, item_id: str) -> None:
             return
         if item.get("truth_label") == "real":
             fields = _build_real_article(item)
+            fields["article_status"] = "ready"
+            fields["article_updated_at"] = _now_iso()
+            fields["article_error"] = fields.get("article_error") or ""
+            _update_article_fields(game_id, user_id, item_id, fields)
         else:
-            fields = _build_synthetic_article(game_id, item)
-        fields["article_status"] = "ready"
-        fields["article_updated_at"] = _now_iso()
-        fields["article_error"] = fields.get("article_error") or ""
-        _update_article_fields(game_id, user_id, item_id, fields)
+            fields, image_prompt = _build_synthetic_article_text(item)
+            fields["article_status"] = "ready"
+            fields["article_updated_at"] = _now_iso()
+            fields["article_error"] = fields.get("article_error") or ""
+            _update_article_fields(game_id, user_id, item_id, fields)
+            if image_prompt:
+                _update_article_fields(game_id, user_id, item_id, _build_synthetic_article_image(game_id, item_id, image_prompt))
     except Exception as exc:
+        logger.exception("Article enrichment failed game_id=%s item_id=%s", game_id, item_id)
         fallback_state = load_game(game_id, user_id)
         fallback_item = _find_item(fallback_state, item_id) if fallback_state else None
         _update_article_fields(game_id, user_id, item_id, _fallback_fields(fallback_item, exc))
@@ -136,7 +151,7 @@ def _build_real_article(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_synthetic_article(game_id: str, item: dict[str, Any]) -> dict[str, Any]:
+def _build_synthetic_article_text(item: dict[str, Any]) -> tuple[dict[str, Any], str]:
     result = ai_agents.generate_synthetic_article(item)
     data = result.data
     fields = {
@@ -151,14 +166,29 @@ def _build_synthetic_article(game_id: str, item: dict[str, Any]) -> dict[str, An
         "article_agent_model": result.model,
     }
     prompt = str(data.get("image_prompt") or "").strip()
-    if prompt:
-        try:
-            image_result = ai_agents.generate_article_image(prompt)
-            fields["article_image_url"] = _write_article_image(game_id, str(item.get("id") or "news"), image_result.data)
-            fields["article_image_model"] = image_result.model
-        except Exception as exc:
-            fields["article_error"] = f"Image generation unavailable. {_safe_error(exc)}"
-    return fields
+    if not prompt:
+        fields["article_error"] = "Image generation skipped because the article image prompt was empty."
+    return fields, prompt
+
+
+def _build_synthetic_article_image(game_id: str, item_id: str, prompt: str) -> dict[str, Any]:
+    try:
+        image_result = ai_agents.generate_article_image(prompt)
+        return {
+            "article_status": "ready",
+            "article_image_url": _write_article_image(game_id, item_id or "news", image_result.data),
+            "article_image_model": image_result.model,
+            "article_updated_at": _now_iso(),
+            "article_error": "",
+        }
+    except Exception as exc:
+        safe_error = _safe_error(exc)
+        logger.warning("Article image generation failed game_id=%s item_id=%s: %s", game_id, item_id, safe_error)
+        return {
+            "article_status": "ready",
+            "article_updated_at": _now_iso(),
+            "article_error": f"Image generation unavailable. {safe_error}",
+        }
 
 
 def _scrape_source(url: str) -> dict[str, Any]:
@@ -253,6 +283,20 @@ def _fallback_fields(item: dict[str, Any] | None, exc: Exception) -> dict[str, A
         "article_updated_at": _now_iso(),
         "article_error": _safe_error(exc),
     }
+
+
+def _article_generation_is_stale(item: dict[str, Any]) -> bool:
+    raw_updated = str(item.get("article_updated_at") or "").strip()
+    if not raw_updated:
+        return True
+    try:
+        updated = datetime.fromisoformat(raw_updated.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    age_seconds = (datetime.now(timezone.utc) - updated).total_seconds()
+    return age_seconds >= ARTICLE_GENERATING_STALE_SECONDS
 
 
 def _find_item(state: dict[str, Any] | None, item_id: str) -> dict[str, Any] | None:

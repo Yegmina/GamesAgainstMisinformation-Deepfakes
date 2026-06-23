@@ -325,7 +325,6 @@ def generate_article_image(prompt: str) -> AgentResult[bytes]:
         "prompt": prompt,
     }
     if OPENAI_IMAGE_MODEL.startswith("dall-e-"):
-        request_args["response_format"] = "b64_json"
         request_args["size"] = "1792x1024" if OPENAI_IMAGE_MODEL == "dall-e-3" else "1024x1024"
         if OPENAI_IMAGE_MODEL == "dall-e-3":
             request_args["quality"] = "standard"
