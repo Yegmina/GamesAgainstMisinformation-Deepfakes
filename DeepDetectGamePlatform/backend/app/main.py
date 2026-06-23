@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr, Field
 
 from .auth import create_session, current_user, hash_password, verify_password
@@ -16,6 +17,8 @@ from .db import connect, init_db, list_games, load_game, row_to_dict, save_game
 from .game_engine import advance_world, apply_action, generate_game
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_DIR / ".env")
 
 app = FastAPI(title="DeepDetect Game Platform")
 app.add_middleware(
