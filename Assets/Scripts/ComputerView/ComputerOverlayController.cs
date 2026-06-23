@@ -52,7 +52,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const string BackendUrlKey    = "DeepDetect.BackendUrl";
     private const string TokenKey         = "DeepDetect.UnityToken";
     private const string UserKey          = "DeepDetect.UnityUser";
-    private const string DefaultBackendUrl = "http://127.0.0.1:8765";
+    private const string DefaultBackendUrl = "http://76.13.159.31:8104";
     private const string DefaultName      = "Unity Player";
     private const string DefaultEmail     = "unity.player@deepdetectgame.dev";
     private const string DefaultPassword  = "unity-local-player-2026";
@@ -175,6 +175,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private GameObject  bootStateObject;
     private TMP_Text    bootTitleText;
     private TMP_Text    bootBodyText;
+    private Button      bootRetryButton;
+    private string      lastStatusMessage = "Connecting to DeepDetect backend...";
 
     // Notification toast
     private GameObject  notificationToast;
@@ -264,8 +266,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private async Task InitializeAsync()
     {
         initializing = true;
-        SetBusy(true, "Connecting to DeepDetect backend...");
+        SetBusy(true, "Starting system network services...");
         string backendUrl  = PlayerPrefs.GetString(BackendUrlKey, DefaultBackendUrl);
+        if (string.IsNullOrEmpty(backendUrl) || 
+            backendUrl == "http://127.0.0.1:8765" || 
+            backendUrl == "http://localhost:8765" || 
+            backendUrl.Contains("127.0.0.1") || 
+            backendUrl.Contains("localhost"))
+        {
+            backendUrl = DefaultBackendUrl;
+            PlayerPrefs.SetString(BackendUrlKey, backendUrl);
+        }
         string savedToken  = PlayerPrefs.GetString(TokenKey, string.Empty);
         api = new ComputerApiClient(backendUrl, savedToken);
         try
@@ -443,13 +454,26 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (item == null || string.IsNullOrWhiteSpace(item.id) || item.correct != false || string.IsNullOrWhiteSpace(item.decision)) continue;
         ComputerNewsItem old;
         bool wasResolved = oldNews.TryGetValue(item.id, out old) && !string.IsNullOrWhiteSpace(old.decision);
-        if (!wasResolved) { delta += 10; newWrong++; }
+        if (!wasResolved)
+        {
+            delta += 10;
+            newWrong++;
+            GlobalCanvasPersistent.Instance.SubtractTime(30);
+        }
     }
     int wrongEmails = CountNewWrongThreadResolutions(prev.emails, next.emails);
     int wrongTelegram = CountNewWrongThreadResolutions(prev.telegramThreads, next.telegramThreads);
     newWrong += wrongEmails + wrongTelegram;
     delta += wrongEmails * 6;
     delta += wrongTelegram * 6;
+    if (wrongEmails > 0)
+    {
+        GlobalCanvasPersistent.Instance.SubtractTime(30 * wrongEmails);
+    }
+    if (wrongTelegram > 0)
+    {
+        GlobalCanvasPersistent.Instance.SubtractTime(30 * wrongTelegram);
+    }
     if (delta > 0) GlobalCanvasPersistent.Instance.AddParanoia(delta);
 
     // Horror event: after every couple of wrong calls, the work window is
@@ -1099,19 +1123,20 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // ── Boot state overlay ──────────────────────────────────────────────────
     private void BuildBootState(Transform parent)
     {
-        bootStateObject = PanelObject(parent, "BootOverlay", Html("#0d1b2af0"));
+        bootStateObject = PanelObject(parent, "BootOverlay", Html("#0d1b2af0")); // original translucent dark blue
         Stretch(bootStateObject.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
         VerticalLayoutGroup vl = bootStateObject.AddComponent<VerticalLayoutGroup>();
-        vl.padding = new RectOffset(0, 0, 200, 0);
-        vl.childAlignment = TextAnchor.UpperCenter;
+        vl.padding = new RectOffset(0, 0, 200, 0); // original center padding
+        vl.childAlignment = TextAnchor.UpperCenter; // original center alignment
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true;
         vl.childForceExpandHeight = false;
 
-        bootTitleText = WinText(bootStateObject.transform, "BootTitle", "DeepDetect", 48, TextPrimary, FontStyles.Bold);
+        bootTitleText = WinText(bootStateObject.transform, "BootTitle", "STARTING UP...", 48, TextPrimary, FontStyles.Bold);
         bootTitleText.alignment = TextAlignmentOptions.Center;
-        bootBodyText  = WinText(bootStateObject.transform, "BootBody", "Connecting to backend...", 18, TextSecondary);
+
+        bootBodyText  = WinText(bootStateObject.transform, "BootBody", "Connecting to system network...", 18, TextSecondary);
         bootBodyText.alignment  = TextAlignmentOptions.Center;
     }
 
@@ -1169,11 +1194,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         hl.childControlHeight   = true;
         hl.childForceExpandHeight = false;
 
-        // "ESC" key-cap
+        // "Q" key-cap
         Color capBg = Html("#1e2535");
-        GameObject cap = PanelObject(hint.transform, "EscCap", capBg);
+        GameObject cap = PanelObject(hint.transform, "QCap", capBg);
         MakeRounded(cap, capBg, 5f);
-        Layout(cap, 34f, 17f, 0f, 0f);
+        Layout(cap, 24f, 17f, 0f, 0f); // Q is narrower than ESC, 24f is perfect!
         cap.GetComponent<Image>().raycastTarget = false;
         HorizontalLayoutGroup capHl = cap.AddComponent<HorizontalLayoutGroup>();
         capHl.childAlignment      = TextAnchor.MiddleCenter;
@@ -1181,7 +1206,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         capHl.childForceExpandWidth  = true;
         capHl.childControlHeight   = true;
         capHl.childForceExpandHeight = true;
-        TMP_Text capTxt = WinText(cap.transform, "ESC", "ESC", 9, TextPrimary, FontStyles.Bold);
+        TMP_Text capTxt = WinText(cap.transform, "Q", "Q", 9, TextPrimary, FontStyles.Bold);
         capTxt.alignment = TextAlignmentOptions.Center;
 
         // Label
@@ -1229,8 +1254,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         }
         else
         {
-            if (bootTitleText != null) bootTitleText.text = DisplayText(busy ? "DeepDetect" : "DeepDetect");
-            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to backend..." : "Press Refresh if backend is offline.");
+            if (bootTitleText != null) bootTitleText.text = DisplayText("STARTING UP...");
+            if (bootBodyText  != null) bootBodyText.text  = DisplayText(busy ? "Connecting to network services..." : "Network offline. Press Refresh to try starting up again.");
         }
 
         UpdateStatusbar();
