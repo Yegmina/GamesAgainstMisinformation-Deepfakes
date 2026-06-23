@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+
 /// <summary>
 /// Story call timeline: Neighbor -> Mom -> Microsoft.
 /// The call is only shown while the player is idle on the Home Screen (never during a chat).
