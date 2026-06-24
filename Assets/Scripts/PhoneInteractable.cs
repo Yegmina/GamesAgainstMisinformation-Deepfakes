@@ -76,10 +76,20 @@ public class PhoneInteractable : Interactable
     {
         if (hasInteracted) return;
 
-        if (!isGlowing)
+        bool shouldGlow = false;
+        if (GlobalCanvasPersistent.Instance != null)
+        {
+            shouldGlow = GlobalCanvasPersistent.Instance.IsCallRinging;
+        }
+        else
         {
             timer += Time.deltaTime;
-            if (timer >= delayTime)
+            shouldGlow = (timer >= delayTime);
+        }
+
+        if (shouldGlow)
+        {
+            if (!isGlowing)
             {
                 isGlowing = true;
                 if (glowLight != null)
@@ -92,15 +102,28 @@ public class PhoneInteractable : Interactable
                     SetScreenColor(originalBaseColor);
                 }
             }
-        }
-        else
-        {
+
             // Breathing animation for the glow light
             if (glowLight != null)
             {
                 float t = Mathf.PingPong(Time.time * glowSpeed, 1.0f);
                 t = Mathf.SmoothStep(0f, 1f, t);
                 glowLight.intensity = Mathf.Lerp(minIntensity, maxIntensity, t);
+            }
+        }
+        else
+        {
+            if (isGlowing)
+            {
+                isGlowing = false;
+                if (glowLight != null)
+                {
+                    glowLight.enabled = false;
+                }
+                if (dimScreenInitially)
+                {
+                    SetScreenColor(dimmedColor);
+                }
             }
         }
     }

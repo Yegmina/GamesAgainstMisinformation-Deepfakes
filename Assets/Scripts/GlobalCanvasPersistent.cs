@@ -33,6 +33,38 @@ public class GlobalCanvasPersistent : MonoBehaviour
     private TMP_Text pointsText;
     private Image paranoiaFill;
 
+    public enum GlobalCallPhase
+    {
+        WaitingForNeighbor,
+        NeighborRinging,
+        WaitingForMom,
+        MomRinging,
+        WaitingForMicrosoft,
+        MicrosoftRinging,
+        Complete
+    }
+
+    [Header("Global Call Timing")]
+    [SerializeField] private float delaySeconds = 60f;
+    [SerializeField] private float delayBeforeMom = 150f;
+    [SerializeField] private float delayBeforeMicrosoft = 150f;
+    [SerializeField] private AudioClip globalIncomingRingtone;
+    [SerializeField] private Sprite notificationBgSprite;
+
+    private GlobalCallPhase callPhase = GlobalCallPhase.WaitingForNeighbor;
+    private float callPhaseElapsed = 0f;
+    private bool isCallRinging = false;
+    private string ringingCallerName = "";
+    private AudioSource ringtoneSource;
+
+    private GameObject notificationToast;
+    private TMP_Text notifTitleText;
+    private TMP_Text notifBodyText;
+
+    public GlobalCallPhase CallPhase => callPhase;
+    public bool IsCallRinging => isCallRinging;
+    public string RingingCallerName => ringingCallerName;
+
     public float Timer { get => timer; set { timer = value; UpdateUI(); } }
     public bool IsTimerRunning => timerRunning;
     public int Paranoia => paranoia;
@@ -98,6 +130,38 @@ public class GlobalCanvasPersistent : MonoBehaviour
                 TriggerEnding();
             }
             UpdateUI();
+        }
+
+        // Global Call Timing Update
+        if (callPhase != GlobalCallPhase.Complete && !isCallRinging && !hideHud)
+        {
+            callPhaseElapsed += Time.deltaTime;
+            float requiredDelay = GetRequiredDelayForCurrentPhase();
+            if (callPhaseElapsed >= requiredDelay)
+            {
+                string callerName = "";
+                GlobalCallPhase nextRingPhase = GlobalCallPhase.Complete;
+                if (callPhase == GlobalCallPhase.WaitingForNeighbor)
+                {
+                    callerName = "Neighbor";
+                    nextRingPhase = GlobalCallPhase.NeighborRinging;
+                }
+                else if (callPhase == GlobalCallPhase.WaitingForMom)
+                {
+                    callerName = "Mom";
+                    nextRingPhase = GlobalCallPhase.MomRinging;
+                }
+                else if (callPhase == GlobalCallPhase.WaitingForMicrosoft)
+                {
+                    callerName = "Microsoft Support";
+                    nextRingPhase = GlobalCallPhase.MicrosoftRinging;
+                }
+
+                if (nextRingPhase != GlobalCallPhase.Complete)
+                {
+                    StartRingingCall(nextRingPhase, callerName);
+                }
+            }
         }
     }
 
@@ -333,5 +397,154 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
         Debug.Log("Timer ended! Loading scene: " + endingScene);
         SceneManager.LoadScene(endingScene);
+    }
+
+    private float GetRequiredDelayForCurrentPhase()
+    {
+        switch (callPhase)
+        {
+            case GlobalCallPhase.WaitingForNeighbor:
+                return delaySeconds;
+            case GlobalCallPhase.WaitingForMom:
+                return delayBeforeMom;
+            case GlobalCallPhase.WaitingForMicrosoft:
+                return delayBeforeMicrosoft;
+            default:
+                return float.MaxValue;
+        }
+    }
+
+    public void StartRingingCall(GlobalCallPhase ringPhase, string callerName)
+    {
+        callPhase = ringPhase;
+        isCallRinging = true;
+        ringingCallerName = callerName;
+
+        CreateNotificationToast();
+        if (notificationToast != null)
+        {
+            if (notifBodyText != null)
+            {
+                notifBodyText.text = $"{callerName} is calling! Go to the phone to answer the call.";
+            }
+            notificationToast.SetActive(true);
+        }
+
+        PlayGlobalRingtone();
+    }
+
+    public void OnCallEnded(GlobalCallPhase nextPhase)
+    {
+        callPhase = nextPhase;
+        callPhaseElapsed = 0f;
+        StopGlobalRingtoneAndNotification();
+    }
+
+    public void PlayGlobalRingtone()
+    {
+        if (ringtoneSource == null)
+        {
+            ringtoneSource = gameObject.AddComponent<AudioSource>();
+            ringtoneSource.playOnAwake = false;
+            ringtoneSource.loop = true;
+        }
+
+        if (globalIncomingRingtone != null)
+        {
+            ringtoneSource.clip = globalIncomingRingtone;
+            ringtoneSource.volume = 0.5f;
+            ringtoneSource.Play();
+        }
+    }
+
+    public void StopGlobalRingtoneAndNotification()
+    {
+        isCallRinging = false;
+        if (ringtoneSource != null)
+        {
+            ringtoneSource.Stop();
+        }
+        if (notificationToast != null)
+        {
+            notificationToast.SetActive(false);
+        }
+    }
+
+    private void CreateNotificationToast()
+    {
+        if (notificationToast != null) return;
+
+        // Create main container panel
+        notificationToast = new GameObject("PhoneCallNotification");
+        notificationToast.transform.SetParent(this.transform, false);
+        
+        RectTransform rect = notificationToast.AddComponent<RectTransform>();
+        // Anchor to bottom right corner
+        rect.anchorMin = new Vector2(1f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(1f, 0f);
+        rect.sizeDelta = new Vector2(730f, 190f); // Much wider and taller to fit 24f font perfectly
+        rect.anchoredPosition = new Vector2(-40f, 40f); // Offset left and up from bottom-right
+
+        // Background Image
+        Image bgImage = notificationToast.AddComponent<Image>();
+        if (notificationBgSprite != null)
+        {
+            bgImage.sprite = notificationBgSprite;
+            bgImage.type = Image.Type.Simple;
+            bgImage.color = Color.white;
+        }
+        else
+        {
+            bgImage.color = new Color(0.08f, 0.11f, 0.18f, 0.95f); // Deep dark blue-slate
+        }
+
+        // Outline (matches the HUD style exactly)
+        Outline outline = notificationToast.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0.9f, 1f, 0.8f); // Neon Cyan border
+        outline.effectDistance = new Vector2(1.5f, 1.5f);
+
+        // Vertical Layout for nice padding and stacking
+        VerticalLayoutGroup layout = notificationToast.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(70, 45, 25, 25); // Increased padding to clear the neon glow border perfectly
+        layout.spacing = 10f;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true; // Set to true so child text elements are correctly sized
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        // Content: Title Text
+        GameObject titleGo = new GameObject("NotifTitle", typeof(RectTransform));
+        titleGo.transform.SetParent(notificationToast.transform, false);
+        
+        RectTransform titleRect = titleGo.GetComponent<RectTransform>();
+        titleRect.pivot = new Vector2(0f, 0.5f); // Force pivot to left-center
+        
+        notifTitleText = titleGo.AddComponent<TextMeshProUGUI>();
+        notifTitleText.text = "📞 PHONE IS RINGING!";
+        notifTitleText.fontSize = 24f; // Font size 24 as requested
+        notifTitleText.color = new Color(0f, 0.9f, 1f, 1f); // Neon Cyan
+        notifTitleText.fontStyle = FontStyles.Bold;
+        notifTitleText.alignment = TextAlignmentOptions.Left;
+        notifTitleText.margin = new Vector4(0f, 0f, 0f, 0f);
+
+        // Content: Body Text
+        GameObject bodyGo = new GameObject("NotifBody", typeof(RectTransform));
+        bodyGo.transform.SetParent(notificationToast.transform, false);
+        
+        RectTransform bodyRect = bodyGo.GetComponent<RectTransform>();
+        bodyRect.pivot = new Vector2(0f, 0.5f); // Force pivot to left-center
+        
+        notifBodyText = bodyGo.AddComponent<TextMeshProUGUI>();
+        notifBodyText.text = "Someone is calling you. Go to the phone to answer the call!";
+        notifBodyText.fontSize = 24f; // Font size 24 as requested
+        notifBodyText.color = Color.white;
+        notifBodyText.alignment = TextAlignmentOptions.Left;
+        notifBodyText.enableWordWrapping = true;
+        notifBodyText.overflowMode = TextOverflowModes.Overflow;
+        notifBodyText.margin = new Vector4(0f, 0f, 0f, 0f);
+
+        notificationToast.SetActive(false);
     }
 }
