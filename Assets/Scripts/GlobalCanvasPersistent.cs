@@ -339,6 +339,9 @@ public class GlobalCanvasPersistent : MonoBehaviour
         points = 0;
         UpdateUI();
 
+        // Reset phone chat state for a fresh game session
+        ChatController.ResetStaticState();
+
         if (MissionSidebarManager.Instance != null)
         {
             MissionSidebarManager.Instance.ResetMissions();
