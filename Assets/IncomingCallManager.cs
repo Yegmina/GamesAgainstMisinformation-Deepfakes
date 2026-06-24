@@ -7,7 +7,7 @@ using TMPro;
 
 
 /// <summary>
-/// Story call timeline: Neighbor -> Mom -> Microsoft.
+/// Story call timeline: Mom -> Neighbor -> Microsoft.
 /// The call is only shown while the player is idle on the Home Screen (never during a chat).
 /// </summary>
 public class IncomingCallManager : MonoBehaviour
@@ -76,7 +76,7 @@ public class IncomingCallManager : MonoBehaviour
     bool callPending;
     bool callShown;
     bool timersInitialized;
-    StoryCallPhase storyPhase = StoryCallPhase.WaitingForNeighbor;
+    StoryCallPhase storyPhase = StoryCallPhase.WaitingForMom;
     ActiveCallType activeCallType = ActiveCallType.None;
     bool answerTransitionInProgress;
     float answerTransitionStartedAt;
@@ -199,7 +199,10 @@ public class IncomingCallManager : MonoBehaviour
             GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
             if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
             {
-                ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                if (storyPhase == StoryCallPhase.WaitingForMom)
+                    ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+                else
+                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
             }
             else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
             {
@@ -234,7 +237,10 @@ public class IncomingCallManager : MonoBehaviour
                 GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
                 if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
                 {
-                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                    if (storyPhase == StoryCallPhase.WaitingForMom)
+                        ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+                    else
+                        ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
                 }
                 else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
                 {
@@ -276,9 +282,9 @@ public class IncomingCallManager : MonoBehaviour
     {
         switch (storyPhase)
         {
-            case StoryCallPhase.WaitingForNeighbor:
-                return delaySeconds;
             case StoryCallPhase.WaitingForMom:
+                return delaySeconds;
+            case StoryCallPhase.WaitingForNeighbor:
                 return delayBeforeMom;
             case StoryCallPhase.WaitingForMicrosoft:
                 return delayBeforeMicrosoft;
@@ -724,29 +730,29 @@ public class IncomingCallManager : MonoBehaviour
 
     void AdvanceStoryTimelineAfterCall()
     {
-        if (activeCallType == ActiveCallType.Neighbor)
+        if (activeCallType == ActiveCallType.Mom)
         {
-            storyPhase = StoryCallPhase.WaitingForMom;
+            storyPhase = StoryCallPhase.WaitingForNeighbor;
             phaseElapsed = 0f;
             callPending = false;
-            Debug.Log($"[IncomingCallManager] Neighbor call finished. Mom timer reset ({delayBeforeMom}s).");
+            Debug.Log($"[IncomingCallManager] Mom call finished. Neighbor timer reset ({delayBeforeMom}s).");
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
-                "Neighbor finished",
+                "Mom finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
 
             if (GlobalCanvasPersistent.Instance != null)
             {
-                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForMom);
+                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForNeighbor);
             }
         }
-        else if (activeCallType == ActiveCallType.Mom)
+        else if (activeCallType == ActiveCallType.Neighbor)
         {
             storyPhase = StoryCallPhase.WaitingForMicrosoft;
             phaseElapsed = 0f;
             callPending = false;
-            Debug.Log($"[IncomingCallManager] Mom call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
+            Debug.Log($"[IncomingCallManager] Neighbor call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
-                "Mom finished",
+                "Neighbor finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
 
             if (GlobalCanvasPersistent.Instance != null)
