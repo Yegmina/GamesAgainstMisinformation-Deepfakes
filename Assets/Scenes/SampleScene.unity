@@ -1159,6 +1159,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 4b482d23a028d9045b54b275598b7f9d, type: 3}
   frameObject: {fileID: 0}
   textInscriptionImage: {fileID: 0}
+  textComponent: {fileID: 0}
   normalTextColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   hoverTextColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &133649731
@@ -1654,6 +1655,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 4b482d23a028d9045b54b275598b7f9d, type: 3}
   frameObject: {fileID: 0}
   textInscriptionImage: {fileID: 0}
+  textComponent: {fileID: 0}
   normalTextColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   hoverTextColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &179119434
@@ -6585,6 +6587,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 4b482d23a028d9045b54b275598b7f9d, type: 3}
   frameObject: {fileID: 0}
   textInscriptionImage: {fileID: 0}
+  textComponent: {fileID: 0}
   normalTextColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   hoverTextColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &627096762
@@ -7178,6 +7181,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 4b482d23a028d9045b54b275598b7f9d, type: 3}
   frameObject: {fileID: 0}
   textInscriptionImage: {fileID: 0}
+  textComponent: {fileID: 0}
   normalTextColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   hoverTextColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &710961905
@@ -13827,6 +13831,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 4b482d23a028d9045b54b275598b7f9d, type: 3}
   frameObject: {fileID: 0}
   textInscriptionImage: {fileID: 0}
+  textComponent: {fileID: 0}
   normalTextColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   hoverTextColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1682172529

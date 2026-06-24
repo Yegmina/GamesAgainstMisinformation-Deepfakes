@@ -189,6 +189,26 @@ public class IncomingCallManager : MonoBehaviour
         AgentLog("C", "IncomingCallManager.Start", "Timers initialized",
             "{\"delaySeconds\":" + delaySeconds + ",\"delayBeforeMom\":" + delayBeforeMom +
             ",\"delayBeforeMicrosoft\":" + delayBeforeMicrosoft + ",\"phase\":\"" + storyPhase + "\"}");
+
+        // IMMEDIATELY DETECT GLOBAL RINGING
+        if (GlobalCanvasPersistent.Instance != null && GlobalCanvasPersistent.Instance.IsCallRinging)
+        {
+            GlobalCanvasPersistent.Instance.StopGlobalRingtoneAndNotification();
+
+            GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
+            if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
+            {
+                ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+            }
+            else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
+            {
+                ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+            }
+            else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MicrosoftRinging)
+            {
+                ShowStoryIncomingCall(StoryCallPhase.MicrosoftActive, ActiveCallType.Microsoft);
+            }
+        }
     }
 
     void OnDestroy()
@@ -203,6 +223,30 @@ public class IncomingCallManager : MonoBehaviour
 
     void Update()
     {
+        if (GlobalCanvasPersistent.Instance != null)
+        {
+            // Sync with global canvas call ringing state
+            if (GlobalCanvasPersistent.Instance.IsCallRinging && !callShown)
+            {
+                GlobalCanvasPersistent.Instance.StopGlobalRingtoneAndNotification();
+
+                GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
+                if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
+                {
+                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                }
+                else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
+                {
+                    ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+                }
+                else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MicrosoftRinging)
+                {
+                    ShowStoryIncomingCall(StoryCallPhase.MicrosoftActive, ActiveCallType.Microsoft);
+                }
+            }
+            return;
+        }
+
         if (!timersInitialized || storyPhase == StoryCallPhase.Complete || callShown || isPhoneBusy)
             return;
 
@@ -622,6 +666,11 @@ public class IncomingCallManager : MonoBehaviour
         AgentLog("F", "IncomingCallManager.HandleMicrosoftStoryCompleted",
             "Microsoft story marked complete",
             "{\"storyPhase\":\"" + storyPhase + "\"}");
+
+        if (GlobalCanvasPersistent.Instance != null)
+        {
+            GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.Complete);
+        }
     }
 
     void HandleCallEnded()
@@ -643,6 +692,11 @@ public class IncomingCallManager : MonoBehaviour
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
                 "Neighbor finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
+
+            if (GlobalCanvasPersistent.Instance != null)
+            {
+                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForMom);
+            }
         }
         else if (activeCallType == ActiveCallType.Mom)
         {
@@ -653,6 +707,11 @@ public class IncomingCallManager : MonoBehaviour
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
                 "Mom finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
+
+            if (GlobalCanvasPersistent.Instance != null)
+            {
+                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForMicrosoft);
+            }
         }
         else if (activeCallType == ActiveCallType.Microsoft)
         {
@@ -662,6 +721,11 @@ public class IncomingCallManager : MonoBehaviour
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
                 "Microsoft finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
+
+            if (GlobalCanvasPersistent.Instance != null)
+            {
+                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.Complete);
+            }
         }
 
         activeCallType = ActiveCallType.None;

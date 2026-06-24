@@ -342,6 +342,11 @@ MonoBehaviour:
   virusScreamClip: {fileID: 0}
   virusScreamSource: {fileID: 0}
   virusScreamVolume: 1
+  delaySeconds: 60
+  delayBeforeMom: 150
+  delayBeforeMicrosoft: 150
+  globalIncomingRingtone: {fileID: 8300000, guid: 6d7d54e4f9af0034a83b159c0a28e228, type: 3}
+  notificationBgSprite: {fileID: 21300000, guid: 704bbbfddebc8c640bbd887684f06df9, type: 3}
 --- !u!82 &7588790051324415800
 AudioSource:
   m_ObjectHideFlags: 0
