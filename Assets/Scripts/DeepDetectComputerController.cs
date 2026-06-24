@@ -472,8 +472,16 @@ public class DeepDetectComputerController : MonoBehaviour
         go.transform.SetParent(parent, false);
         var rect = go.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(0, 42);
-        go.GetComponent<Image>().color = new Color(0.18f, 0.29f, 0.42f, 1f);
+        Color normalCol = new Color(0.18f, 0.29f, 0.42f, 1f);
+        go.GetComponent<Image>().color = normalCol;
         var button = go.GetComponent<Button>();
+        button.targetGraphic = go.GetComponent<Image>();
+        ColorBlock cb = button.colors;
+        cb.normalColor = normalCol;
+        cb.highlightedColor = new Color(0.24f, 0.38f, 0.54f, 1f);
+        cb.pressedColor = new Color(0.12f, 0.20f, 0.30f, 1f);
+        cb.selectedColor = normalCol;
+        button.colors = cb;
         button.onClick.AddListener(action);
 
         var text = CreateText(rect, "Label", DisplaySafe(displayText ?? label), 15, FontStyles.Bold, TextAlignmentOptions.Center);
