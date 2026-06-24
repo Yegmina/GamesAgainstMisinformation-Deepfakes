@@ -7,7 +7,7 @@ using TMPro;
 
 
 /// <summary>
-/// Story call timeline: Neighbor -> Mom -> Microsoft.
+/// Story call timeline: Mom -> Neighbor -> Microsoft.
 /// The call is only shown while the player is idle on the Home Screen (never during a chat).
 /// </summary>
 public class IncomingCallManager : MonoBehaviour
@@ -42,6 +42,7 @@ public class IncomingCallManager : MonoBehaviour
     public Button incomingDeclineButton;
     public TMP_Text incomingCallerName;
     public Image incomingCallerAvatar;
+    [SerializeField] private GameObject incomingCallErrorPanel;
 
     [Header("Caller Screen buttons")]
     public GameObject callerEndCallButton;
@@ -75,7 +76,7 @@ public class IncomingCallManager : MonoBehaviour
     bool callPending;
     bool callShown;
     bool timersInitialized;
-    StoryCallPhase storyPhase = StoryCallPhase.WaitingForNeighbor;
+    StoryCallPhase storyPhase = StoryCallPhase.WaitingForMom;
     ActiveCallType activeCallType = ActiveCallType.None;
     bool answerTransitionInProgress;
     float answerTransitionStartedAt;
@@ -117,7 +118,7 @@ public class IncomingCallManager : MonoBehaviour
         ringtoneSource.playOnAwake = false;
         ringtoneSource.loop = true;
 
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
 
         WireIncomingButtons();
     }
@@ -198,7 +199,10 @@ public class IncomingCallManager : MonoBehaviour
             GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
             if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
             {
-                ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                if (storyPhase == StoryCallPhase.WaitingForMom)
+                    ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+                else
+                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
             }
             else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
             {
@@ -233,7 +237,10 @@ public class IncomingCallManager : MonoBehaviour
                 GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
                 if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
                 {
-                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                    if (storyPhase == StoryCallPhase.WaitingForMom)
+                        ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
+                    else
+                        ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
                 }
                 else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
                 {
@@ -275,9 +282,9 @@ public class IncomingCallManager : MonoBehaviour
     {
         switch (storyPhase)
         {
-            case StoryCallPhase.WaitingForNeighbor:
-                return delaySeconds;
             case StoryCallPhase.WaitingForMom:
+                return delaySeconds;
+            case StoryCallPhase.WaitingForNeighbor:
                 return delayBeforeMom;
             case StoryCallPhase.WaitingForMicrosoft:
                 return delayBeforeMicrosoft;
@@ -369,6 +376,7 @@ public class IncomingCallManager : MonoBehaviour
             phoneManager.homeScreen.SetActive(false);
 
         if (incomingCallScreen != null) incomingCallScreen.SetActive(true);
+        EnsureIncomingScreenReceivesInput();
         PrepareIncomingRingButtons();
 
         if (ringtoneSource != null && incomingRingtoneClip != null)
@@ -402,12 +410,16 @@ public class IncomingCallManager : MonoBehaviour
         {
             incomingAnswerButton.gameObject.SetActive(true);
             incomingAnswerButton.interactable = true;
+            if (incomingAnswerButton.targetGraphic != null)
+                incomingAnswerButton.targetGraphic.raycastTarget = true;
         }
 
         if (incomingDeclineButton != null)
         {
             incomingDeclineButton.gameObject.SetActive(true);
-            incomingDeclineButton.interactable = !IsIncomingStoryCallInProgress;
+            incomingDeclineButton.interactable = true;
+            if (incomingDeclineButton.targetGraphic != null)
+                incomingDeclineButton.targetGraphic.raycastTarget = true;
         }
 
         AgentLog("G", "IncomingCallManager.EnsureIncomingAnswerButtonVisible",
@@ -416,6 +428,23 @@ public class IncomingCallManager : MonoBehaviour
             (incomingAnswerButton != null && incomingAnswerButton.gameObject.activeSelf ? "true" : "false") +
             ",\"sharesCallerAnswerReference\":" +
             (incomingAnswerButton != null && incomingAnswerButton == callerAnswerButton ? "true" : "false") + "}");
+    }
+
+    void EnsureIncomingScreenReceivesInput()
+    {
+        if (incomingCallScreen == null)
+            return;
+
+        CanvasGroup canvasGroup = incomingCallScreen.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        GraphicRaycaster raycaster = incomingCallScreen.GetComponentInParent<GraphicRaycaster>();
+        if (raycaster != null)
+            raycaster.enabled = true;
     }
 
     void SetCallerScreenButtonVisible(Button button, bool visible)
@@ -431,35 +460,50 @@ public class IncomingCallManager : MonoBehaviour
         if (ringtoneSource != null) ringtoneSource.Stop();
     }
 
-    void StartIncomingDeclineVibration()
+    void StartIncomingDeclineFeedback()
     {
         if (vibrationRoutine != null)
             StopCoroutine(vibrationRoutine);
 
-        vibrationRoutine = StartCoroutine(IncomingDeclineVibrationCoroutine());
+        vibrationRoutine = StartCoroutine(FlashErrorAndVibrateCoroutine());
     }
 
-    void StopIncomingDeclineVibration()
+    void StopIncomingDeclineFeedback()
     {
         if (vibrationRoutine != null)
         {
             StopCoroutine(vibrationRoutine);
             vibrationRoutine = null;
         }
+
+        if (incomingCallErrorPanel != null)
+            incomingCallErrorPanel.SetActive(false);
     }
 
-    IEnumerator IncomingDeclineVibrationCoroutine()
+    IEnumerator FlashErrorAndVibrateCoroutine()
     {
         const float duration = 2f;
-        const float interval = 0.12f;
+        const float interval = 0.1f;
         float elapsed = 0f;
+        bool panelVisible = false;
 
         while (elapsed < duration)
         {
+#if UNITY_ANDROID || UNITY_IOS
             Handheld.Vibrate();
-            yield return new WaitForSecondsRealtime(interval);
-            elapsed += interval;
+#endif
+
+            panelVisible = !panelVisible;
+            if (incomingCallErrorPanel != null)
+                incomingCallErrorPanel.SetActive(panelVisible);
+
+            float waitTime = Mathf.Min(interval, duration - elapsed);
+            yield return new WaitForSecondsRealtime(waitTime);
+            elapsed += waitTime;
         }
+
+        if (incomingCallErrorPanel != null)
+            incomingCallErrorPanel.SetActive(false);
 
         vibrationRoutine = null;
     }
@@ -489,7 +533,7 @@ public class IncomingCallManager : MonoBehaviour
     void ReturnToIdleHome()
     {
         StopRingtone();
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
         if (!phoneLockedByBadEnding)
             isPhoneBusy = false;
 
@@ -519,7 +563,7 @@ public class IncomingCallManager : MonoBehaviour
 
     public void AnswerIncoming()
     {
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
 
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
         {
@@ -609,7 +653,7 @@ public class IncomingCallManager : MonoBehaviour
     {
         if (IsIncomingStoryCallInProgress)
         {
-            StartIncomingDeclineVibration();
+            StartIncomingDeclineFeedback();
             return;
         }
 
@@ -625,6 +669,11 @@ public class IncomingCallManager : MonoBehaviour
         AdvanceStoryTimelineAfterCall();
     }
 
+    public void ResetCall()
+    {
+        EndCallerScreen();
+    }
+
     public void EndCallerScreen()
     {
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
@@ -636,7 +685,7 @@ public class IncomingCallManager : MonoBehaviour
 
         if (IsIncomingStoryCallInProgress)
         {
-            StartIncomingDeclineVibration();
+            StartIncomingDeclineFeedback();
             return;
         }
 
@@ -683,29 +732,29 @@ public class IncomingCallManager : MonoBehaviour
 
     void AdvanceStoryTimelineAfterCall()
     {
-        if (activeCallType == ActiveCallType.Neighbor)
+        if (activeCallType == ActiveCallType.Mom)
         {
-            storyPhase = StoryCallPhase.WaitingForMom;
+            storyPhase = StoryCallPhase.WaitingForNeighbor;
             phaseElapsed = 0f;
             callPending = false;
-            Debug.Log($"[IncomingCallManager] Neighbor call finished. Mom timer reset ({delayBeforeMom}s).");
+            Debug.Log($"[IncomingCallManager] Mom call finished. Neighbor timer reset ({delayBeforeMom}s).");
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
-                "Neighbor finished",
+                "Mom finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
 
             if (GlobalCanvasPersistent.Instance != null)
             {
-                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForMom);
+                GlobalCanvasPersistent.Instance.OnCallEnded(GlobalCanvasPersistent.GlobalCallPhase.WaitingForNeighbor);
             }
         }
-        else if (activeCallType == ActiveCallType.Mom)
+        else if (activeCallType == ActiveCallType.Neighbor)
         {
             storyPhase = StoryCallPhase.WaitingForMicrosoft;
             phaseElapsed = 0f;
             callPending = false;
-            Debug.Log($"[IncomingCallManager] Mom call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
+            Debug.Log($"[IncomingCallManager] Neighbor call finished. Microsoft timer reset ({delayBeforeMicrosoft}s).");
             AgentLog("F", "IncomingCallManager.AdvanceStoryTimelineAfterCall",
-                "Mom finished",
+                "Neighbor finished",
                 "{\"storyPhase\":\"" + storyPhase + "\"}");
 
             if (GlobalCanvasPersistent.Instance != null)
