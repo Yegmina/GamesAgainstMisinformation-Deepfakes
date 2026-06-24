@@ -3743,7 +3743,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         HideFakeAttachmentOverlay();
         fakeAttachmentActive = false;
         fakeAttachmentRoutine = null;
-        TriggerVirusAttack();
+        TriggerVirusAttack(VirusVisualSet.EmailAttachments);
     }
 
     private void ShowFakePdfOverlay(string name, string previewTitle, string previewBody)
@@ -3903,7 +3903,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         HideFakeBrowserOverlay();
         fakeBrowserActive = false;
         fakeBrowserRoutine = null;
-        TriggerVirusAttack();
+        TriggerVirusAttack(VirusVisualSet.TelegramLinks);
     }
 
     private void ShowFakeBrowserOverlay(string label, string url)
@@ -3998,7 +3998,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     //  VIRUS POP-UP ATTACK (horror event)
     // ════════════════════════════════════════════════════════════════════════
     // After every couple of wrong calls the work window is forced shut and the
-    // desktop is overrun by virus pop-ups (virus1..virus4). Each pop-up has a
+    // desktop is overrun by source-specific virus pop-ups. Each pop-up has a
     // close (✕) button in its corner; closing one can spawn another (like a real
     // infection) up to a hard cap, so the wave always ends and the player can
     // keep playing once the desktop is clean.
@@ -4006,10 +4006,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const int   VirusInitialCount   = 5;     // pop-ups in the first burst
     private const int   VirusMaxTotal       = 9;     // hard cap on pop-ups per wave
     private const float VirusRespawnChance  = 0f;    // Disabled respawning to make the final virus easily closeable
+    private static readonly int[] TelegramVirusSprites = { 1, 2, 3, 4 };
+    private static readonly int[] AttachmentVirusSprites = { 1, 3, 4, 7, 10 };
+
+    private enum VirusVisualSet { TelegramLinks, EmailAttachments }
 
     private int  wrongDecisionsSinceVirus;
     private int  virusSpawnedThisWave;
     private bool virusActive;
+    private VirusVisualSet activeVirusVisualSet = VirusVisualSet.TelegramLinks;
     private GameObject virusLayer;
     private readonly List<GameObject> activeVirusPopups = new List<GameObject>();
 
@@ -4019,10 +4024,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return;
     }
 
-    private void TriggerVirusAttack()
+    private void TriggerVirusAttack(VirusVisualSet visualSet)
     {
         if (virusActive || canvasObject == null) return;
         virusActive = true;
+        activeVirusVisualSet = visualSet;
         virusSpawnedThisWave = 0;
 
         // Force the work window shut → reveal the (now infected) desktop.
@@ -4058,15 +4064,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (virusLayer == null || virusSpawnedThisWave >= VirusMaxTotal) return;
         virusSpawnedThisWave++;
 
-        int idx = UnityEngine.Random.Range(1, 5); // virus1..virus4
+        int idx = RandomVirusSpriteIndex();
         Sprite sp = Resources.Load<Sprite>("UI/desktop/virus" + idx);
 
         GameObject popup = PanelObject(virusLayer.transform, "VirusPopup", Color.white);
         Image img = popup.GetComponent<Image>();
 
         // virus2 is the "boss" pop-up — almost half the screen; the rest stay small.
-        float w = idx == 2 ? 960f : 440f;
-        float h = idx == 2 ? 700f : 320f;
+        float w = VirusPopupWidth(idx);
+        float h = VirusPopupHeight(idx);
         if (sp != null)
         {
             img.sprite = sp;
@@ -4090,6 +4096,27 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         BuildVirusCloseButton(popup.transform, popup);
         activeVirusPopups.Add(popup);
+    }
+
+    private int RandomVirusSpriteIndex()
+    {
+        int[] sprites = activeVirusVisualSet == VirusVisualSet.EmailAttachments ? AttachmentVirusSprites : TelegramVirusSprites;
+        if (sprites == null || sprites.Length == 0) return 1;
+        return sprites[UnityEngine.Random.Range(0, sprites.Length)];
+    }
+
+    private static float VirusPopupWidth(int spriteIndex)
+    {
+        if (spriteIndex == 2) return 960f;
+        if (spriteIndex == 7 || spriteIndex == 10) return 760f;
+        return 440f;
+    }
+
+    private static float VirusPopupHeight(int spriteIndex)
+    {
+        if (spriteIndex == 2) return 700f;
+        if (spriteIndex == 7 || spriteIndex == 10) return 480f;
+        return 320f;
     }
 
     private void BuildVirusCloseButton(Transform parent, GameObject popup)
