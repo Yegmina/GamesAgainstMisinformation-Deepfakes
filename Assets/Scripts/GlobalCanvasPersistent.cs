@@ -90,7 +90,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     {
         UpdateUI();
         string currentScene = SceneManager.GetActiveScene().name;
-        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         UpdateHorrorMusic(hideHud);
     }
 
@@ -106,7 +106,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
 
         string currentScene = SceneManager.GetActiveScene().name;
-        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         ApplyHudVisibility(!hideHud);
         UpdateHorrorMusic(hideHud);
 
@@ -236,6 +236,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     }
 
     private bool _hudVisible = true;
+    private bool _hudVisibilityApplied;
     private Transform _hudTransform;
     private Transform _missionSidebarTransform;
     private Transform _sidebarOpenButtonTransform;
@@ -246,32 +247,40 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             _hudTransform = transform.Find("HUD");
         }
-        if (_hudTransform == null) return;
-
-        if (_hudVisible != visible || _hudTransform.gameObject.activeSelf != visible)
+        if (_missionSidebarTransform == null)
         {
-            _hudVisible = visible;
+            _missionSidebarTransform = transform.Find("MissionSidebar");
+        }
+        if (_sidebarOpenButtonTransform == null)
+        {
+            _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
+        }
+
+        if (_hudVisibilityApplied && _hudVisible == visible)
+        {
+            return;
+        }
+
+        if (_hudTransform != null && _hudTransform.gameObject.activeSelf != visible)
+        {
             _hudTransform.gameObject.SetActive(visible);
+        }
 
-            if (_missionSidebarTransform == null)
-            {
-                _missionSidebarTransform = transform.Find("MissionSidebar");
-            }
-            if (_sidebarOpenButtonTransform == null)
-            {
-                _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
-            }
+        if (_missionSidebarTransform != null && _missionSidebarTransform.gameObject.activeSelf != visible)
+        {
+            _missionSidebarTransform.gameObject.SetActive(visible);
+        }
 
-            if (_missionSidebarTransform != null)
-            {
-                _missionSidebarTransform.gameObject.SetActive(visible);
-            }
-
-            if (_sidebarOpenButtonTransform != null)
+        if (_sidebarOpenButtonTransform != null)
+        {
+            if (!visible && _sidebarOpenButtonTransform.gameObject.activeSelf)
             {
                 _sidebarOpenButtonTransform.gameObject.SetActive(false);
             }
         }
+
+        _hudVisible = visible;
+        _hudVisibilityApplied = true;
     }
 
     public void SetTimerRunning(bool run)
@@ -336,6 +345,9 @@ public class GlobalCanvasPersistent : MonoBehaviour
         paranoia = 0;
         points = 0;
         UpdateUI();
+
+        // Reset phone chat state for a fresh game session
+        ChatController.ResetStaticState();
 
         if (MissionSidebarManager.Instance != null)
         {
@@ -488,6 +500,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
 
         // Background Image
         Image bgImage = notificationToast.AddComponent<Image>();
+        bgImage.raycastTarget = true;
         if (notificationBgSprite != null)
         {
             bgImage.sprite = notificationBgSprite;
@@ -522,6 +535,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         titleRect.pivot = new Vector2(0f, 0.5f); // Force pivot to left-center
         
         notifTitleText = titleGo.AddComponent<TextMeshProUGUI>();
+        notifTitleText.raycastTarget = false;
         notifTitleText.text = "📞 PHONE IS RINGING!";
         notifTitleText.fontSize = 24f; // Font size 24 as requested
         notifTitleText.color = new Color(0f, 0.9f, 1f, 1f); // Neon Cyan
@@ -537,6 +551,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         bodyRect.pivot = new Vector2(0f, 0.5f); // Force pivot to left-center
         
         notifBodyText = bodyGo.AddComponent<TextMeshProUGUI>();
+        notifBodyText.raycastTarget = false;
         notifBodyText.text = "Someone is calling you. Go to the phone to answer the call!";
         notifBodyText.fontSize = 24f; // Font size 24 as requested
         notifBodyText.color = Color.white;
@@ -545,6 +560,33 @@ public class GlobalCanvasPersistent : MonoBehaviour
         notifBodyText.overflowMode = TextOverflowModes.Overflow;
         notifBodyText.margin = new Vector4(0f, 0f, 0f, 0f);
 
+        // Make the notification clickable as a button
+        Button button = notificationToast.AddComponent<Button>();
+        button.onClick.AddListener(OnNotificationClicked);
+
         notificationToast.SetActive(false);
+    }
+
+    private void OnNotificationClicked()
+    {
+        if (SceneManager.GetActiveScene().name != "Apartment")
+            return;
+
+        PlayerInteraction playerInteraction = Object.FindFirstObjectByType<PlayerInteraction>();
+        PhoneInteractable phoneInteractable = Object.FindFirstObjectByType<PhoneInteractable>();
+
+        if (phoneInteractable == null || playerInteraction == null)
+            return;
+
+        // Hide the visual notification toast immediately so it cannot be double-clicked,
+        // but DO NOT call StopGlobalRingtoneAndNotification() here because that would set isCallRinging = false.
+        // We want isCallRinging to remain true so that IncomingCallManager in the newly loaded phone scene
+        // can detect the ringing state and show the story incoming call screen.
+        if (notificationToast != null)
+        {
+            notificationToast.SetActive(false);
+        }
+        
+        playerInteraction.GoToPhoneFromNotification(phoneInteractable);
     }
 }

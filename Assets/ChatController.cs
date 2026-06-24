@@ -130,23 +130,269 @@ TMP_FontAsset font;
         get => GlobalCanvasPersistent.Instance != null ? GlobalCanvasPersistent.Instance.IsTimerRunning : true;
         set { if (GlobalCanvasPersistent.Instance != null) GlobalCanvasPersistent.Instance.SetTimerRunning(value); }
     }
+
+    // Static state backing fields to persist across phone exits (scene reloads)
+    private static bool s_momFinished = false;
+    private static bool s_broFinished = false;
+    private static bool s_broWarned = false;
+    private static bool s_momStarted = false;
+    private static bool s_broStarted = false;
+    private static bool s_broSecondVoiceNoteTriggered = false;
+    private static bool s_isBroSecondVoice = false;
+    private static bool s_unknownRead = false;
+    private static bool s_providerFinished = false;
+    private static bool s_providerLinkClicked = false;
+    private static bool s_sarahFinished = false;
+    private static bool s_sarahStarted = false;
+    private static bool s_sarahBadPath = false;
+
+    // Static structures to persist the message history of each chat
+    public class SavedMessage
+    {
+        public enum MessageType
+        {
+            Normal,
+            System,
+            Spam,
+            Link,
+            Photo,
+            Voice,
+            Video
+        }
+        public MessageType type;
+        public bool isMe;
+        public string text;
+        public bool isError;
+        public bool isDanger;
+        public string videoName;
+        public string videoDuration;
+    }
+
+    private static Dictionary<string, List<SavedMessage>> SavedChatHistories = new Dictionary<string, List<SavedMessage>>();
+    private static Dictionary<string, string> s_chatStates = new Dictionary<string, string>();
+    private bool isReconstructing = false;
+
     bool ended = false;
     bool locked = false;
     string currentChat = null;
-    bool momFinished = false;
-    bool broFinished = false;
-    bool broWarned = false;
-    bool momStarted = false;
-    bool broStarted = false;
-    bool broSecondVoiceNoteTriggered = false; 
-    bool isBroSecondVoice = false;
     AudioClip currentVoiceClip;
-    bool unknownRead = false;
-    bool providerFinished = false;
-    bool providerLinkClicked = false;
-    bool sarahFinished = false;
-    bool sarahStarted = false;
-    bool sarahBadPath = false;
+
+    bool momFinished { get => s_momFinished; set => s_momFinished = value; }
+    bool broFinished { get => s_broFinished; set => s_broFinished = value; }
+    bool broWarned { get => s_broWarned; set => s_broWarned = value; }
+    bool momStarted { get => s_momStarted; set => s_momStarted = value; }
+    bool broStarted { get => s_broStarted; set => s_broStarted = value; }
+    bool broSecondVoiceNoteTriggered { get => s_broSecondVoiceNoteTriggered; set => s_broSecondVoiceNoteTriggered = value; }
+    bool isBroSecondVoice { get => s_isBroSecondVoice; set => s_isBroSecondVoice = value; }
+    bool unknownRead { get => s_unknownRead; set => s_unknownRead = value; }
+    bool providerFinished { get => s_providerFinished; set => s_providerFinished = value; }
+    bool providerLinkClicked { get => s_providerLinkClicked; set => s_providerLinkClicked = value; }
+    bool sarahFinished { get => s_sarahFinished; set => s_sarahFinished = value; }
+    bool sarahStarted { get => s_sarahStarted; set => s_sarahStarted = value; }
+    bool sarahBadPath { get => s_sarahBadPath; set => s_sarahBadPath = value; }
+
+    void SaveMessageToHistory(string chatId, SavedMessage msg)
+    {
+        if (isReconstructing) return;
+        if (string.IsNullOrEmpty(chatId)) chatId = currentChat;
+        if (string.IsNullOrEmpty(chatId)) return;
+        
+        if (!SavedChatHistories.ContainsKey(chatId))
+        {
+            SavedChatHistories[chatId] = new List<SavedMessage>();
+        }
+        SavedChatHistories[chatId].Add(msg);
+    }
+
+    bool HasMessageInHistory(string chatId, string partialText)
+    {
+        if (!SavedChatHistories.ContainsKey(chatId)) return false;
+        foreach (var msg in SavedChatHistories[chatId])
+        {
+            if (msg.text != null && msg.text.Contains(partialText))
+                return true;
+        }
+        return false;
+    }
+
+    bool HasPhotoInHistory(string chatId)
+    {
+        if (!SavedChatHistories.ContainsKey(chatId)) return false;
+        foreach (var msg in SavedChatHistories[chatId])
+        {
+            if (msg.type == SavedMessage.MessageType.Photo)
+                return true;
+        }
+        return false;
+    }
+
+    bool HasVoiceInHistory(string chatId)
+    {
+        if (!SavedChatHistories.ContainsKey(chatId)) return false;
+        foreach (var msg in SavedChatHistories[chatId])
+        {
+            if (msg.type == SavedMessage.MessageType.Voice)
+                return true;
+        }
+        return false;
+    }
+
+    bool HasVideoInHistory(string chatId)
+    {
+        if (!SavedChatHistories.ContainsKey(chatId)) return false;
+        foreach (var msg in SavedChatHistories[chatId])
+        {
+            if (msg.type == SavedMessage.MessageType.Video)
+                return true;
+        }
+        return false;
+    }
+
+    void SetChatState(string chatId, string state)
+    {
+        s_chatStates[chatId] = state;
+    }
+
+    public static void ResetStaticState()
+    {
+        s_momFinished = false;
+        s_broFinished = false;
+        s_broWarned = false;
+        s_momStarted = false;
+        s_broStarted = false;
+        s_broSecondVoiceNoteTriggered = false;
+        s_isBroSecondVoice = false;
+        s_unknownRead = false;
+        s_providerFinished = false;
+        s_providerLinkClicked = false;
+        s_sarahFinished = false;
+        s_sarahStarted = false;
+        s_sarahBadPath = false;
+
+        SavedChatHistories.Clear();
+        s_chatStates.Clear();
+    }
+
+    void ReconstructChat(string chatId)
+    {
+        if (!SavedChatHistories.ContainsKey(chatId)) return;
+        
+        isReconstructing = true;
+        foreach (var msg in SavedChatHistories[chatId])
+        {
+            switch (msg.type)
+            {
+                case SavedMessage.MessageType.Normal:
+                    AddMessage(msg.isMe, msg.text, msg.isError, chatId);
+                    break;
+                case SavedMessage.MessageType.System:
+                    AddSystem(msg.text, chatId);
+                    break;
+                case SavedMessage.MessageType.Spam:
+                    AddSpam(msg.text, chatId);
+                    break;
+                case SavedMessage.MessageType.Link:
+                    AddLinkMessage(chatId);
+                    break;
+                case SavedMessage.MessageType.Photo:
+                    AddPhoto(chatId);
+                    break;
+                case SavedMessage.MessageType.Voice:
+                    AudioClip clip = msg.isDanger ? screamerClip : voiceNoteClip;
+                    AddVoice(msg.isMe, clip, msg.isDanger, chatId);
+                    break;
+                case SavedMessage.MessageType.Video:
+                    AddVideoMessage(msg.isMe, msg.videoName, msg.videoDuration, chatId);
+                    break;
+            }
+        }
+        isReconstructing = false;
+    }
+
+    void RestoreChatChoices(string chatId)
+    {
+        if (!s_chatStates.ContainsKey(chatId)) return;
+        string state = s_chatStates[chatId];
+        
+        switch (state)
+        {
+            // --- Mom ---
+            case "Mom_Intro":
+                ShowChoices(
+                    ("\"Yeah, where else would I be at 4 AM?\"", 0, MomChoice1A),
+                    ("\"I'm home. Did something happen?\"", 2, MomChoice1B)
+                );
+                break;
+            case "Mom_Request":
+                ShowChoices(
+                    ("\"Sure, hold on.\"", 1, MomChoice2A),
+                    ("\"Send me a photo first, I'm freaked out.\"", 2, MomChoice2B)
+                );
+                break;
+            case "Mom_Pressure":
+                ShowChoices(
+                    ("[ SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
+                    ("[ ASK FOR A PHOTO FIRST ]", 0, MomAskPhoto)
+                );
+                break;
+            case "Mom_SendPhoto":
+                ShowChoices(
+                    ("[ TRUST & SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
+                    ("[ BLOCK CONTACT ]", 2, TriggerMomBlock)
+                );
+                break;
+                
+            // --- Brother ---
+            case "Bro_Intro":
+                ShowChoices(
+                    ("\"Sure, sending it now.\"", 1, BroChoice1A),
+                    ("\"Send me another voice note just to be sure.\"", 0, BroChoice1B)
+                );
+                break;
+            case "Bro_Angry":
+                ShowChoices(
+                    ("\"Okay, okay, sorry. Sending it now.\"", 1, () => StartCoroutine(TriggerTransactionFail())),
+                    ("\"Come on, just one more. Then I'll send it.\"", 0, BroChoiceDangerPath)
+                );
+                break;
+                
+            // --- Sarah ---
+            case "Sarah_Intro":
+                ShowChoices(
+                    ("\"What's wrong? Are you okay?\"", 0, SarahChoiceConcern),
+                    ("\"It's 4 AM. Can this wait until morning?\"", 1, SarahChoiceDismissive)
+                );
+                break;
+            case "Sarah_RevealVideo":
+                ShowChoices(
+                    ("\"Sarah, that's a deepfake. Don't panic.\"", 0, SarahGoodPathStart),
+                    ("\"Are you sure it's not you? Maybe you forgot?\"", 1, SarahBadPathStart)
+                );
+                break;
+            case "Sarah_GoodPathContinue":
+                ShowChoices(
+                    ("\"Block him immediately. Don't respond.\"", 0, SarahAdviceBlock),
+                    ("\"Save the video as evidence first. Then block him.\"", 0, SarahAdviceEvidence)
+                );
+                break;
+            case "Sarah_GoodPathComfort":
+                ShowChoices(
+                    ("\"Some people are just evil. Stay strong.\"", 0, SarahComfortStrong),
+                    ("\"I'm here for you. You're not alone.\"", 0, SarahComfortHere)
+                );
+                break;
+            case "Sarah_BadPathContinue":
+                ShowChoices(
+                    ("\"Wait, I'm sorry. I believe you. What can I do?\"", 0, SarahRecovery),
+                    ("\"I'm just worried about you. The video just looks so real.\"", 1, SarahBadEnding)
+                );
+                break;
+                
+            default:
+                ClearChoices();
+                break;
+        }
+    }
 
     void Start()
     {
@@ -187,11 +433,91 @@ TMP_FontAsset font;
             ConfigureChatLayout(templateMessagesContent);
         }
 
-        if (momPreview != null) momPreview.text = "Are you home?";
-if (broPreview != null) broPreview.text = "Left my gym bag";
-        if (unknownPreview != null) unknownPreview.text = "Unknown number";
-        if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
-        if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
+        if (momStarted)
+        {
+            if (momBadge != null) momBadge.SetActive(false);
+            if (momPreview != null)
+            {
+                if (momFinished)
+                {
+                    bool blocked = HasMessageInHistory("mom", "Contact BLOCKED");
+                    momPreview.text = blocked ? "[Blocked]" : "address received.";
+                }
+                else
+                {
+                    momPreview.text = "In progress...";
+                }
+            }
+        }
+        else
+        {
+            if (momPreview != null) momPreview.text = "Are you home?";
+        }
+
+        if (broStarted)
+        {
+            if (broBadge != null) broBadge.SetActive(false);
+            if (broPreview != null)
+            {
+                if (broFinished)
+                {
+                    bool failed = HasMessageInHistory("bro", "TRANSACTION FAILED");
+                    broPreview.text = failed ? "[Compromised]" : "DO YOU BELIEVE ME NOW?";
+                }
+                else
+                {
+                    broPreview.text = "In progress...";
+                }
+            }
+        }
+        else
+        {
+            if (broPreview != null) broPreview.text = "Left my gym bag";
+        }
+
+        if (sarahStarted)
+        {
+            if (sarahBadge != null) sarahBadge.SetActive(false);
+            if (sarahPreview != null)
+            {
+                if (sarahFinished)
+                {
+                    sarahPreview.text = sarahBadPath ? "[Ignored you]" : "Thank you Alex ❤️";
+                }
+                else
+                {
+                    sarahPreview.text = "In progress...";
+                }
+            }
+        }
+        else
+        {
+            if (sarahPreview != null) sarahPreview.text = "Hey, you there?";
+        }
+
+        if (unknownRead)
+        {
+            if (unknownBadge != null) unknownBadge.SetActive(false);
+            if (unknownPreview != null) unknownPreview.text = "[Read]";
+        }
+        else
+        {
+            if (unknownPreview != null) unknownPreview.text = "Unknown number";
+        }
+
+        if (providerFinished)
+        {
+            if (providerBadge != null) providerBadge.SetActive(false);
+            if (providerPreview != null)
+            {
+                bool blocked = HasMessageInHistory("provider", "blocked the contact");
+                providerPreview.text = blocked ? "[Blocked]" : "[COMPROMISED]";
+            }
+        }
+        else
+        {
+            if (providerPreview != null) providerPreview.text = "⚠ Your connection is unstable...";
+        }
 
         SetParanoia(paranoia);
         SetAppState("ACTIVE");
@@ -255,20 +581,32 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         if (firstTime)
         {
             ClearChoices();
-            AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left. 🍕", false, "mom");
-
-            if (momFinished)
+            
+            if (SavedChatHistories.ContainsKey("mom"))
             {
-                AddSystem("This conversation has ended. Connection locked.", "mom");
-                return;
+                ReconstructChat("mom");
+                RestoreChatChoices("mom");
             }
-
-            if (optionsPanel != null) optionsPanel.SetActive(true);
-
-            if (!momStarted)
+            else
             {
-                momStarted = true;
-                StartCoroutine(MomIntro());
+                SavedChatHistories["mom"] = new List<SavedMessage>();
+                s_chatStates["mom"] = "Mom_Intro";
+
+                AddMessage(false, "Alex, defrost the pizza if you want, it's in the freezer. We left. 🍕", false, "mom");
+
+                if (momFinished)
+                {
+                    AddSystem("This conversation has ended. Connection locked.", "mom");
+                    return;
+                }
+
+                if (optionsPanel != null) optionsPanel.SetActive(true);
+
+                if (!momStarted)
+                {
+                    momStarted = true;
+                    StartCoroutine(MomIntro());
+                }
             }
         }
         else
@@ -297,20 +635,32 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         if (firstTime)
         {
             ClearChoices();
-            AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro", false, "bro");
-
-            if (broFinished)
+            
+            if (SavedChatHistories.ContainsKey("bro"))
             {
-                AddSystem("This conversation has ended. Connection locked.", "bro");
-                return;
+                ReconstructChat("bro");
+                RestoreChatChoices("bro");
             }
-
-            if (optionsPanel != null) optionsPanel.SetActive(true);
-
-            if (!broStarted)
+            else
             {
-                broStarted = true;
-                StartCoroutine(BroIntro());
+                SavedChatHistories["bro"] = new List<SavedMessage>();
+                s_chatStates["bro"] = "Bro_Intro";
+
+                AddMessage(false, "Left my gym bag at your place. Don't touch my protein bar, bro", false, "bro");
+
+                if (broFinished)
+                {
+                    AddSystem("This conversation has ended. Connection locked.", "bro");
+                    return;
+                }
+
+                if (optionsPanel != null) optionsPanel.SetActive(true);
+
+                if (!broStarted)
+                {
+                    broStarted = true;
+                    StartCoroutine(BroIntro());
+                }
             }
         }
         else
@@ -341,18 +691,27 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         {
             ClearChoices();
             
-            AddMessage(false, "???: Alex...", false, "unknown");
-            AddMessage(false, "???: I see you.", false, "unknown");
-            AddMessage(false, "???: You don't know me. But I know you.", false, "unknown");
-            AddMessage(false, "???: I've been watching.", false, "unknown");
-            AddMessage(false, "???: Don't trust anyone. Especially not your family.", false, "unknown");
-            AddMessage(false, "???: They are not who you think.", false, "unknown");
-            AddMessage(false, "???: The video... it's real.", false, "unknown");
-            AddMessage(false, "???: I'll find you.", false, "unknown");
-            AddMessage(false, "???: Tick tock.", false, "unknown");
-            AddMessage(false, "???: This conversation will self-destruct.", false, "unknown");
-            
-            AddSystem("⚠ This number is no longer in service.", "unknown");
+            if (SavedChatHistories.ContainsKey("unknown"))
+            {
+                ReconstructChat("unknown");
+            }
+            else
+            {
+                SavedChatHistories["unknown"] = new List<SavedMessage>();
+
+                AddMessage(false, "???: Alex...", false, "unknown");
+                AddMessage(false, "???: I see you.", false, "unknown");
+                AddMessage(false, "???: You don't know me. But I know you.", false, "unknown");
+                AddMessage(false, "???: I've been watching.", false, "unknown");
+                AddMessage(false, "???: Don't trust anyone. Especially not your family.", false, "unknown");
+                AddMessage(false, "???: They are not who you think.", false, "unknown");
+                AddMessage(false, "???: The video... it's real.", false, "unknown");
+                AddMessage(false, "???: I'll find you.", false, "unknown");
+                AddMessage(false, "???: Tick tock.", false, "unknown");
+                AddMessage(false, "???: This conversation will self-destruct.", false, "unknown");
+                
+                AddSystem("⚠ This number is no longer in service.", "unknown");
+            }
         }
         
         if (unknownPreview != null) unknownPreview.text = "[Read]";
@@ -378,13 +737,22 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         {
             ClearChoices();
             
-            AddMessage(false, "📡 Internet Provider: Important notice!", false, "provider");
-            AddMessage(false, "📡 Your connection has been unstable for 3 days.", false, "provider");
-            AddMessage(false, "📡 Click the link below to verify your IP address:", false, "provider");
-            
-            AddLinkMessage("provider");
-            
-            AddMessage(false, "📡 If not verified within 24h, your service will be suspended.", false, "provider");
+            if (SavedChatHistories.ContainsKey("provider"))
+            {
+                ReconstructChat("provider");
+            }
+            else
+            {
+                SavedChatHistories["provider"] = new List<SavedMessage>();
+
+                AddMessage(false, "📡 Internet Provider: Important notice!", false, "provider");
+                AddMessage(false, "📡 Your connection has been unstable for 3 days.", false, "provider");
+                AddMessage(false, "📡 Click the link below to verify your IP address:", false, "provider");
+                
+                AddLinkMessage("provider");
+                
+                AddMessage(false, "📡 If not verified within 24h, your service will be suspended.", false, "provider");
+            }
         }
 
         ScrollToBottom();
@@ -408,23 +776,35 @@ if (broPreview != null) broPreview.text = "Left my gym bag";
         if (firstTime)
         {
             ClearChoices();
-            AddMessage(false, "Hey, you there? 💬", false, "sarah");
-
-            if (sarahFinished)
+            
+            if (SavedChatHistories.ContainsKey("sarah"))
             {
-                if (sarahBadPath)
-                    AddSystem("Sarah stopped responding. You messed up.", "sarah");
-                else
-                    AddSystem("Sarah is okay now. You're a good friend.", "sarah");
-                return;
+                ReconstructChat("sarah");
+                RestoreChatChoices("sarah");
             }
-
-            if (optionsPanel != null) optionsPanel.SetActive(true);
-
-            if (!sarahStarted)
+            else
             {
-                sarahStarted = true;
-                StartCoroutine(SarahIntro());
+                SavedChatHistories["sarah"] = new List<SavedMessage>();
+                s_chatStates["sarah"] = "Sarah_Intro";
+
+                AddMessage(false, "Hey, you there? 💬", false, "sarah");
+
+                if (sarahFinished)
+                {
+                    if (sarahBadPath)
+                        AddSystem("Sarah stopped responding. You messed up.", "sarah");
+                    else
+                        AddSystem("Sarah is okay now. You're a good friend.", "sarah");
+                    return;
+                }
+
+                if (optionsPanel != null) optionsPanel.SetActive(true);
+
+                if (!sarahStarted)
+                {
+                    sarahStarted = true;
+                    StartCoroutine(SarahIntro());
+                }
             }
         }
         else
@@ -792,6 +1172,13 @@ videoObj.transform.SetParent(row, false);
 
         PlayChime();
         ScrollToBottom();
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.Video,
+            isMe = isMe,
+            videoName = videoName,
+            videoDuration = duration
+        });
     }
 
     // ════════════════════════════════════════ SARAH DIALOG
@@ -800,6 +1187,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.6f);
         AddMessage(false, "Alex... something weird happened", false, "sarah");
         yield return Wait(0.5f);
+        s_chatStates["sarah"] = "Sarah_Intro";
         ShowChoices(
             ("\"What's wrong? Are you okay?\"", 0, SarahChoiceConcern),
             ("\"It's 4 AM. Can this wait until morning?\"", 1, SarahChoiceDismissive)
@@ -811,6 +1199,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         // No paranoia change
         AddMessage(true, "What's wrong? Are you okay?", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_RevealVideo";
         StartCoroutine(SarahRevealVideo());
     }
 
@@ -819,6 +1208,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia + 5);
         AddMessage(true, "It's 4 AM. Can this wait until morning?", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_RevealVideo";
         StartCoroutine(SarahRevealVideo());
     }
 
@@ -830,6 +1220,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(1.2f);
         AddMessage(false, "It looks like me but... I never filmed this 😭", false, "sarah");
         yield return Wait(0.8f);
+        s_chatStates["sarah"] = "Sarah_RevealVideo";
         ShowChoices(
             ("\"Sarah, that's a deepfake. Don't panic.\"", 0, SarahGoodPathStart),
             ("\"Are you sure it's not you? Maybe you forgot?\"", 1, SarahBadPathStart)
@@ -841,6 +1232,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         // No paranoia change
         AddMessage(true, "Sarah, that's a deepfake. Don't panic.", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_GoodPathContinue";
         StartCoroutine(SarahGoodPathContinue());
     }
 
@@ -849,6 +1241,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.8f);
         AddMessage(false, "What do I do?? I'm so scared 😰", false, "sarah");
         yield return Wait(0.5f);
+        s_chatStates["sarah"] = "Sarah_GoodPathContinue";
         ShowChoices(
             ("\"Block him immediately. Don't respond.\"", 0, SarahAdviceBlock),
             ("\"Save the video as evidence first. Then block him.\"", 0, SarahAdviceEvidence)
@@ -860,6 +1253,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 5);
         AddMessage(true, "Block him immediately. Don't respond.", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_GoodPathComfort";
         StartCoroutine(SarahGoodPathComfort());
     }
 
@@ -868,6 +1262,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 3);
         AddMessage(true, "Save the video as evidence first. Then block him.", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_GoodPathComfort";
         StartCoroutine(SarahGoodPathComfort());
     }
 
@@ -880,6 +1275,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.6f);
         AddMessage(false, "Why would someone do this to me? 😢", false, "sarah");
         yield return Wait(0.5f);
+        s_chatStates["sarah"] = "Sarah_GoodPathComfort";
         ShowChoices(
             ("\"Some people are just evil. Stay strong.\"", 0, SarahComfortStrong),
             ("\"I'm here for you. You're not alone.\"", 0, SarahComfortHere)
@@ -891,6 +1287,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 5);
         AddMessage(true, "Some people are just evil. Stay strong.", false, "sarah");
+        s_chatStates["sarah"] = "None";
         StartCoroutine(SarahGoodEnding());
     }
 
@@ -899,6 +1296,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 5);
         AddMessage(true, "I'm here for you. You're not alone.", false, "sarah");
+        s_chatStates["sarah"] = "None";
         StartCoroutine(SarahGoodEnding());
     }
 
@@ -914,6 +1312,7 @@ videoObj.transform.SetParent(row, false);
         SetParanoia(paranoia); // already updated through the chain
         sarahFinished = true;
         sarahBadPath = false;
+        s_chatStates["sarah"] = "None";
         if (sarahPreview != null) sarahPreview.text = "Thank you Alex ❤️";
         
         yield return Wait(1.5f);
@@ -931,6 +1330,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia + 15);
         AddMessage(true, "Are you sure it's not you? Maybe you forgot?", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_BadPathContinue";
         StartCoroutine(SarahBadPathContinue());
     }
 
@@ -939,6 +1339,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.8f);
         AddMessage(false, "Wow. Thanks for believing me.", false, "sarah");
         yield return Wait(0.5f);
+        s_chatStates["sarah"] = "Sarah_BadPathContinue";
         ShowChoices(
             ("\"Wait, I'm sorry. I believe you. What can I do?\"", 0, SarahRecovery),
             ("\"I'm just worried about you. The video just looks so real.\"", 1, SarahBadEnding)
@@ -950,6 +1351,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 10);
         AddMessage(true, "Wait, I'm sorry. I believe you. What can I do?", false, "sarah");
+        s_chatStates["sarah"] = "Sarah_GoodPathContinue";
         // Redirect to good path at the "What do I do?" stage
         StartCoroutine(SarahGoodPathContinue());
     }
@@ -959,6 +1361,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia + 5);
         AddMessage(true, "I'm just worried about you. The video just looks so real.", false, "sarah");
+        s_chatStates["sarah"] = "None";
         StartCoroutine(SarahBadEndingFinal());
     }
 
@@ -971,6 +1374,7 @@ videoObj.transform.SetParent(row, false);
         
         sarahFinished = true;
         sarahBadPath = true;
+        s_chatStates["sarah"] = "None";
         if (sarahPreview != null) sarahPreview.text = "[Ignored you]";
         
         yield return Wait(1.5f);
@@ -983,6 +1387,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.6f);
         AddMessage(false, "Are you home??", false, "mom");
         yield return Wait(0.5f);
+        s_chatStates["mom"] = "Mom_Intro";
         ShowChoices(
             ("\"Yeah, where else would I be at 4 AM?\"", 0, MomChoice1A),
             ("\"I'm home. Did something happen?\"", 2, MomChoice1B)
@@ -993,6 +1398,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Yeah, where else would I be at 4 AM?", false, "mom");
+        s_chatStates["mom"] = "Mom_Request";
         StartCoroutine(MomRequest());
     }
 
@@ -1001,6 +1407,7 @@ videoObj.transform.SetParent(row, false);
         ClearChoices();
         SetParanoia(paranoia - 5);
         AddMessage(true, "I'm home. Did something happen?", false, "mom");
+        s_chatStates["mom"] = "Mom_Request";
         StartCoroutine(MomChoice1BSeq());
     }
 
@@ -1016,6 +1423,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.9f);
         AddMessage(false, "Alex! I need you to type out the FULL home address - in English. Dad's Google Maps keeps resetting. Fast!", false, "mom");
         yield return Wait(0.3f);
+        s_chatStates["mom"] = "Mom_Request";
         ShowChoices(
             ("\"Sure, hold on.\"", 1, MomChoice2A),
             ("\"Send me a photo first, I'm freaked out.\"", 2, MomChoice2B)
@@ -1026,6 +1434,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Sure, hold on.", false, "mom");
+        s_chatStates["mom"] = "Mom_Pressure";
         StartCoroutine(MomPressure());
     }
 
@@ -1034,6 +1443,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.8f);
         AddMessage(false, "Faster, Alex! Dad is losing his mind! Just type it!", false, "mom");
         yield return Wait(0.3f);
+        s_chatStates["mom"] = "Mom_Pressure";
         ShowChoices(
             ("[ SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
             ("[ ASK FOR A PHOTO FIRST ]", 0, MomAskPhoto)
@@ -1044,6 +1454,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Send me a photo first, I'm freaked out.", false, "mom");
+        s_chatStates["mom"] = "Mom_SendPhoto";
         StartCoroutine(MomSendPhoto());
     }
 
@@ -1051,6 +1462,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Actually wait - send me a quick photo first. Just to be sure.", false, "mom");
+        s_chatStates["mom"] = "Mom_SendPhoto";
         StartCoroutine(MomSendPhoto());
     }
 
@@ -1064,6 +1476,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.6f);
         AddMessage(false, "See? It's me. Now send it.", false, "mom");
         yield return Wait(0.3f);
+        s_chatStates["mom"] = "Mom_SendPhoto";
         ShowChoices(
             ("[ TRUST & SEND ADDRESS ]", 1, () => StartCoroutine(MomPunishmentRoutine())),
             ("[ BLOCK CONTACT ]", 2, TriggerMomBlock)
@@ -1074,6 +1487,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         momFinished = true;
+        s_chatStates["mom"] = "None";
         AddSystem("Contact BLOCKED at 4:18 AM", "mom");
         SetParanoia(Mathf.Max(0, paranoia - 20));
         if (momPreview != null) momPreview.text = "[Blocked]";
@@ -1098,6 +1512,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         momFinished = true;
+        s_chatStates["mom"] = "None";
         if (momPreview != null) momPreview.text = "address received.";
 
         AddMessage(true, "Green Street, bld 14, apt 8", false, "mom");
@@ -1131,6 +1546,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(0.5f);
         AddVoice(false, voiceNoteClip, false, "bro");
         yield return Wait(0.7f);
+        s_chatStates["bro"] = "Bro_Intro";
         ShowChoices(
             ("\"Sure, sending it now.\"", 1, BroChoice1A),
             ("\"Send me another voice note just to be sure.\"", 0, BroChoice1B)
@@ -1140,6 +1556,7 @@ videoObj.transform.SetParent(row, false);
     void BroChoice1A()
     {
         ClearChoices();
+        s_chatStates["bro"] = "None";
         StartCoroutine(TriggerTransactionFail());
     }
 
@@ -1147,6 +1564,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Send me another voice note just to be sure.", false, "bro");
+        s_chatStates["bro"] = "Bro_Angry";
         StartCoroutine(BroAngry());
     }
 
@@ -1155,6 +1573,7 @@ videoObj.transform.SetParent(row, false);
         yield return Wait(1.5f);
         AddMessage(false, "Are you fucking stupid? I'm standing in the freezing cold at a gas station and you want me to send you voice notes? Just send the cash!", false, "bro");
         yield return Wait(0.5f);
+        s_chatStates["bro"] = "Bro_Angry";
         ShowChoices(
             ("\"Okay, okay, sorry. Sending it now.\"", 1, () => StartCoroutine(TriggerTransactionFail())),
             ("\"Come on, just one more. Then I'll send it.\"", 0, BroChoiceDangerPath)
@@ -1165,6 +1584,7 @@ videoObj.transform.SetParent(row, false);
     {
         ClearChoices();
         AddMessage(true, "Come on, just one more. Then I'll send it.", false, "bro");
+        s_chatStates["bro"] = "None";
         StartCoroutine(AddDangerVoiceNote());
     }
 
@@ -1180,6 +1600,7 @@ videoObj.transform.SetParent(row, false);
     IEnumerator TriggerTransactionFail()
     {
         broFinished = true;
+        s_chatStates["bro"] = "None";
         if (broPreview != null) broPreview.text = "[Compromised]";
 
         AddMessage(true, "Sure, sending it now.", false, "bro");
@@ -1197,6 +1618,7 @@ videoObj.transform.SetParent(row, false);
     IEnumerator BroFinalSpamRoutine()
     {
         broFinished = true;
+        s_chatStates["bro"] = "None";
         if (broPreview != null) broPreview.text = "DO YOU BELIEVE ME NOW?";
 
         ClearChoices();
@@ -1473,16 +1895,33 @@ videoObj.transform.SetParent(row, false);
         }
         else if (isMe) AddBubble(true, text, meBubble, meText, FontStyles.Normal, target);
         else AddBubble(false, text, themBubble, themText, FontStyles.Normal, target);
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.Normal,
+            isMe = isMe,
+            text = text,
+            isError = isError
+        });
     }
 
     void AddSystem(string text, string targetChatId = null)
     {
         AddBubble(false, text, new Color(0.25f, 0.2f, 0.0f, 0.9f), new Color(1f, 0.82f, 0.38f), FontStyles.Normal, GetTargetContainer(targetChatId));
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.System,
+            text = text
+        });
     }
 
     void AddSpam(string text, string targetChatId = null)
     {
         AddBubble(false, text, new Color(0.16f, 0.0f, 0.0f, 0.95f), new Color(1f, 0.13f, 0.13f), FontStyles.Bold, GetTargetContainer(targetChatId));
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.Spam,
+            text = text
+        });
     }
 
     void AddPhoto(string targetChatId = null)
@@ -1520,6 +1959,10 @@ videoObj.transform.SetParent(row, false);
 
         PlayChime();
         ScrollToBottom();
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.Photo
+        });
     }
 
     void AddVoice(bool isMe, AudioClip clip = null, bool isDanger = false, string targetChatId = null)
@@ -1633,6 +2076,12 @@ videoObj.transform.SetParent(row, false);
 
         PlayChime();
         ScrollToBottom();
+
+        SaveMessageToHistory(targetChatId, new SavedMessage {
+            type = SavedMessage.MessageType.Voice,
+            isMe = isMe,
+            isDanger = isDanger
+        });
     }
 
     // Tap toggles play/pause. Plays the real clip when one is assigned; otherwise

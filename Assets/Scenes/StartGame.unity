@@ -2479,7 +2479,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af17c56301344f049a046af077425cb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StartGameButton
-  targetSceneName: Apartment
+  targetSceneName: IntroScene
 --- !u!114 &1089797183
 MonoBehaviour:
   m_ObjectHideFlags: 0

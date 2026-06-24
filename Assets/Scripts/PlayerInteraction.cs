@@ -337,6 +337,85 @@ public class PlayerInteraction : MonoBehaviour
         ComputerOverlayController.CloseComputer();
     }
 
+    public void GoToPhoneFromNotification(Interactable phoneInteractable)
+    {
+        if (exitTransitioning) return;
+
+        // If we are currently interacting with something (like the computer)
+        if (activeInteraction != null)
+        {
+            // If it is the computer, we need to exit it first and transition to the phone
+            if (activeInteraction.OpensComputerOverlay)
+            {
+                StartCoroutine(TransitionFromComputerToPhone(activeInteraction, phoneInteractable));
+                return;
+            }
+            else
+            {
+                // Just in case, exit any other interaction
+                activeInteraction.ExitInteraction();
+                activeInteraction = null;
+            }
+        }
+
+        // Snapshot state for return
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            savedPlayerPosition = controller.transform.position;
+            savedPlayerRotation = controller.transform.rotation;
+            savedCameraRotation = mainCamera.transform.localRotation;
+            savedCameraFov = mainCamera.fieldOfView;
+        }
+        else
+        {
+            savedPlayerPosition = controller.transform.position;
+            savedPlayerRotation = controller.transform.rotation;
+            savedCameraRotation = Quaternion.identity;
+        }
+
+        // Smooth transition directly from current apartment view to the phone
+        activeInteraction = phoneInteractable;
+        controller.enabled = false;
+        wasInteractingWithPhone = true;
+        uiController.ShowInteraction(" ");
+        StartCoroutine(SmoothInteractionTransition(phoneInteractable));
+    }
+
+    private IEnumerator TransitionFromComputerToPhone(Interactable computerInteractable, Interactable phoneInteractable)
+    {
+        exitTransitioning = true;
+
+        uiController.LockCursor();
+        computerInteractable.ExitInteraction();
+
+        while (ComputerOverlayController.IsTransitioning)
+        {
+            yield return null;
+        }
+
+        controller.ResetGaze();
+        activeInteraction = null;
+        exitTransitioning = false;
+
+        // Take a snapshot from where we sit at the computer so we can return here
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            savedPlayerPosition = controller.transform.position;
+            savedPlayerRotation = controller.transform.rotation;
+            savedCameraRotation = mainCamera.transform.localRotation;
+            savedCameraFov = mainCamera.fieldOfView;
+        }
+
+        // Start phone transition
+        activeInteraction = phoneInteractable;
+        controller.enabled = false;
+        wasInteractingWithPhone = true;
+        uiController.ShowInteraction(" ");
+        yield return StartCoroutine(SmoothInteractionTransition(phoneInteractable));
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (other.TryGetComponent(out Interactable interactable))

@@ -1234,6 +1234,11 @@ public class CallerScript : MonoBehaviour
         SetChoicesContainerVisible(false);
         badEndingPlaying = true;
 
+        if (GlobalCanvasPersistent.Instance != null)
+        {
+            GlobalCanvasPersistent.Instance.AddParanoia(10);
+        }
+
         AgentLog("H", "CallerScript.StartBadEndingSequence", "Bad ending started",
             "{\"storyCallId\":\"" + activeStoryCallId + "\",\"nodeIndex\":" + currentNodeIndex + "}");
 

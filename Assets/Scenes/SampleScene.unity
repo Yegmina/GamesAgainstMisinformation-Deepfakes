@@ -415,7 +415,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -13, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &29290528
@@ -5217,10 +5217,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1802813314}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -9.438, y: -0.0000047684}
-  m_SizeDelta: {x: 346.521, y: 103.32}
+  m_AnchorMin: {x: 0.5635689, y: 0.5}
+  m_AnchorMax: {x: 0.5635689, y: 0.5}
+  m_AnchoredPosition: {x: -19, y: 0.0000076294}
+  m_SizeDelta: {x: 282.818, y: 31.308}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &476681770
 MonoBehaviour:
@@ -5242,7 +5242,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'ERROR: RESET UNABLE!'
+  m_text: ' You can''t decline the call !'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -5264,15 +5264,15 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
+  m_fontSize: 19.95
   m_fontSizeBase: 36
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 1
@@ -5308,7 +5308,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: 0, z: 7.6693115, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -13018,7 +13018,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1535236820}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1995845835}
+        m_TargetAssemblyTypeName: IncomingCallManager, Assembly-CSharp
+        m_MethodName: ResetCall
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1535236820
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15789,8 +15801,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 472.6983, y: -335.5}
-  m_SizeDelta: {x: 365.397, y: 129}
+  m_AnchoredPosition: {x: 0.000026235, y: -326.6}
+  m_SizeDelta: {x: 298.888, y: 44.17}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1802813315
 MonoBehaviour:
@@ -15805,7 +15817,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0, b: 0, a: 0.88235295}
+  m_Color: {r: 1, g: 0, b: 0, a: 0.47058824}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -17269,7 +17281,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1946645654
 RectTransform:
   m_ObjectHideFlags: 0
@@ -18517,6 +18529,7 @@ MonoBehaviour:
   incomingDeclineButton: {fileID: 1535236819}
   incomingCallerName: {fileID: 654993585}
   incomingCallerAvatar: {fileID: 1921546703}
+  incomingCallErrorPanel: {fileID: 1802813313}
   callerEndCallButton: {fileID: 1328033593}
   callerAnswerButton: {fileID: 1782549347}
   callerDeclineButton: {fileID: 12330412}
@@ -18524,9 +18537,9 @@ MonoBehaviour:
   ringtoneClip: {fileID: 8300000, guid: 1ad764c6b1daea64aa432d59d3d4dcb9, type: 3}
   ringtoneSource: {fileID: 1995845836}
   incomingRingtoneClip: {fileID: 8300000, guid: 6d7d54e4f9af0034a83b159c0a28e228, type: 3}
-  delaySeconds: 60
-  delayBeforeMom: 150
-  delayBeforeMicrosoft: 150
+  delaySeconds: 10
+  delayBeforeMom: 10
+  delayBeforeMicrosoft: 10
   wireIncomingButtonsAtRuntime: 1
   isPhoneBusy: 0
 --- !u!82 &1995845836
