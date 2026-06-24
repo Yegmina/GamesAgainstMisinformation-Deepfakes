@@ -22,18 +22,40 @@ public class PlayerController : MonoBehaviour
     private float verticalRotation;
     private float currentSpeed => moveSpeed;
 
+    private float yaw;
+
+    private bool rotationReady;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        verticalRotation = mainCamera.transform.localEulerAngles.x;
+
+        if (verticalRotation > 180f)
+            verticalRotation -= 360f;
+
+        yaw = transform.eulerAngles.y;
+
+        StartCoroutine(EnableRotationNextFrame());
+        Debug.Log($"Camera X: {verticalRotation}");
+    }
+
+    private IEnumerator EnableRotationNextFrame()
+    {
+        yield return null; // Wait for the next frame
+        rotationReady = true;
     }
 
     // Update is called once per frame
     void Update()
     {
         HandleMovement();
+
+        Debug.Log($"Before: {verticalRotation}");
+
         HandleRotation();
+
+        Debug.Log($"After: {verticalRotation}");
     }
 
     private Vector3 CalculateWorldDirection()
@@ -63,7 +85,8 @@ public class PlayerController : MonoBehaviour
 
     private void ApplyHorizontalRotation(float rotationAmount)
     {
-        transform.Rotate(0, rotationAmount, 0);
+        yaw += rotationAmount;
+        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
     private void ApplyVerticalRotation(float rotationAmount)
@@ -74,6 +97,11 @@ public class PlayerController : MonoBehaviour
 
     private void HandleRotation()
     {
+        if (!rotationReady)
+            return;
+
+        Debug.Log(playerInputHandler.RotationInput);
+
         float mouseXRotation = playerInputHandler.RotationInput.x * mouseSensitivity;
         float mouseYRotation = playerInputHandler.RotationInput.y * mouseSensitivity;
 
@@ -86,9 +114,9 @@ public class PlayerController : MonoBehaviour
         transform.position = point.position;
         transform.rotation = Quaternion.Euler(0, point.eulerAngles.y, 0);
 
+        yaw = point.eulerAngles.y; //
         verticalRotation = point.eulerAngles.x;
-        mainCamera.transform.localRotation =
-            Quaternion.Euler(verticalRotation, 0, 0);
+        mainCamera.transform.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
     }
 
     public void ResetGaze()
