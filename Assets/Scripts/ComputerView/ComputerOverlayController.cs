@@ -2660,10 +2660,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.normalColor      = bg;
         cb.highlightedColor = Color.Lerp(bg, Color.white, 0.15f);
         cb.pressedColor     = Color.Lerp(bg, Color.black, 0.15f);
-        cb.disabledColor    = Html("#1e2535");
+        cb.disabledColor    = bg;
         cb.selectedColor    = bg;
         btn.colors = cb;
         btn.onClick.AddListener(onClick);
+        SetupButton(btn);
         TMP_Text txt = WinText(go.transform, "L", label, 12, fg, FontStyles.Bold);
         txt.alignment = TextAlignmentOptions.Center;
         Stretch(txt.rectTransform);
