@@ -680,6 +680,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             GameObject icon = BuildDesktopIcon(col.transform, labels[i], capturedTab, capturedColor);
             Button btn = icon.GetComponent<Button>() ?? icon.AddComponent<Button>();
             btn.targetGraphic = icon.GetComponent<Image>();
+            SetupButton(btn);
             btn.onClick.AddListener(() => { 
                 if (capturedTab != "recycle") {
                     windowMinimized = false;
@@ -700,7 +701,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.normalColor      = Color.clear;
         cb.highlightedColor = Html("#ffffff14");
         cb.pressedColor     = Html("#ffffff24");
+        cb.selectedColor    = Color.clear;
         btn.colors = cb;
+        SetupButton(btn);
 
         VerticalLayoutGroup vl = go.AddComponent<VerticalLayoutGroup>();
         vl.padding = new RectOffset(6, 6, 12, 6);
@@ -843,7 +846,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.normalColor      = Color.clear;
         cb.highlightedColor = hoverColor;
         cb.pressedColor     = Color.Lerp(hoverColor, Color.black, 0.2f);
+        cb.selectedColor    = Color.clear;
         btn.colors = cb;
+        SetupButton(btn);
         btn.onClick.AddListener(onClick);
 
         // Glyph container centered in the button
@@ -1340,8 +1345,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         ColorBlock cb = btn.colors;
         cb.normalColor = active ? NavActive : Color.clear;
         cb.highlightedColor = active ? NavActive : Html("#ffffff12");
-        cb.pressedColor     = Html("#ffffff20");
+        cb.pressedColor     = active ? NavActive : Html("#ffffff20");
+        cb.selectedColor    = active ? NavActive : Color.clear;
+        cb.disabledColor    = active ? NavActive : Color.clear;
         btn.colors = cb;
+        SetupButton(btn);
         string capturedTab = tab;
         btn.interactable = !active && !busy && currentGame != null;
         btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; if (capturedTab != "home") activeArticleId = string.Empty; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
@@ -1460,10 +1468,13 @@ public sealed class ComputerOverlayController : MonoBehaviour
         btn.targetGraphic = go.GetComponent<Image>();
         ColorBlock cb = btn.colors;
         cb.normalColor      = bgCol;
-        cb.highlightedColor = active ? Html("#747f91") : Html("#545d6e");
-        cb.pressedColor     = Html("#ffffff30");
+        cb.highlightedColor = active ? bgCol : Html("#545d6e");
+        cb.pressedColor     = active ? bgCol : Html("#ffffff30");
+        cb.selectedColor    = bgCol;
+        cb.disabledColor    = bgCol;
         cb.fadeDuration     = 0.08f;
         btn.colors = cb;
+        SetupButton(btn);
 
         string capturedTab = tab;
         btn.onClick.AddListener(() => { windowMinimized = false; activeTab = capturedTab; if (capturedTab != "home") activeArticleId = string.Empty; RenderTabs(); UpdateTaskbarApps(); UpdateSidebarNav(); RenderAll(); });
@@ -1664,7 +1675,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         openColors.normalColor = LightCardBg;
         openColors.highlightedColor = Html("#f8fbff");
         openColors.pressedColor = Html("#e8eefc");
+        openColors.selectedColor = LightCardBg;
         openBtn.colors = openColors;
+        SetupButton(openBtn);
         string openId = item.id;
         openBtn.onClick.AddListener(() => OpenArticle(openId));
         VerticalLayoutGroup vl = card.AddComponent<VerticalLayoutGroup>();
@@ -2011,10 +2024,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         ColorBlock cb = btn.colors;
         cb.normalColor      = bg;
         cb.highlightedColor = bg;                  // no white hover
-        cb.pressedColor     = selected ? Html("#7c3aed66") : Html("#ffffff12"); // subtle feedback
+        cb.pressedColor     = selected ? bg : Html("#ffffff12"); // subtle feedback
         cb.selectedColor    = bg;
+        cb.disabledColor    = bg;
         cb.fadeDuration     = 0.08f;
         btn.colors = cb;
+        SetupButton(btn);
         btn.onClick.AddListener(() => { activeEmailId = item.id; RenderTabs(); });
 
         VerticalLayoutGroup vl = row.AddComponent<VerticalLayoutGroup>();
@@ -2119,10 +2134,12 @@ public sealed class ComputerOverlayController : MonoBehaviour
         ColorBlock cb = btn.colors;
         cb.normalColor = baseCol;
         cb.highlightedColor = baseCol;                 // no white hover
-        cb.pressedColor = selected ? Html("#7c3aed66") : Html("#ffffff12"); // subtle feedback
+        cb.pressedColor = selected ? baseCol : Html("#ffffff12"); // subtle feedback
         cb.selectedColor = baseCol;
+        cb.disabledColor = baseCol;
         cb.fadeDuration = 0.08f;
         btn.colors = cb;
+        SetupButton(btn);
         btn.onClick.AddListener(() => { activeTelegramId = thread.id; RenderTabs(); });
 
         VerticalLayoutGroup vl = row.AddComponent<VerticalLayoutGroup>();
@@ -2414,8 +2431,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
             cb.highlightedColor = Html("#14b8a6");
             cb.pressedColor = Html("#0f4f47");
             cb.disabledColor = Html("#334155");
+            cb.selectedColor = Html("#0f766e");
             cb.fadeDuration = 0.08f;
             btn.colors = cb;
+            SetupButton(btn);
             btn.interactable = !fakeBrowserActive && !fakeAttachmentActive && !virusActive;
             btn.onClick.AddListener(() => HandleUnsafeTelegramLinkClicked(label, url));
 
@@ -2477,8 +2496,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
             cb.highlightedColor = hover;
             cb.pressedColor = pressed;
             cb.disabledColor = Html("#334155");
+            cb.selectedColor = bg;
             cb.fadeDuration = 0.08f;
             btn.colors = cb;
+            SetupButton(btn);
             btn.interactable = !busy && !fakeBrowserActive && !fakeAttachmentActive && !virusActive;
 
             string capturedName = name;
@@ -2559,8 +2580,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
             cb.highlightedColor = Color.Lerp(bubbleBg, Color.white, 0.16f);
             cb.pressedColor     = Color.Lerp(bubbleBg, Color.black, 0.14f);
             cb.disabledColor    = Html("#3a4a63");
+            cb.selectedColor    = bubbleBg;
             cb.fadeDuration     = 0.08f;
             btn.colors = cb;
+            SetupButton(btn);
             btn.interactable = enabled;
             btn.onClick.AddListener(() => SendActionClicked(surface, itemId, capturedId));
 
@@ -2638,6 +2661,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.highlightedColor = Color.Lerp(bg, Color.white, 0.15f);
         cb.pressedColor     = Color.Lerp(bg, Color.black, 0.15f);
         cb.disabledColor    = Html("#1e2535");
+        cb.selectedColor    = bg;
         btn.colors = cb;
         btn.onClick.AddListener(onClick);
         TMP_Text txt = WinText(go.transform, "L", label, 12, fg, FontStyles.Bold);
@@ -2666,10 +2690,29 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.highlightedColor = new Color(1f, 1f, 1f, 0.88f);
         cb.pressedColor     = new Color(0.85f, 0.9f, 1f, 1f);
         cb.disabledColor    = new Color(1f, 1f, 1f, 0.4f);
+        cb.selectedColor    = Color.white;
         cb.fadeDuration     = 0.1f;
         btn.colors = cb;
         btn.onClick.AddListener(onClick);
+        SetupButton(btn);
         return btn;
+    }
+
+    private static void SetupButton(Button btn)
+    {
+        if (btn == null) return;
+        Navigation nav = btn.navigation;
+        nav.mode = Navigation.Mode.None;
+        btn.navigation = nav;
+        
+        ColorBlock cb = btn.colors;
+        cb.selectedColor = cb.normalColor;
+        if (cb.disabledColor == ColorBlock.defaultColorBlock.disabledColor)
+        {
+            cb.disabledColor = cb.normalColor;
+        }
+        cb.fadeDuration = 0f; // Instant transitions to eliminate all possible recreation flickers
+        btn.colors = cb;
     }
 
     private static TMP_InputField InputField(Transform parent, string placeholder)
@@ -2899,8 +2942,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
         {
             if (busyOverlay == null)
             {
-                // Semi-transparent overlay to block interactions and look glassy
-                busyOverlay = PanelObject(canvasObject.transform, "BusyOverlay", new Color(0f, 0f, 0f, 0.45f));
+                // Semi-transparent overlay to block interactions without harsh screen dimming
+                busyOverlay = PanelObject(canvasObject.transform, "BusyOverlay", Color.clear);
                 Stretch(busyOverlay.GetComponent<RectTransform>());
                 UnityEngine.UI.Image img = busyOverlay.GetComponent<UnityEngine.UI.Image>();
                 if (img != null) img.raycastTarget = true;
@@ -4063,7 +4106,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cb.normalColor      = WinBtnClose;
         cb.highlightedColor = Color.Lerp(WinBtnClose, Color.white, 0.2f);
         cb.pressedColor     = Color.Lerp(WinBtnClose, Color.black, 0.2f);
+        cb.selectedColor    = WinBtnClose;
         btn.colors = cb;
+        SetupButton(btn);
         btn.onClick.AddListener(() => CloseVirusPopup(popup));
 
         // ✕ glyph (two crossed bars)
