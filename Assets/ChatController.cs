@@ -1875,7 +1875,7 @@ videoObj.transform.SetParent(row, false);
     {
         if (paranoiaText != null) 
         {
-            paranoiaText.text = val + "%\n<size=10><color=#888888>PARANOIA</color></size>";
+            paranoiaText.text = val + "%\n<size=75%><color=#00E5FF><b>PARANOIA</b></color></size>";
         }
         if (paranoiaFill != null)
         {
@@ -1915,7 +1915,7 @@ videoObj.transform.SetParent(row, false);
         if (timerText == null) return;
         int m = Mathf.FloorToInt(timer / 60f);
         int s = Mathf.FloorToInt(timer % 60f);
-        timerText.text = string.Format("{0:00}:{1:00}\n<size=10><color=#888888>TIME LEFT</color></size>", m, s);
+        timerText.text = string.Format("{0:00}:{1:00}\n<size=60%><color=#888888>TIME LEFT</color></size>", m, s);
         timerText.color = timer < 120f ? new Color(1f, 0.25f, 0.25f) : Color.white;
     }
 
@@ -2062,7 +2062,7 @@ videoObj.transform.SetParent(row, false);
             if (pointsTxtTrans != null)
             {
                 var pt = pointsTxtTrans.GetComponent<TMPro.TextMeshProUGUI>();
-                if (pt != null) pt.text = "0\n<size=10><color=#888888>POINTS</color></size>";
+                if (pt != null) pt.text = "0\n<size=18><color=#888888>POINTS</color></size>";
             }
         }
         else

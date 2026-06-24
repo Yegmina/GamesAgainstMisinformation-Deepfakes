@@ -498,7 +498,7 @@ public class DeepDetectComputerController : MonoBehaviour
         tmp.fontSize = size;
         tmp.fontStyle = style;
         tmp.alignment = alignment;
-        tmp.color = new Color(0.92f, 0.94f, 0.96f, 1f);
+        tmp.color = Color.white;
         return tmp;
     }
 

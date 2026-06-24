@@ -30,8 +30,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float DesktopIconSpacing         = 16f;
     private const float NewsCardHeight             = 192f;
     private const float NewsLeadCardHeight         = 340f;
-    private const float EmailRowHeight             = 100f;
-    private const float TelegramRowHeight          = 100f;
+    private const float EmailRowHeight             = 115f;
+    private const float TelegramRowHeight          = 115f;
     private const float ThreadViewportHeight       = 320f;
     private const float ChatBodyHeight             = 800f;
     private const float TaskbarAppWidth            = 140f;
@@ -57,6 +57,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const string DefaultName      = "Unity Player";
     private const string DefaultEmail     = "unity.player@deepdetectgame.dev";
     private const string DefaultPassword  = "unity-local-player-2026";
+    private const float ArticleImageRetryDelay = 15f;
 
     private const string PrimaryMonitorName  = "monitor";
     private const string FallbackMonitorName = "Monitor_27__Curved";
@@ -86,17 +87,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // Light (white) card palette — for readable news cards
     private static readonly Color LightCardBg     = Html("#f8fafc");
     private static readonly Color LightCardShadow  = Html("#00000026");
-    private static readonly Color LightText        = Html("#0b1220");
-    private static readonly Color LightTextSub     = Html("#1f2937");
-    private static readonly Color LightTextMuted   = Html("#475569");
+    private static readonly Color LightText        = Html("#000000"); // Pure Black
+    private static readonly Color LightTextSub     = Html("#000000"); // Pure Black
+    private static readonly Color LightTextMuted   = Html("#000000"); // Pure Black
     private static readonly Color CardHover       = Html("#1e2a3e");
     private static readonly Color PanelRaised    = Html("#242f45");
 
     // Text
-    private static readonly Color TextPrimary    = Html("#e2e8f0");
-    private static readonly Color TextSecondary  = Html("#94a3b8");
-    private static readonly Color TextMuted      = Html("#7587a0");
-    private static readonly Color TextDim        = Html("#374151");
+    private static readonly Color TextPrimary    = Html("#ffffff"); // Pure White
+    private static readonly Color TextSecondary  = Html("#f1f5f9"); // Bright Light Gray
+    private static readonly Color TextMuted      = Html("#cbd5e1"); // Bright Gray
+    private static readonly Color TextDim        = Html("#94a3b8"); // Readable Medium Gray
 
     // Accent colors
     private static readonly Color AccentBlue     = Html("#3b82f6");
@@ -134,6 +135,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private bool   initialized;
     private bool   initializing;
     private bool   busy;
+    private GameObject busyOverlay;
     private bool   usingWorldMonitor;
     private bool   computerOpen;
     private bool   focusActive;
@@ -146,7 +148,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private Coroutine  articlePollRoutine;
     private readonly Dictionary<string, Sprite> articleImageCache = new Dictionary<string, Sprite>();
     private readonly HashSet<string> articleImageLoading = new HashSet<string>();
-    private readonly HashSet<string> articleImageFailed = new HashSet<string>();
+    private readonly Dictionary<string, float> articleImageFailedAt = new Dictionary<string, float>();
     private Transform  focusAnchor;
 
     // ─── UI references ──────────────────────────────────────────────────────
@@ -222,6 +224,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     {
         ExitFocusModeImmediate();
         CancelFakeBrowserSequence();
+        CancelFakeAttachmentSequence();
         if (instance == this) instance = null;
         if (canvasObject != null) { Destroy(canvasObject); canvasObject = null; }
     }
@@ -257,6 +260,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private void Close()
     {
         CancelFakeBrowserSequence();
+        CancelFakeAttachmentSequence();
         StopArticlePolling();
         computerOpen = false;
         RefreshCanvasInteractivity();
@@ -1879,7 +1883,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(item.articleError))
         {
-            TMP_Text err = WinText(shell.transform, "ArticleError", $"Article enrichment note: {item.articleError}", 12, AccentAmber);
+            TMP_Text err = WinText(shell.transform, "ArticleError", $"Article enrichment note: {ShortUiText(item.articleError, 180)}", 12, AccentAmber);
             err.textWrappingMode = TextWrappingModes.Normal;
             err.overflowMode = TextOverflowModes.Overflow;
         }
@@ -1940,10 +1944,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         cvl.childControlHeight = true; cvl.childForceExpandHeight = false;
         cvl.spacing = 2;
 
-        TMP_Text cap = WinText(captionBox.transform, "Caption", HeroCaption(item), 14, Color.white, FontStyles.Bold);
+        TMP_Text cap = WinText(captionBox.transform, "Caption", HeroCaption(item, imageUrl), 14, Color.white, FontStyles.Bold);
         cap.textWrappingMode = TextWrappingModes.Normal;
         cap.overflowMode = TextOverflowModes.Ellipsis;
-        TMP_Text credit = WinText(captionBox.transform, "Credit", Fallback(item.articleImageCredit, ArticleReady(item) ? "News image" : "Article image loading"), 11, Html("#dbeafe"));
+        TMP_Text credit = WinText(captionBox.transform, "Credit", ArticleImageCredit(item, imageUrl), 11, Html("#dbeafe"));
         credit.textWrappingMode = TextWrappingModes.Normal;
         credit.overflowMode = TextOverflowModes.Ellipsis;
     }
@@ -1968,7 +1972,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         // Left: thread list
         GameObject left = PanelObject(body.transform, "ThreadList", Html("#0f1726"));
         MakeRounded(left, Html("#0f1726"));
-        Layout(left, 264f, -1f, 0f, 1f);
+        Layout(left, 290f, -1f, 0f, 1f);
 
         VerticalLayoutGroup leftVl = left.AddComponent<VerticalLayoutGroup>();
         leftVl.padding = new RectOffset(8,8,8,8);
@@ -1984,9 +1988,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         lhHl.childAlignment = TextAnchor.MiddleLeft;
         lhHl.childControlWidth = true; lhHl.childForceExpandWidth = true;
         lhHl.childControlHeight = true; lhHl.childForceExpandHeight = true;
-        TMP_Text listTitle = WinText(listHeader.transform, "T", "THREADS", 10, TextMuted, FontStyles.Bold);
+        TMP_Text listTitle = WinText(listHeader.transform, "T", "THREADS", 12, TextMuted, FontStyles.Bold);
         Layout(listTitle.gameObject, -1f, -1f, 1f, 1f);
-        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{emails.Count}", 10, AccentBlueSoft, FontStyles.Bold);
+        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{emails.Count}", 12, AccentBlueSoft, FontStyles.Bold);
 
         foreach (ComputerEmailItem item in emails)
             BuildEmailRow(left.transform, item, item.id == active.id);
@@ -2020,10 +2024,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
         bool resolved = ThreadResolved(item);
-        TMP_Text from = WinText(row.transform, "From", Fallback(item.fromName, "Sender"), 13, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
-        TMP_Text subj = WinText(row.transform, "Subject", Fallback(item.subject, "No subject"), 12, TextSecondary);
+        TMP_Text from = WinText(row.transform, "From", Fallback(item.fromName, "Sender"), 15, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
+        TMP_Text subj = WinText(row.transform, "Subject", Fallback(item.subject, "No subject"), 14, TextSecondary);
         subj.overflowMode = TextOverflowModes.Ellipsis;
-        TMP_Text prog = WinText(row.transform, "Progress", ThreadProgress(item), 11, resolved ? AccentGreenSoft : AccentAmberSoft);
+        TMP_Text prog = WinText(row.transform, "Progress", ThreadProgress(item), 13, resolved ? AccentGreenSoft : AccentAmberSoft);
     }
 
     private void BuildEmailReader(Transform parent, ComputerEmailItem active)
@@ -2037,15 +2041,15 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
-        TMP_Text subj = WinText(reader.transform, "Subject", Fallback(active.subject, "No subject"), 18, TextPrimary, FontStyles.Bold);
+        TMP_Text subj = WinText(reader.transform, "Subject", Fallback(active.subject, "No subject"), 21, TextPrimary, FontStyles.Bold);
         subj.textWrappingMode = TextWrappingModes.Normal;
         subj.overflowMode = TextOverflowModes.Overflow;
         Layout(subj.gameObject, -1f, -1f, 1f, 0f);
 
-        TMP_Text sender = WinText(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")}  <{Fallback(active.fromEmail, "unknown")}>  ·  {ThreadProgress(active)}", 13, TextSecondary);
+        TMP_Text sender = WinText(reader.transform, "Sender", $"{Fallback(active.fromName, "Sender")}  <{Fallback(active.fromEmail, "unknown")}>  ·  {ThreadProgress(active)}", 15, TextSecondary);
         Layout(sender.gameObject, -1f, -1f, 1f, 0f);
 
-        AddThread(reader.transform, EmailMessages(active), active.fromName);
+        AddThread(reader.transform, EmailMessages(active), active.fromName, false, true);
         AddResult(reader.transform, active.correct);
         AddOptionButtons(reader.transform, "email", active.id, active.options, ThreadResolved(active));
         if (!ThreadResolved(active))
@@ -2071,7 +2075,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         // Left list
         GameObject left = PanelObject(body.transform, "ChatList", Html("#0f1726"));
         MakeRounded(left, Html("#0f1726"));
-        Layout(left, 264f, -1f, 0f, 1f);
+        Layout(left, 290f, -1f, 0f, 1f);
         VerticalLayoutGroup leftVl = left.AddComponent<VerticalLayoutGroup>();
         leftVl.padding = new RectOffset(8,8,8,8);
         leftVl.spacing = 6;
@@ -2086,10 +2090,10 @@ public sealed class ComputerOverlayController : MonoBehaviour
         lhHl.childAlignment = TextAnchor.MiddleLeft;
         lhHl.childControlWidth = true; lhHl.childForceExpandWidth = true;
         lhHl.childControlHeight = true; lhHl.childForceExpandHeight = true;
-        TMP_Text listTitle = WinText(listHeader.transform, "T", "CHATS", 11, TextMuted, FontStyles.Bold);
+        TMP_Text listTitle = WinText(listHeader.transform, "T", "CHATS", 13, TextMuted, FontStyles.Bold);
         listTitle.characterSpacing = 3f;
         Layout(listTitle.gameObject, -1f, -1f, 1f, 1f);
-        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{threads.Count}", 10, Html("#a78bfa"), FontStyles.Bold);
+        TMP_Text countLbl = WinText(listHeader.transform, "C", $"{threads.Count}", 12, Html("#a78bfa"), FontStyles.Bold);
 
         foreach (ComputerTelegramThread thread in threads)
             BuildTelegramRow(left.transform, thread, thread.id == active.id);
@@ -2128,9 +2132,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
         bool resolved = ThreadResolved(thread);
-        TMP_Text contact = WinText(row.transform, "Contact", Fallback(thread.contact, "Contact"), 13, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
-        TMP_Text rel = WinText(row.transform, "Rel", Fallback(thread.relationship, "relationship"), 12, TextSecondary);
-        TMP_Text prog = WinText(row.transform, "Prog", ThreadProgress(thread), 11, resolved ? AccentGreenSoft : Html("#a78bfa"));
+        TMP_Text contact = WinText(row.transform, "Contact", Fallback(thread.contact, "Contact"), 15, resolved ? TextMuted : TextPrimary, resolved ? FontStyles.Normal : FontStyles.Bold);
+        TMP_Text rel = WinText(row.transform, "Rel", Fallback(thread.relationship, "relationship"), 14, TextSecondary);
+        TMP_Text prog = WinText(row.transform, "Prog", ThreadProgress(thread), 13, resolved ? AccentGreenSoft : Html("#a78bfa"));
     }
 
     private void BuildTelegramConversation(Transform parent, ComputerTelegramThread active)
@@ -2144,9 +2148,9 @@ public sealed class ComputerOverlayController : MonoBehaviour
         vl.childControlWidth = vl.childForceExpandWidth = true;
         vl.childControlHeight = true; vl.childForceExpandHeight = false;
 
-        TMP_Text contactName = WinText(conv.transform, "Contact", Fallback(active.contact, "Contact"), 18, TextPrimary, FontStyles.Bold);
+        TMP_Text contactName = WinText(conv.transform, "Contact", Fallback(active.contact, "Contact"), 21, TextPrimary, FontStyles.Bold);
         Layout(contactName.gameObject, -1f, -1f, 1f, 0f);
-        TMP_Text meta = WinText(conv.transform, "Meta", $"{Fallback(active.relationship, "relationship")}  ·  {ThreadProgress(active)}", 13, TextSecondary);
+        TMP_Text meta = WinText(conv.transform, "Meta", $"{Fallback(active.relationship, "relationship")}  ·  {ThreadProgress(active)}", 15, TextSecondary);
         Layout(meta.gameObject, -1f, -1f, 1f, 0f);
         AddThread(conv.transform, active.messages ?? new List<JToken>(), active.contact, true);
         AddResult(conv.transform, active.correct);
@@ -2324,7 +2328,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     }
 
     // ─── Shared UI helpers ───────────────────────────────────────────────────
-    private void AddThread(Transform parent, List<JToken> messages, string fallbackSender, bool enableUnsafeLinks = false)
+    private void AddThread(Transform parent, List<JToken> messages, string fallbackSender, bool enableUnsafeLinks = false, bool enableAttachments = false)
     {
         RectTransform content;
         RectTransform scroll = CreateScroll(parent, "Thread", out content, false);
@@ -2358,19 +2362,20 @@ public sealed class ComputerOverlayController : MonoBehaviour
             MakeRounded(bubble, bubbleBg);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bvl = bubble.AddComponent<VerticalLayoutGroup>();
-            bvl.padding = new RectOffset(14,14,10,10); bvl.spacing = 4;
+            bvl.padding = new RectOffset(16,16,12,12); bvl.spacing = 4;
             bvl.childControlWidth = bvl.childForceExpandWidth = true;
             bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
 
             string sender = Fallback(MessageSender(msg), player ? "You" : fallbackSender);
-            TMP_Text senderLbl = WinText(bubble.transform, "Sender", sender, 11, player ? Html("#cfe3ff") : Html("#9fb3cc"), FontStyles.Bold);
-            TMP_Text bodyLbl   = WinText(bubble.transform, "Text", MessageText(msg), 14, Color.white);
+            TMP_Text senderLbl = WinText(bubble.transform, "Sender", sender, 13, player ? Html("#cfe3ff") : Html("#9fb3cc"), FontStyles.Bold);
+            TMP_Text bodyLbl   = WinText(bubble.transform, "Text", MessageText(msg), 17, Color.white);
             bodyLbl.textWrappingMode = TextWrappingModes.Normal;
             bodyLbl.overflowMode     = TextOverflowModes.Overflow;
             bodyLbl.lineSpacing      = 5f;
             Layout(bodyLbl.gameObject, -1f, -1f, 1f, 0f);
 
             AddMessageLinks(bubble.transform, msg, enableUnsafeLinks);
+            AddMessageAttachments(bubble.transform, msg, enableAttachments);
         }
     }
 
@@ -2411,7 +2416,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             cb.disabledColor = Html("#334155");
             cb.fadeDuration = 0.08f;
             btn.colors = cb;
-            btn.interactable = !fakeBrowserActive && !virusActive;
+            btn.interactable = !fakeBrowserActive && !fakeAttachmentActive && !virusActive;
             btn.onClick.AddListener(() => HandleUnsafeTelegramLinkClicked(label, url));
 
             TMP_Text title = WinText(go.transform, "Label", label, 13, Color.white, FontStyles.Bold);
@@ -2425,6 +2430,79 @@ public sealed class ComputerOverlayController : MonoBehaviour
             host.overflowMode = TextOverflowModes.Ellipsis;
             host.raycastTarget = false;
             Layout(host.gameObject, -1f, -1f, 1f, 0f);
+        }
+    }
+
+    private void AddMessageAttachments(Transform parent, JToken message, bool enableAttachments)
+    {
+        if (!enableAttachments) return;
+        List<JToken> attachments = MessageAttachments(message);
+        if (attachments.Count == 0) return;
+
+        GameObject group = Element(parent, "Attachments");
+        Layout(group, -1f, -1f, 1f, 0f);
+        VerticalLayoutGroup vl = group.AddComponent<VerticalLayoutGroup>();
+        vl.spacing = 6;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+        TMP_Text caption = WinText(group.transform, "AttachmentCaption", "ATTACHMENTS", 10, Html("#9fb3cc"), FontStyles.Bold);
+        caption.characterSpacing = 2f;
+        Layout(caption.gameObject, -1f, 16f, 1f, 0f);
+
+        foreach (JToken attachment in attachments)
+        {
+            string name = Fallback(AttachmentName(attachment), "attachment.dat");
+            string extension = Fallback(AttachmentExtension(attachment), "file").ToLowerInvariant();
+            bool dangerous = AttachmentUnsafe(attachment);
+            Color bg = dangerous ? Html("#7f1d1d") : Html("#1d4ed8");
+            Color hover = dangerous ? Html("#b91c1c") : Html("#2563eb");
+            Color pressed = dangerous ? Html("#5f1717") : Html("#1e40af");
+            string titleText = dangerous ? $"{extension.ToUpperInvariant()}  {name}" : $"{extension.ToUpperInvariant()}  {name}";
+            string detailText = dangerous ? "Executable attachment" : "Document preview";
+
+            GameObject go = PanelObject(group.transform, dangerous ? "UnsafeAttachment" : "SafeAttachment", bg);
+            MakeRounded(go, bg, 8f);
+            Layout(go, -1f, -1f, 1f, 0f);
+            VerticalLayoutGroup bvl = go.AddComponent<VerticalLayoutGroup>();
+            bvl.padding = new RectOffset(12, 12, 8, 8);
+            bvl.spacing = 3;
+            bvl.childControlWidth = bvl.childForceExpandWidth = true;
+            bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
+
+            Button btn = go.AddComponent<Button>();
+            btn.targetGraphic = go.GetComponent<Image>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = bg;
+            cb.highlightedColor = hover;
+            cb.pressedColor = pressed;
+            cb.disabledColor = Html("#334155");
+            cb.fadeDuration = 0.08f;
+            btn.colors = cb;
+            btn.interactable = !busy && !fakeBrowserActive && !fakeAttachmentActive && !virusActive;
+
+            string capturedName = name;
+            string capturedExtension = extension;
+            string capturedPreviewTitle = Fallback(AttachmentPreviewTitle(attachment), name);
+            string capturedPreviewBody = Fallback(AttachmentPreviewBody(attachment), "No preview text was included with this attachment.");
+            bool capturedDangerous = dangerous;
+            btn.onClick.AddListener(() =>
+            {
+                if (capturedDangerous) HandleUnsafeEmailAttachmentClicked(capturedName, capturedExtension);
+                else HandleSafeEmailAttachmentClicked(capturedName, capturedPreviewTitle, capturedPreviewBody);
+            });
+
+            TMP_Text title = WinText(go.transform, "FileName", titleText, 13, Color.white, FontStyles.Bold);
+            title.textWrappingMode = TextWrappingModes.Normal;
+            title.overflowMode = TextOverflowModes.Overflow;
+            title.raycastTarget = false;
+            Layout(title.gameObject, -1f, -1f, 1f, 0f);
+
+            TMP_Text detail = WinText(go.transform, "FileMeta", detailText, 11, dangerous ? Html("#fecaca") : Html("#bfdbfe"));
+            detail.textWrappingMode = TextWrappingModes.Normal;
+            detail.overflowMode = TextOverflowModes.Ellipsis;
+            detail.raycastTarget = false;
+            Layout(detail.gameObject, -1f, -1f, 1f, 0f);
         }
     }
 
@@ -2443,7 +2521,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         gvl.childControlHeight = true; gvl.childForceExpandHeight = false;
 
         // Small right-aligned caption above the suggestions.
-        TMP_Text caption = WinText(group.transform, "SuggestLabel", "SUGGESTED REPLIES", 10, Html("#7f9bc0"), FontStyles.Bold);
+        TMP_Text caption = WinText(group.transform, "SuggestLabel", "SUGGESTED REPLIES", 12, Html("#7f9bc0"), FontStyles.Bold);
         caption.characterSpacing = 3f;
         caption.alignment = TextAlignmentOptions.Right;
         Layout(caption.gameObject, -1f, 16f, 1f, 0f);
@@ -2469,7 +2547,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             MakeRounded(bubble, bubbleBg);
             Layout(bubble, -1f, -1f, 1f, 0f);
             VerticalLayoutGroup bvl = bubble.AddComponent<VerticalLayoutGroup>();
-            bvl.padding = new RectOffset(16, 16, 11, 11); bvl.spacing = 2;
+            bvl.padding = new RectOffset(18, 18, 14, 14); bvl.spacing = 2;
             bvl.childControlWidth = bvl.childForceExpandWidth = true;
             bvl.childControlHeight = true; bvl.childForceExpandHeight = false;
 
@@ -2486,7 +2564,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
             btn.interactable = enabled;
             btn.onClick.AddListener(() => SendActionClicked(surface, itemId, capturedId));
 
-            TMP_Text body = WinText(bubble.transform, "Text", Fallback(opt.label, opt.id), 14, Color.white, FontStyles.Normal);
+            TMP_Text body = WinText(bubble.transform, "Text", Fallback(opt.label, opt.id), 16, Color.white, FontStyles.Normal);
             body.textWrappingMode = TextWrappingModes.Normal;
             body.overflowMode     = TextOverflowModes.Overflow;
             body.lineSpacing      = 4f;
@@ -2810,6 +2888,85 @@ public sealed class ComputerOverlayController : MonoBehaviour
         RefreshCanvasInteractivity();
         SetStatus(message);
         UpdateStatusbar();
+        UpdateBusyOverlay();
+    }
+
+    private void UpdateBusyOverlay()
+    {
+        if (canvasObject == null) return;
+
+        if (busy)
+        {
+            if (busyOverlay == null)
+            {
+                // Semi-transparent overlay to block interactions and look glassy
+                busyOverlay = PanelObject(canvasObject.transform, "BusyOverlay", new Color(0f, 0f, 0f, 0.45f));
+                Stretch(busyOverlay.GetComponent<RectTransform>());
+                UnityEngine.UI.Image img = busyOverlay.GetComponent<UnityEngine.UI.Image>();
+                if (img != null) img.raycastTarget = true;
+                busyOverlay.transform.SetAsLastSibling();
+
+                // Centered modal box
+                GameObject modal = PanelObject(busyOverlay.transform, "BusyModal", Html("#1e2535"));
+                MakeRounded(modal, Html("#1e2535"), 12f);
+                RectTransform r = modal.GetComponent<RectTransform>();
+                r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.pivot = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = new Vector2(360f, 180f);
+                r.anchoredPosition = Vector2.zero;
+
+                UnityEngine.UI.Shadow shadow = modal.AddComponent<UnityEngine.UI.Shadow>();
+                shadow.effectColor = Html("#00000055");
+                shadow.effectDistance = new Vector2(0f, -4f);
+
+                UnityEngine.UI.VerticalLayoutGroup vl = modal.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+                vl.padding = new RectOffset(20, 20, 24, 20);
+                vl.spacing = 16;
+                vl.childAlignment = TextAnchor.MiddleCenter;
+                vl.childControlWidth = vl.childForceExpandWidth = true;
+                vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+                // Simple loading spinner container
+                GameObject spinner = Element(modal.transform, "Spinner");
+                Layout(spinner, 32f, 32f, 0f, 0f);
+                var spinnerImg = spinner.AddComponent<UnityEngine.UI.Image>();
+                spinnerImg.sprite = Resources.Load<Sprite>("UI/desktop/refresh-icon");
+                if (spinnerImg.sprite == null)
+                {
+                    spinnerImg.color = AccentBlueSoft;
+                }
+                else
+                {
+                    spinnerImg.color = AccentBlueSoft;
+                    spinnerImg.preserveAspect = true;
+                }
+                spinner.AddComponent<BusyRotator>();
+
+                // Loading text label
+                string loadingText = string.IsNullOrWhiteSpace(lastStatusMessage) ? "Processing..." : lastStatusMessage;
+                TMP_Text label = WinText(modal.transform, "Label", loadingText, 14, Color.white, FontStyles.Bold);
+                label.alignment = TextAlignmentOptions.Center;
+                Layout(label.gameObject, -1f, -1f, 1f, 0f);
+            }
+            else
+            {
+                // Update message
+                busyOverlay.transform.SetAsLastSibling();
+                TMP_Text label = busyOverlay.GetComponentInChildren<TMP_Text>();
+                if (label != null)
+                {
+                    label.text = DisplayText(string.IsNullOrWhiteSpace(lastStatusMessage) ? "Processing..." : lastStatusMessage);
+                }
+            }
+        }
+        else
+        {
+            if (busyOverlay != null)
+            {
+                Destroy(busyOverlay);
+                busyOverlay = null;
+            }
+        }
     }
 
     private void SetStatus(string message)
@@ -3105,8 +3262,17 @@ public sealed class ComputerOverlayController : MonoBehaviour
             if (item == null) continue;
             string status = (item.articleStatus ?? string.Empty).Trim().ToLowerInvariant();
             if (status == "pending" || status == "generating") return true;
+            if (ArticleImagePending(item)) return true;
         }
         return false;
+    }
+
+    private static bool ArticleImagePending(ComputerNewsItem item)
+    {
+        if (!ArticleReady(item)) return false;
+        if (!string.Equals(item.articleMode, "synthetic", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.IsNullOrWhiteSpace(item.articleImageUrl)) return false;
+        return string.IsNullOrWhiteSpace(item.articleError);
     }
 
     private IEnumerator PollArticleEnrichment()
@@ -3236,6 +3402,19 @@ public sealed class ComputerOverlayController : MonoBehaviour
                 result.Add(link);
         return result;
     }
+
+    private static List<JToken> MessageAttachments(JToken m)
+    {
+        List<JToken> result = new List<JToken>();
+        if (m == null || m.Type != JTokenType.Object) return result;
+        JToken attachments = m["attachments"];
+        if (attachments == null || attachments.Type != JTokenType.Array) return result;
+        foreach (JToken attachment in attachments)
+            if (attachment != null && attachment.Type == JTokenType.Object)
+                result.Add(attachment);
+        return result;
+    }
+
     private static string LinkLabel(JToken link) { if (link==null||link.Type!=JTokenType.Object) return string.Empty; JToken l=link["label"]; return l!=null?l.Value<string>():string.Empty; }
     private static string LinkUrl(JToken link)   { if (link==null||link.Type!=JTokenType.Object) return string.Empty; JToken u=link["url"];   return u!=null?u.Value<string>():string.Empty; }
     private static bool LinkUnsafe(JToken link)
@@ -3244,6 +3423,25 @@ public sealed class ComputerOverlayController : MonoBehaviour
         JToken unsafeToken = link["unsafe"];
         return unsafeToken != null && unsafeToken.Type == JTokenType.Boolean && unsafeToken.Value<bool>();
     }
+    private static string AttachmentName(JToken attachment) { if (attachment==null||attachment.Type!=JTokenType.Object) return string.Empty; JToken n=attachment["name"]; return n!=null?n.Value<string>():string.Empty; }
+    private static string AttachmentExtension(JToken attachment)
+    {
+        if (attachment == null || attachment.Type != JTokenType.Object) return string.Empty;
+        JToken e = attachment["extension"];
+        string extension = e != null ? e.Value<string>() : string.Empty;
+        if (!string.IsNullOrWhiteSpace(extension)) return extension.Trim().TrimStart('.');
+        string name = AttachmentName(attachment);
+        int dot = name.LastIndexOf('.');
+        return dot >= 0 && dot < name.Length - 1 ? name.Substring(dot + 1) : string.Empty;
+    }
+    private static bool AttachmentUnsafe(JToken attachment)
+    {
+        if (attachment == null || attachment.Type != JTokenType.Object) return false;
+        JToken unsafeToken = attachment["unsafe"];
+        return unsafeToken != null && unsafeToken.Type == JTokenType.Boolean && unsafeToken.Value<bool>();
+    }
+    private static string AttachmentPreviewTitle(JToken attachment) { if (attachment==null||attachment.Type!=JTokenType.Object) return string.Empty; JToken t=attachment["preview_title"]; return t!=null?t.Value<string>():string.Empty; }
+    private static string AttachmentPreviewBody(JToken attachment) { if (attachment==null||attachment.Type!=JTokenType.Object) return string.Empty; JToken b=attachment["preview_body"]; return b!=null?b.Value<string>():string.Empty; }
 
     private List<string> ArticleParagraphs(ComputerNewsItem item)
     {
@@ -3272,11 +3470,20 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return "Article pending";
     }
 
-    private static string HeroCaption(ComputerNewsItem item)
+    private static string HeroCaption(ComputerNewsItem item, string imageUrl)
     {
         if (!string.IsNullOrWhiteSpace(item?.articleImageCaption)) return item.articleImageCaption;
+        if (ArticleReady(item) && string.IsNullOrWhiteSpace(imageUrl)) return "Article image is still being prepared.";
         if (ArticleReady(item)) return "Editorial image for this wire.";
         return "Full article media is loading.";
+    }
+
+    private string ArticleImageCredit(ComputerNewsItem item, string imageUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(item?.articleImageCredit)) return item.articleImageCredit;
+        if (!string.IsNullOrWhiteSpace(imageUrl) && articleImageFailedAt.ContainsKey(imageUrl)) return "Image retrying";
+        if (ArticleReady(item) && string.IsNullOrWhiteSpace(imageUrl)) return "Image generation pending";
+        return ArticleReady(item) ? "News image" : "Article image loading";
     }
 
     private string ResolveArticleImageUrl(ComputerNewsItem item)
@@ -3291,8 +3498,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void StartArticleImageLoad(string url)
     {
-        if (string.IsNullOrWhiteSpace(url) || articleImageCache.ContainsKey(url) || articleImageLoading.Contains(url) || articleImageFailed.Contains(url))
+        if (string.IsNullOrWhiteSpace(url) || articleImageCache.ContainsKey(url) || articleImageLoading.Contains(url))
             return;
+        if (articleImageFailedAt.TryGetValue(url, out float failedAt) && Time.unscaledTime - failedAt < ArticleImageRetryDelay)
+            return;
+        articleImageFailedAt.Remove(url);
         articleImageLoading.Add(url);
         StartCoroutine(LoadArticleImage(url));
     }
@@ -3308,19 +3518,26 @@ public sealed class ComputerOverlayController : MonoBehaviour
             articleImageLoading.Remove(url);
             if (request.result != UnityWebRequest.Result.Success)
             {
-                articleImageFailed.Add(url);
+                articleImageFailedAt[url] = Time.unscaledTime;
+                Debug.LogWarning($"[ComputerOverlay] Article image load failed: {url} result={request.result} status={request.responseCode} error={request.error}");
+                if (!string.IsNullOrWhiteSpace(activeArticleId))
+                    RenderAll();
                 yield break;
             }
 
             Texture2D tex = DownloadHandlerTexture.GetContent(request);
             if (tex == null)
             {
-                articleImageFailed.Add(url);
+                articleImageFailedAt[url] = Time.unscaledTime;
+                Debug.LogWarning($"[ComputerOverlay] Article image load failed: {url} returned no texture");
+                if (!string.IsNullOrWhiteSpace(activeArticleId))
+                    RenderAll();
                 yield break;
             }
 
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             articleImageCache[url] = sprite;
+            articleImageFailedAt.Remove(url);
             if (!string.IsNullOrWhiteSpace(activeArticleId))
                 RenderAll();
         }
@@ -3344,6 +3561,14 @@ public sealed class ComputerOverlayController : MonoBehaviour
     }
 
     private static string Fallback(string v, string fb) => string.IsNullOrWhiteSpace(v) ? fb : v;
+
+    private static string ShortUiText(string value, int max)
+    {
+        value = Fallback(value, "");
+        if (value.Length <= max) return value;
+        int clippedLength = Mathf.Max(0, max - 3);
+        return value.Substring(0, clippedLength) + "...";
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     //  TEXT SANITIZE
@@ -3449,6 +3674,172 @@ public sealed class ComputerOverlayController : MonoBehaviour
         return Resources.Load<Sprite>("UI/desktop/" + spriteName);
     }
 
+    // Fake in-game email attachments. These never open or execute real files.
+    private GameObject fakeAttachmentOverlay;
+    private Coroutine fakeAttachmentRoutine;
+    private bool fakeAttachmentActive;
+
+    private void HandleSafeEmailAttachmentClicked(string name, string previewTitle, string previewBody)
+    {
+        if (fakeAttachmentActive || fakeBrowserActive || virusActive || canvasObject == null) return;
+        ShowFakePdfOverlay(name, previewTitle, previewBody);
+    }
+
+    private void HandleUnsafeEmailAttachmentClicked(string name, string extension)
+    {
+        if (fakeAttachmentActive || fakeBrowserActive || virusActive || canvasObject == null) return;
+        fakeAttachmentRoutine = StartCoroutine(FakeAttachmentThenVirus(name, extension));
+    }
+
+    private IEnumerator FakeAttachmentThenVirus(string name, string extension)
+    {
+        fakeAttachmentActive = true;
+        ShowFakeAttachmentOpenOverlay(name, extension);
+        yield return new WaitForSecondsRealtime(1.25f);
+        HideFakeAttachmentOverlay();
+        fakeAttachmentActive = false;
+        fakeAttachmentRoutine = null;
+        TriggerVirusAttack();
+    }
+
+    private void ShowFakePdfOverlay(string name, string previewTitle, string previewBody)
+    {
+        fakeAttachmentActive = true;
+        HideFakeAttachmentOverlay();
+        if (canvasObject == null) return;
+
+        fakeAttachmentOverlay = PanelObject(canvasObject.transform, "FakePdfOverlay", new Color(0f, 0f, 0f, 0.42f));
+        Stretch(fakeAttachmentOverlay.GetComponent<RectTransform>());
+        Image blocker = fakeAttachmentOverlay.GetComponent<Image>();
+        if (blocker != null) blocker.raycastTarget = true;
+        fakeAttachmentOverlay.transform.SetAsLastSibling();
+
+        GameObject window = PanelObject(fakeAttachmentOverlay.transform, "FakePdfWindow", Html("#f8fafc"));
+        MakeRounded(window, Html("#f8fafc"), 12f);
+        RectTransform wr = window.GetComponent<RectTransform>();
+        wr.anchorMin = wr.anchorMax = new Vector2(0.5f, 0.5f);
+        wr.pivot = new Vector2(0.5f, 0.5f);
+        wr.sizeDelta = new Vector2(820f, 620f);
+        wr.anchoredPosition = Vector2.zero;
+        Shadow shadow = window.AddComponent<Shadow>();
+        shadow.effectColor = Html("#00000055");
+        shadow.effectDistance = new Vector2(0f, -6f);
+
+        VerticalLayoutGroup vl = window.AddComponent<VerticalLayoutGroup>();
+        vl.padding = new RectOffset(20, 20, 18, 20);
+        vl.spacing = 12;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+        GameObject header = Element(window.transform, "Header");
+        Layout(header, -1f, 40f, 1f, 0f);
+        HorizontalLayoutGroup hl = header.AddComponent<HorizontalLayoutGroup>();
+        hl.spacing = 10;
+        hl.childAlignment = TextAnchor.MiddleLeft;
+        hl.childControlWidth = true; hl.childForceExpandWidth = false;
+        hl.childControlHeight = true; hl.childForceExpandHeight = true;
+
+        TMP_Text file = WinText(header.transform, "File", Fallback(name, "source-chain-notes.pdf"), 13, LightTextMuted, FontStyles.Bold);
+        file.textWrappingMode = TextWrappingModes.NoWrap;
+        file.overflowMode = TextOverflowModes.Ellipsis;
+        Layout(file.gameObject, -1f, -1f, 1f, 1f);
+        WinButton(header.transform, "Close", Html("#e5e7eb"), LightText, () =>
+        {
+            fakeAttachmentActive = false;
+            HideFakeAttachmentOverlay();
+        }, 90f, 34f);
+
+        TMP_Text badge = WinText(window.transform, "Badge", "PDF PREVIEW", 11, Html("#1d4ed8"), FontStyles.Bold);
+        badge.characterSpacing = 3f;
+        Layout(badge.gameObject, -1f, 18f, 1f, 0f);
+
+        TMP_Text title = WinText(window.transform, "Title", Fallback(previewTitle, "Source attachment"), 24, LightText, FontStyles.Bold);
+        title.textWrappingMode = TextWrappingModes.Normal;
+        title.overflowMode = TextOverflowModes.Overflow;
+        Layout(title.gameObject, -1f, -1f, 1f, 0f);
+
+        RectTransform content;
+        RectTransform scroll = CreateScroll(window.transform, "PdfBody", out content, false);
+        Layout(scroll.gameObject, -1f, -1f, 1f, 1f);
+        ScrollRect sr = scroll.GetComponent<ScrollRect>();
+        if (sr != null) sr.scrollSensitivity = 30f;
+        TMP_Text body = WinText(content, "Body", Fallback(previewBody, "No preview text was included with this attachment."), 15, LightTextSub);
+        body.textWrappingMode = TextWrappingModes.Normal;
+        body.overflowMode = TextOverflowModes.Overflow;
+        body.lineSpacing = 7f;
+        Layout(body.gameObject, -1f, -1f, 1f, 0f);
+    }
+
+    private void ShowFakeAttachmentOpenOverlay(string name, string extension)
+    {
+        HideFakeAttachmentOverlay();
+        if (canvasObject == null) return;
+
+        fakeAttachmentOverlay = PanelObject(canvasObject.transform, "FakeAttachmentOpenOverlay", new Color(0f, 0f, 0f, 0.48f));
+        Stretch(fakeAttachmentOverlay.GetComponent<RectTransform>());
+        Image blocker = fakeAttachmentOverlay.GetComponent<Image>();
+        if (blocker != null) blocker.raycastTarget = true;
+        fakeAttachmentOverlay.transform.SetAsLastSibling();
+
+        GameObject window = PanelObject(fakeAttachmentOverlay.transform, "FakeAttachmentOpenWindow", Html("#111827"));
+        MakeRounded(window, Html("#111827"), 12f);
+        RectTransform wr = window.GetComponent<RectTransform>();
+        wr.anchorMin = wr.anchorMax = new Vector2(0.5f, 0.5f);
+        wr.pivot = new Vector2(0.5f, 0.5f);
+        wr.sizeDelta = new Vector2(680f, 310f);
+        wr.anchoredPosition = Vector2.zero;
+        Shadow shadow = window.AddComponent<Shadow>();
+        shadow.effectColor = Html("#00000077");
+        shadow.effectDistance = new Vector2(0f, -7f);
+
+        VerticalLayoutGroup vl = window.AddComponent<VerticalLayoutGroup>();
+        vl.padding = new RectOffset(22, 22, 20, 22);
+        vl.spacing = 13;
+        vl.childControlWidth = vl.childForceExpandWidth = true;
+        vl.childControlHeight = true; vl.childForceExpandHeight = false;
+
+        TMP_Text file = WinText(window.transform, "File", Fallback(name, $"attachment.{extension}"), 22, Html("#f8fafc"), FontStyles.Bold);
+        file.textWrappingMode = TextWrappingModes.Normal;
+        file.overflowMode = TextOverflowModes.Overflow;
+        Layout(file.gameObject, -1f, -1f, 1f, 0f);
+
+        TMP_Text body = WinText(window.transform, "Body", "Opening attachment...\nExtracting package...\nSecurity scan interrupted.", 16, Html("#fecaca"));
+        body.textWrappingMode = TextWrappingModes.Normal;
+        body.overflowMode = TextOverflowModes.Overflow;
+        body.lineSpacing = 7f;
+        Layout(body.gameObject, -1f, -1f, 1f, 0f);
+
+        GameObject barTrack = PanelObject(window.transform, "AttachmentLoadTrack", Html("#374151"));
+        MakeRounded(barTrack, Html("#374151"), 8f);
+        Layout(barTrack, -1f, 18f, 1f, 0f);
+        GameObject barFill = PanelObject(barTrack.transform, "AttachmentLoadFill", Html("#dc2626"));
+        MakeRounded(barFill, Html("#dc2626"), 8f);
+        RectTransform fr = barFill.GetComponent<RectTransform>();
+        fr.anchorMin = new Vector2(0f, 0f);
+        fr.anchorMax = new Vector2(0.86f, 1f);
+        fr.offsetMin = fr.offsetMax = Vector2.zero;
+    }
+
+    private void HideFakeAttachmentOverlay()
+    {
+        if (fakeAttachmentOverlay != null)
+        {
+            Destroy(fakeAttachmentOverlay);
+            fakeAttachmentOverlay = null;
+        }
+    }
+
+    private void CancelFakeAttachmentSequence()
+    {
+        if (fakeAttachmentRoutine != null)
+        {
+            StopCoroutine(fakeAttachmentRoutine);
+            fakeAttachmentRoutine = null;
+        }
+        fakeAttachmentActive = false;
+        HideFakeAttachmentOverlay();
+    }
+
     // Fake in-game browser used for scam Telegram links. It never opens a real URL.
     private GameObject fakeBrowserOverlay;
     private Coroutine fakeBrowserRoutine;
@@ -3456,7 +3847,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void HandleUnsafeTelegramLinkClicked(string label, string url)
     {
-        if (fakeBrowserActive || virusActive || canvasObject == null) return;
+        if (fakeBrowserActive || fakeAttachmentActive || virusActive || canvasObject == null) return;
         fakeBrowserRoutine = StartCoroutine(FakeBrowserThenVirus(label, url));
     }
 
@@ -3570,7 +3961,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const int   VirusWrongThreshold = 2;     // attack every N wrong calls
     private const int   VirusInitialCount   = 5;     // pop-ups in the first burst
     private const int   VirusMaxTotal       = 9;     // hard cap on pop-ups per wave
-    private const float VirusRespawnChance  = 0.65f; // chance a close spawns a new one
+    private const float VirusRespawnChance  = 0f;    // Disabled respawning to make the final virus easily closeable
 
     private int  wrongDecisionsSinceVirus;
     private int  virusSpawnedThisWave;
@@ -3580,13 +3971,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     private void RegisterWrongDecisions(int count)
     {
-        if (count <= 0) return;
-        wrongDecisionsSinceVirus += count;
-        if (wrongDecisionsSinceVirus >= VirusWrongThreshold && !virusActive)
-        {
-            wrongDecisionsSinceVirus = 0;
-            TriggerVirusAttack();
-        }
+        // Removed as requested: mistakes no longer trigger the virus attack.
+        return;
     }
 
     private void TriggerVirusAttack()
@@ -3713,5 +4099,74 @@ public sealed class ComputerOverlayController : MonoBehaviour
         if (virusLayer != null) { Destroy(virusLayer); virusLayer = null; }
         // Window stays minimized; the player reopens it via a desktop/taskbar icon.
         Debug.Log("[ComputerOverlay] Virus attack cleared.");
+    }
+}
+
+internal class BusyRotator : MonoBehaviour
+{
+    private Texture2D generatedTexture;
+    private Sprite generatedSprite;
+
+    private void Start()
+    {
+        var img = GetComponent<UnityEngine.UI.Image>();
+        if (img == null) return;
+
+        int size = 128;
+        generatedTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] cols = new Color[size * size];
+        float cx = size / 2f;
+        float cy = size / 2f;
+        float maxRadius = size / 2f - 2f;
+        float minRadius = maxRadius - 16f; // Perfect ring thickness
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - cx;
+                float dy = y - cy;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                if (dist >= minRadius && dist <= maxRadius)
+                {
+                    float angle = Mathf.Atan2(dy, dx);
+                    if (angle < 0) angle += Mathf.PI * 2f;
+                    float alpha = angle / (Mathf.PI * 2f);
+                    
+                    // Smooth power-falloff for the trailing fade
+                    float fadeFactor = Mathf.Pow(alpha, 1.8f);
+                    cols[y * size + x] = new Color(1f, 1f, 1f, fadeFactor);
+                }
+                else
+                {
+                    cols[y * size + x] = Color.clear;
+                }
+            }
+        }
+
+        generatedTexture.SetPixels(cols);
+        generatedTexture.Apply();
+
+        generatedSprite = Sprite.Create(generatedTexture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        img.sprite = generatedSprite;
+        img.preserveAspect = true;
+    }
+
+    private void Update()
+    {
+        // Smooth classic spinner speed
+        transform.Rotate(0f, 0f, -340f * Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        if (generatedSprite != null)
+        {
+            Destroy(generatedSprite);
+        }
+        if (generatedTexture != null)
+        {
+            Destroy(generatedTexture);
+        }
     }
 }

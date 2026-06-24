@@ -11,6 +11,7 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
     [Header("Main Menu Visuals (Optional)")]
     public GameObject frameObject;
     public UnityEngine.UI.Image textInscriptionImage;
+    public TMPro.TMP_Text textComponent;
     public Color normalTextColor = new Color(0.6f, 0.6f, 0.6f, 1f);
     public Color hoverTextColor = Color.white;
     
@@ -37,6 +38,10 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         {
             textInscriptionImage.color = normalTextColor;
         }
+        if (textComponent != null)
+        {
+            textComponent.color = normalTextColor;
+        }
         if (frameObject != null)
         {
             frameObject.SetActive(false);
@@ -55,6 +60,10 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         {
             textInscriptionImage.color = normalTextColor;
         }
+        if (textComponent != null)
+        {
+            textComponent.color = normalTextColor;
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -70,6 +79,10 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         {
             textInscriptionImage.color = hoverTextColor;
         }
+        if (textComponent != null)
+        {
+            textComponent.color = hoverTextColor;
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -84,6 +97,10 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
         if (textInscriptionImage != null)
         {
             textInscriptionImage.color = normalTextColor;
+        }
+        if (textComponent != null)
+        {
+            textComponent.color = normalTextColor;
         }
     }
 

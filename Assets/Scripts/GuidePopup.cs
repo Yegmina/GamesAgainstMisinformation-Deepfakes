@@ -2,15 +2,35 @@ using UnityEngine;
 
 public class GuidePopup : MonoBehaviour
 {
-    public GameObject guidePopup;
+    [SerializeField] private GameObject guidePopup;
+    [SerializeField] private GameObject mainMenuPanel;
+
+    private void Start()
+    {
+        CloseGuide();
+    }
 
     public void OpenGuide()
     {
-        guidePopup.SetActive(true);
+        if (guidePopup != null)
+        {
+            guidePopup.SetActive(true);
+        }
+        if (mainMenuPanel != null)
+        {
+            mainMenuPanel.SetActive(false);
+        }
     }
 
     public void CloseGuide()
     {
-        guidePopup.SetActive(false);
+        if (guidePopup != null)
+        {
+            guidePopup.SetActive(false);
+        }
+        if (mainMenuPanel != null)
+        {
+            mainMenuPanel.SetActive(true);
+        }
     }
 }
