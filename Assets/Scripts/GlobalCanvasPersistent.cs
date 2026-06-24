@@ -236,6 +236,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     }
 
     private bool _hudVisible = true;
+    private bool _hudVisibilityApplied;
     private Transform _hudTransform;
     private Transform _missionSidebarTransform;
     private Transform _sidebarOpenButtonTransform;
@@ -253,6 +254,11 @@ public class GlobalCanvasPersistent : MonoBehaviour
         if (_sidebarOpenButtonTransform == null)
         {
             _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
+        }
+
+        if (_hudVisibilityApplied && _hudVisible == visible)
+        {
+            return;
         }
 
         if (_hudTransform != null && _hudTransform.gameObject.activeSelf != visible)
@@ -274,6 +280,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
 
         _hudVisible = visible;
+        _hudVisibilityApplied = true;
     }
 
     public void SetTimerRunning(bool run)

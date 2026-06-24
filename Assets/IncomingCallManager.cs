@@ -489,7 +489,9 @@ public class IncomingCallManager : MonoBehaviour
 
         while (elapsed < duration)
         {
+#if UNITY_ANDROID || UNITY_IOS
             Handheld.Vibrate();
+#endif
 
             panelVisible = !panelVisible;
             if (incomingCallErrorPanel != null)
