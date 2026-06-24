@@ -65,8 +65,8 @@ public class PauseMenuManager : MonoBehaviour
         // Handle ESC key press globally (using KeyCode.Escape for bulletproof reliability)
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // Only allow pausing if we are not in the main menu scene
-            if (SceneManager.GetActiveScene().name == "StartGame")
+            // Only allow pausing if we are not in the main menu or intro scenes
+            if (SceneManager.GetActiveScene().name == "StartGame" || SceneManager.GetActiveScene().name == "IntroScene")
             {
                 return;
             }

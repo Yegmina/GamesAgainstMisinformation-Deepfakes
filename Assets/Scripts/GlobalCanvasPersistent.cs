@@ -90,7 +90,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     {
         UpdateUI();
         string currentScene = SceneManager.GetActiveScene().name;
-        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         UpdateHorrorMusic(hideHud);
     }
 
@@ -106,7 +106,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
 
         string currentScene = SceneManager.GetActiveScene().name;
-        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame";
+        bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         ApplyHudVisibility(!hideHud);
         UpdateHorrorMusic(hideHud);
 
@@ -246,32 +246,34 @@ public class GlobalCanvasPersistent : MonoBehaviour
         {
             _hudTransform = transform.Find("HUD");
         }
-        if (_hudTransform == null) return;
-
-        if (_hudVisible != visible || _hudTransform.gameObject.activeSelf != visible)
+        if (_missionSidebarTransform == null)
         {
-            _hudVisible = visible;
+            _missionSidebarTransform = transform.Find("MissionSidebar");
+        }
+        if (_sidebarOpenButtonTransform == null)
+        {
+            _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
+        }
+
+        if (_hudTransform != null && _hudTransform.gameObject.activeSelf != visible)
+        {
             _hudTransform.gameObject.SetActive(visible);
+        }
 
-            if (_missionSidebarTransform == null)
-            {
-                _missionSidebarTransform = transform.Find("MissionSidebar");
-            }
-            if (_sidebarOpenButtonTransform == null)
-            {
-                _sidebarOpenButtonTransform = transform.Find("SidebarOpenButton");
-            }
+        if (_missionSidebarTransform != null && _missionSidebarTransform.gameObject.activeSelf != visible)
+        {
+            _missionSidebarTransform.gameObject.SetActive(visible);
+        }
 
-            if (_missionSidebarTransform != null)
-            {
-                _missionSidebarTransform.gameObject.SetActive(visible);
-            }
-
-            if (_sidebarOpenButtonTransform != null)
+        if (_sidebarOpenButtonTransform != null)
+        {
+            if (!visible && _sidebarOpenButtonTransform.gameObject.activeSelf)
             {
                 _sidebarOpenButtonTransform.gameObject.SetActive(false);
             }
         }
+
+        _hudVisible = visible;
     }
 
     public void SetTimerRunning(bool run)
