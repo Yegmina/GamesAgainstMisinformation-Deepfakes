@@ -42,6 +42,7 @@ public class IncomingCallManager : MonoBehaviour
     public Button incomingDeclineButton;
     public TMP_Text incomingCallerName;
     public Image incomingCallerAvatar;
+    [SerializeField] private GameObject incomingCallErrorPanel;
 
     [Header("Caller Screen buttons")]
     public GameObject callerEndCallButton;
@@ -117,7 +118,7 @@ public class IncomingCallManager : MonoBehaviour
         ringtoneSource.playOnAwake = false;
         ringtoneSource.loop = true;
 
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
 
         WireIncomingButtons();
     }
@@ -369,6 +370,7 @@ public class IncomingCallManager : MonoBehaviour
             phoneManager.homeScreen.SetActive(false);
 
         if (incomingCallScreen != null) incomingCallScreen.SetActive(true);
+        EnsureIncomingScreenReceivesInput();
         PrepareIncomingRingButtons();
 
         if (ringtoneSource != null && incomingRingtoneClip != null)
@@ -402,12 +404,16 @@ public class IncomingCallManager : MonoBehaviour
         {
             incomingAnswerButton.gameObject.SetActive(true);
             incomingAnswerButton.interactable = true;
+            if (incomingAnswerButton.targetGraphic != null)
+                incomingAnswerButton.targetGraphic.raycastTarget = true;
         }
 
         if (incomingDeclineButton != null)
         {
             incomingDeclineButton.gameObject.SetActive(true);
-            incomingDeclineButton.interactable = !IsIncomingStoryCallInProgress;
+            incomingDeclineButton.interactable = true;
+            if (incomingDeclineButton.targetGraphic != null)
+                incomingDeclineButton.targetGraphic.raycastTarget = true;
         }
 
         AgentLog("G", "IncomingCallManager.EnsureIncomingAnswerButtonVisible",
@@ -416,6 +422,23 @@ public class IncomingCallManager : MonoBehaviour
             (incomingAnswerButton != null && incomingAnswerButton.gameObject.activeSelf ? "true" : "false") +
             ",\"sharesCallerAnswerReference\":" +
             (incomingAnswerButton != null && incomingAnswerButton == callerAnswerButton ? "true" : "false") + "}");
+    }
+
+    void EnsureIncomingScreenReceivesInput()
+    {
+        if (incomingCallScreen == null)
+            return;
+
+        CanvasGroup canvasGroup = incomingCallScreen.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        GraphicRaycaster raycaster = incomingCallScreen.GetComponentInParent<GraphicRaycaster>();
+        if (raycaster != null)
+            raycaster.enabled = true;
     }
 
     void SetCallerScreenButtonVisible(Button button, bool visible)
@@ -431,35 +454,48 @@ public class IncomingCallManager : MonoBehaviour
         if (ringtoneSource != null) ringtoneSource.Stop();
     }
 
-    void StartIncomingDeclineVibration()
+    void StartIncomingDeclineFeedback()
     {
         if (vibrationRoutine != null)
             StopCoroutine(vibrationRoutine);
 
-        vibrationRoutine = StartCoroutine(IncomingDeclineVibrationCoroutine());
+        vibrationRoutine = StartCoroutine(FlashErrorAndVibrateCoroutine());
     }
 
-    void StopIncomingDeclineVibration()
+    void StopIncomingDeclineFeedback()
     {
         if (vibrationRoutine != null)
         {
             StopCoroutine(vibrationRoutine);
             vibrationRoutine = null;
         }
+
+        if (incomingCallErrorPanel != null)
+            incomingCallErrorPanel.SetActive(false);
     }
 
-    IEnumerator IncomingDeclineVibrationCoroutine()
+    IEnumerator FlashErrorAndVibrateCoroutine()
     {
         const float duration = 2f;
-        const float interval = 0.12f;
+        const float interval = 0.1f;
         float elapsed = 0f;
+        bool panelVisible = false;
 
         while (elapsed < duration)
         {
             Handheld.Vibrate();
-            yield return new WaitForSecondsRealtime(interval);
-            elapsed += interval;
+
+            panelVisible = !panelVisible;
+            if (incomingCallErrorPanel != null)
+                incomingCallErrorPanel.SetActive(panelVisible);
+
+            float waitTime = Mathf.Min(interval, duration - elapsed);
+            yield return new WaitForSecondsRealtime(waitTime);
+            elapsed += waitTime;
         }
+
+        if (incomingCallErrorPanel != null)
+            incomingCallErrorPanel.SetActive(false);
 
         vibrationRoutine = null;
     }
@@ -489,7 +525,7 @@ public class IncomingCallManager : MonoBehaviour
     void ReturnToIdleHome()
     {
         StopRingtone();
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
         if (!phoneLockedByBadEnding)
             isPhoneBusy = false;
 
@@ -519,7 +555,7 @@ public class IncomingCallManager : MonoBehaviour
 
     public void AnswerIncoming()
     {
-        StopIncomingDeclineVibration();
+        StopIncomingDeclineFeedback();
 
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
         {
@@ -609,7 +645,7 @@ public class IncomingCallManager : MonoBehaviour
     {
         if (IsIncomingStoryCallInProgress)
         {
-            StartIncomingDeclineVibration();
+            StartIncomingDeclineFeedback();
             return;
         }
 
@@ -625,6 +661,11 @@ public class IncomingCallManager : MonoBehaviour
         AdvanceStoryTimelineAfterCall();
     }
 
+    public void ResetCall()
+    {
+        EndCallerScreen();
+    }
+
     public void EndCallerScreen()
     {
         if (answerTransitionInProgress && Time.unscaledTime - answerTransitionStartedAt < 0.35f)
@@ -636,7 +677,7 @@ public class IncomingCallManager : MonoBehaviour
 
         if (IsIncomingStoryCallInProgress)
         {
-            StartIncomingDeclineVibration();
+            StartIncomingDeclineFeedback();
             return;
         }
 
