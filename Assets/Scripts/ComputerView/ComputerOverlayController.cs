@@ -42,7 +42,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     private const float MonitorScreenWidthRatio         = 0.94f;
     private const float MonitorScreenVerticalOffsetRatio = 0.08f;
     private const float MonitorFallbackWorldWidth        = 4.8f;
-    private const float MonitorSurfaceOffset             = 0.025f;
+    private const float MonitorSurfaceOffset             = 0.12f;
     private const float FocusDistance                   = 6.2f;
     private const float FocusHeightOffset               = 0.1f;
     private const float FocusFov                        = 34f;
@@ -2687,11 +2687,11 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Button btn = go.AddComponent<Button>();
         btn.targetGraphic = img;
         ColorBlock cb = btn.colors;
-        cb.normalColor      = Color.white;
-        cb.highlightedColor = new Color(1f, 1f, 1f, 0.88f);
-        cb.pressedColor     = new Color(0.85f, 0.9f, 1f, 1f);
+        cb.normalColor      = new Color(0.9f, 0.9f, 0.9f, 1f); // Slightly dimmed by default to allow "lighting up" on hover
+        cb.highlightedColor = Color.white;                    // Fully bright white on hover (makes buttons visibly whiter)
+        cb.pressedColor     = new Color(0.78f, 0.78f, 0.78f, 1f); // Darker on click
         cb.disabledColor    = new Color(1f, 1f, 1f, 0.4f);
-        cb.selectedColor    = Color.white;
+        cb.selectedColor    = new Color(0.9f, 0.9f, 0.9f, 1f);
         cb.fadeDuration     = 0.1f;
         btn.colors = cb;
         btn.onClick.AddListener(onClick);
