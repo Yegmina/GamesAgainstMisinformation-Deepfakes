@@ -195,6 +195,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
     // ─── Public API ─────────────────────────────────────────────────────────
     public static event Action ReturnToApartmentRequested;
     public static bool IsTransitioning => instance != null && instance.focusTransitioning;
+    public static bool IsComputerOpen => instance != null && instance.computerOpen;
 
     public static void OpenComputer()              => EnsureInstance().Open(null);
     public static void OpenComputer(Transform a)   => EnsureInstance().Open(a);
@@ -830,7 +831,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
         // Window control buttons (drawn as shapes, not glyphs).
         // Both minimize and close just hide the window/tabs and keep the player on
-        // the computer. Leaving the PC is done with the ESC key (see exit hint).
+        // the computer. Leaving the PC is done with the Q key (see exit hint).
         WinControlButton(tb.transform, "min",   WinBtnHover, TextSecondary, () => { windowMinimized = true; RenderAll(); }, 46f);
         WinControlButton(tb.transform, "max",   WinBtnHover, TextSecondary, () => { }, 46f);
         WinControlButton(tb.transform, "close", WinBtnClose, Color.white,   () => { windowMinimized = true; RenderAll(); }, 46f);
@@ -1037,7 +1038,7 @@ public sealed class ComputerOverlayController : MonoBehaviour
         Layout(statusbarAgentText.gameObject, -1f, -1f, 1f, 1f);
         statusbarRightText = WinText(bar.transform, "Right", "Ready", 12, AccentBlueSoft);
 
-        // ESC → apartment hint, sitting right next to the "Ready" text.
+        // Q apartment hint, sitting right next to the "Ready" text.
         BuildExitHint(bar.transform);
     }
 
@@ -1191,8 +1192,8 @@ public sealed class ComputerOverlayController : MonoBehaviour
 
     // ── Exit hint ───────────────────────────────────────────────────────────
     // A compact inline pill that lives in the window status bar, right next to the
-    // "Ready" text, telling the player they can leave the computer with the ESC
-    // key. The actual ESC handling lives in the player's Input System "Exit"
+    // "Ready" text, telling the player they can leave the computer with the Q
+    // key. The actual handling lives in the player's Input System "Exit"
     // action, which closes the computer overlay.
     private void BuildExitHint(Transform parent)
     {

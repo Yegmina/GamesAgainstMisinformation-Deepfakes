@@ -6,6 +6,10 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(Canvas))]
 public class GlobalCanvasPersistent : MonoBehaviour
 {
+    private const string ApartmentMovementHint = "WASD to move";
+    private const string ComputerMovementHint = "Q to leave desktop view";
+    private const string PhoneMovementHint = "Press Q to exit";
+
     private static GlobalCanvasPersistent instance;
     public static GlobalCanvasPersistent Instance => instance;
 
@@ -93,6 +97,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         string currentScene = SceneManager.GetActiveScene().name;
         bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         UpdateHorrorMusic(hideHud);
+        UpdateMovementHintForScene(currentScene);
     }
 
     private void Update()
@@ -110,12 +115,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         bool hideHud = currentScene.Contains("Ending_") || currentScene == "StartGame" || currentScene == "IntroScene";
         ApplyHudVisibility(!hideHud);
         UpdateHorrorMusic(hideHud);
-
-        // Auto-update movement hint in phone scene
-        if (currentScene == "SampleScene")
-        {
-            SetMovementHint("Press Q to exit");
-        }
+        UpdateMovementHintForScene(currentScene);
 
         if (hideHud)
 {
@@ -250,6 +250,20 @@ public class GlobalCanvasPersistent : MonoBehaviour
         if (movementHintText != null)
         {
             movementHintText.text = text;
+        }
+    }
+
+    private void UpdateMovementHintForScene(string currentScene)
+    {
+        if (currentScene == "SampleScene")
+        {
+            SetMovementHint(PhoneMovementHint);
+            return;
+        }
+
+        if (currentScene == "Apartment")
+        {
+            SetMovementHint(ComputerOverlayController.IsComputerOpen ? ComputerMovementHint : ApartmentMovementHint);
         }
     }
 

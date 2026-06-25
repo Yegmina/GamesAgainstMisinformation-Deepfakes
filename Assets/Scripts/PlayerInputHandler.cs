@@ -54,7 +54,7 @@ public class PlayerInputHandler : MonoBehaviour
 
         exitAction.performed += _ =>
         {
-            Debug.Log("Input System: Esc pressed!");
+            Debug.Log("Input System: Exit pressed!");
             OnExit?.Invoke();
         };
     }
