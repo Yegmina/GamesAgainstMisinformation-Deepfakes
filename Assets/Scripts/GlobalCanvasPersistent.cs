@@ -14,7 +14,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     public static GlobalCanvasPersistent Instance => instance;
 
     [Header("Global Game State")]
-    [SerializeField] private float timer = 600f; // 10 minutes
+    [SerializeField] private float timer = 360f; // 6 minutes
     [SerializeField] private bool timerRunning = true;
     [SerializeField] private int paranoia = 0;
     [SerializeField] private int points = 0;
@@ -50,7 +50,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     }
 
     [Header("Global Call Timing")]
-    [SerializeField] private float delaySeconds = 60f;
+    [SerializeField] private float delaySeconds = 30f;
     [SerializeField] private float delayBeforeMom = 150f;
     [SerializeField] private float delayBeforeMicrosoft = 150f;
     [SerializeField] private AudioClip globalIncomingRingtone;
@@ -87,7 +87,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         gameObject.name = "GlobalCanvas";
         DontDestroyOnLoad(gameObject);
         Application.runInBackground = true;
-        timer = 600f;
+        timer = 360f;
         BindUIElements();
     }
 
@@ -140,7 +140,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
         }
 
         // Global Call Timing Update
-        if (callPhase != GlobalCallPhase.Complete && !isCallRinging && !hideHud)
+        if (callPhase != GlobalCallPhase.Complete && !isCallRinging && !hideHud && CanAdvanceGlobalCallTimer(currentScene))
         {
             callPhaseElapsed += Time.deltaTime;
             float requiredDelay = GetRequiredDelayForCurrentPhase();
@@ -368,7 +368,7 @@ private bool _hudVisibilityApplied;
 
     public void ResetHUD()
     {
-        timer = 600f;
+        timer = 360f;
         timerRunning = true;
         paranoia = 0;
         points = 0;
@@ -454,14 +454,32 @@ private bool _hudVisibilityApplied;
         switch (callPhase)
         {
             case GlobalCallPhase.WaitingForNeighbor:
-                return delaySeconds;
-            case GlobalCallPhase.WaitingForMom:
                 return delayBeforeMom;
+            case GlobalCallPhase.WaitingForMom:
+                return delaySeconds;
             case GlobalCallPhase.WaitingForMicrosoft:
                 return delayBeforeMicrosoft;
             default:
                 return float.MaxValue;
         }
+    }
+
+    private bool CanAdvanceGlobalCallTimer(string currentScene)
+    {
+        if (currentScene != "SampleScene")
+            return true;
+
+        PhoneUIManager phoneManager = Object.FindFirstObjectByType<PhoneUIManager>();
+        if (phoneManager == null)
+            return true;
+
+        if (phoneManager.chatScreen != null && phoneManager.chatScreen.activeSelf)
+            return false;
+
+        if (phoneManager.messagesScreen != null && phoneManager.messagesScreen.activeSelf)
+            return false;
+
+        return true;
     }
 
     public void StartRingingCall(GlobalCallPhase ringPhase, string callerName)

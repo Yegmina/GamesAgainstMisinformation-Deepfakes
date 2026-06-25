@@ -58,8 +58,8 @@ public class IncomingCallManager : MonoBehaviour
     public AudioClip incomingRingtoneClip;
 
     [Header("Timing")]
-    [Tooltip("Seconds after game start before the Neighbor call can ring (default 60 = 1 minute).")]
-    public float delaySeconds = 60f;
+    [Tooltip("Seconds after game start before the first story call can ring (default 30 seconds).")]
+    public float delaySeconds = 30f;
 
     [Header("Story Call Timing")]
     [Tooltip("Seconds after Neighbor call ends before Mom call can ring(default 150s).")]
@@ -192,7 +192,7 @@ public class IncomingCallManager : MonoBehaviour
             ",\"delayBeforeMicrosoft\":" + delayBeforeMicrosoft + ",\"phase\":\"" + storyPhase + "\"}");
 
         // IMMEDIATELY DETECT GLOBAL RINGING
-        if (GlobalCanvasPersistent.Instance != null && GlobalCanvasPersistent.Instance.IsCallRinging)
+        if (GlobalCanvasPersistent.Instance != null && GlobalCanvasPersistent.Instance.IsCallRinging && IsIdleOnHome())
         {
             GlobalCanvasPersistent.Instance.StopGlobalRingtoneAndNotification();
 
@@ -229,6 +229,9 @@ public class IncomingCallManager : MonoBehaviour
             // Sync with global canvas call ringing state
             if (GlobalCanvasPersistent.Instance.IsCallRinging && !callShown)
             {
+                if (!IsIdleOnHome())
+                    return;
+
                 GlobalCanvasPersistent.Instance.StopGlobalRingtoneAndNotification();
 
                 GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
@@ -631,7 +634,7 @@ public class IncomingCallManager : MonoBehaviour
             return;
         }
 
-        SetCallerEndCallAvailable(false);
+        SetCallerEndCallAvailable(true);
 
         if (audioSource != null && ringtoneClip != null)
         {
@@ -645,12 +648,6 @@ public class IncomingCallManager : MonoBehaviour
 
     public void DeclineIncoming()
     {
-        if (IsIncomingStoryCallInProgress)
-        {
-            StartIncomingDeclineFeedback();
-            return;
-        }
-
         Debug.Log("[IncomingCallManager] DeclineIncoming");
         AgentLog("A", "IncomingCallManager.DeclineIncoming", "Call declined", "{}");
         FinishIncomingCallWithoutConversation();
@@ -677,17 +674,11 @@ public class IncomingCallManager : MonoBehaviour
             return;
         }
 
-        if (IsIncomingStoryCallInProgress)
-        {
-            StartIncomingDeclineFeedback();
-            return;
-        }
-
         Debug.Log("[IncomingCallManager] EndCallerScreen");
         if (audioSource != null) audioSource.Stop();
 
         if (callerController != null && callerController.IsCallActive)
-            callerController.DeclineCall();
+            callerController.HangUpCurrentCall();
         else
             HandleCallEnded();
     }

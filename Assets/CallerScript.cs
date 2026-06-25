@@ -302,6 +302,17 @@ public class CallerScript : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            && dialogueActive
+            && callActive
+            && !badEndingPlaying)
+        {
+            SkipCurrentDialogueLine();
+        }
+    }
+
     void CacheShakeTarget()
     {
         if (callShakeTarget != null)
@@ -743,7 +754,7 @@ public class CallerScript : MonoBehaviour
     {
         fatherChoiceActive = true;
         if (incomingCallManager != null)
-            incomingCallManager.SetCallerEndCallAvailable(false);
+            incomingCallManager.SetCallerEndCallAvailable(true);
 
         SpawnFatherChoiceButtons();
 
@@ -1141,6 +1152,57 @@ public class CallerScript : MonoBehaviour
         {
             CloseCaller("microsoft call completed");
             yield break;
+        }
+
+        ShowDialogueNode(node.nextNodeIndex);
+    }
+
+    void SkipCurrentDialogueLine()
+    {
+        if (!dialogueActive || !callActive || activeCallData == null || activeCallData.nodes == null)
+            return;
+
+        if (currentNodeIndex < 0 || currentNodeIndex >= activeCallData.nodes.Length)
+            return;
+
+        Transform container = GetChoicesContainer();
+        if (container != null && container.gameObject.activeInHierarchy && container.childCount > 0)
+            return;
+
+        if (nodeFlowRoutine != null)
+        {
+            StopCoroutine(nodeFlowRoutine);
+            nodeFlowRoutine = null;
+        }
+
+        if (audioSource != null && audioSource.isPlaying)
+            audioSource.Stop();
+
+        CallNode node = activeCallData.nodes[currentNodeIndex];
+        bool hasChoices = node.choices != null && node.choices.Length > 0;
+
+        if (hasChoices)
+        {
+            SpawnChoiceButtons(node, currentNodeIndex);
+            return;
+        }
+
+        if (node.isBadEnding)
+        {
+            StartBadEndingSequence();
+            return;
+        }
+
+        if (node.nextNodeIndex < 0)
+        {
+            CloseCaller("conversation ended");
+            return;
+        }
+
+        if (ShouldCompleteMicrosoftCallInsteadOfLooping(node, node.nextNodeIndex))
+        {
+            CloseCaller("microsoft call completed");
+            return;
         }
 
         ShowDialogueNode(node.nextNodeIndex);
@@ -1624,6 +1686,12 @@ public class CallerScript : MonoBehaviour
         if (outgoingFinishInProgress)
             return;
 
+        if (badEndingPlaying)
+        {
+            CloseCaller("declined");
+            return;
+        }
+
         if (IsOutgoingDialingPhase)
         {
             FinishLegacyOutgoingCall("declined");
@@ -1637,7 +1705,10 @@ public class CallerScript : MonoBehaviour
         }
 
         if (fatherChoiceActive)
+        {
+            FinishOutgoingNodeCall("declined", activeOutgoingDisconnectSound);
             return;
+        }
 
         if (outgoingUnavailablePhase)
             return;
@@ -1648,10 +1719,21 @@ public class CallerScript : MonoBehaviour
             return;
         }
 
+        if (callActive && dialogueActive)
+        {
+            CloseCaller("declined");
+            return;
+        }
+
         if (incomingCallManager != null)
             incomingCallManager.DeclineIncoming();
         else
             CloseCaller("declined");
+    }
+
+    public void HangUpCurrentCall()
+    {
+        DeclineCall();
     }
 }
 

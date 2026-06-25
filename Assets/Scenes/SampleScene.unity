@@ -18671,7 +18671,7 @@ MonoBehaviour:
   ringtoneClip: {fileID: 8300000, guid: 1ad764c6b1daea64aa432d59d3d4dcb9, type: 3}
   ringtoneSource: {fileID: 1995845836}
   incomingRingtoneClip: {fileID: 8300000, guid: 6d7d54e4f9af0034a83b159c0a28e228, type: 3}
-  delaySeconds: 10
+  delaySeconds: 30
   delayBeforeMom: 10
   delayBeforeMicrosoft: 10
   wireIncomingButtonsAtRuntime: 1
