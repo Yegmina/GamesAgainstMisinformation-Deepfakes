@@ -32,9 +32,10 @@ public class GlobalCanvasPersistent : MonoBehaviour
     private TMP_Text paranoiaText;
     private TMP_Text pointsText;
     private Image paranoiaFill;
+    private TMP_Text movementHintText;
 
     public enum GlobalCallPhase
-    {
+{
         WaitingForNeighbor,
         NeighborRinging,
         WaitingForMom,
@@ -110,8 +111,14 @@ public class GlobalCanvasPersistent : MonoBehaviour
         ApplyHudVisibility(!hideHud);
         UpdateHorrorMusic(hideHud);
 
-        if (hideHud)
+        // Auto-update movement hint in phone scene
+        if (currentScene == "SampleScene")
         {
+            SetMovementHint("Press Q to exit");
+        }
+
+        if (hideHud)
+{
             timerRunning = false;
             return;
         }
@@ -233,10 +240,21 @@ public class GlobalCanvasPersistent : MonoBehaviour
             Transform pointsTxtTrans = hud.Find("PointsPanel/Content/PointsText");
             if (pointsTxtTrans != null) pointsText = pointsTxtTrans.GetComponent<TMP_Text>();
         }
+
+        Transform hintTrans = transform.Find("MovementHint");
+        if (hintTrans != null) movementHintText = hintTrans.GetComponent<TMP_Text>();
+    }
+
+    public void SetMovementHint(string text)
+    {
+        if (movementHintText != null)
+        {
+            movementHintText.text = text;
+        }
     }
 
     private bool _hudVisible = true;
-    private bool _hudVisibilityApplied;
+private bool _hudVisibilityApplied;
     private Transform _hudTransform;
     private Transform _missionSidebarTransform;
     private Transform _sidebarOpenButtonTransform;
