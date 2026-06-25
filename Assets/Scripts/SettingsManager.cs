@@ -53,6 +53,8 @@ public class SettingsManager : MonoBehaviour
             resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
         }
 
+        MouseSettingsUiBuilder.EnsureStartMenu(settingsPanel, volumeSlider, volumeValueText);
+
         // Ensure panel is hidden at start
         if (settingsPanel != null)
         {
@@ -66,6 +68,8 @@ public class SettingsManager : MonoBehaviour
 
     public void OpenSettings()
     {
+        MouseSettingsUiBuilder.EnsureStartMenu(settingsPanel, volumeSlider, volumeValueText);
+
         if (settingsPanel != null)
         {
             settingsPanel.SetActive(true);

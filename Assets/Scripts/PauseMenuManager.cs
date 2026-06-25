@@ -58,6 +58,8 @@ public class PauseMenuManager : MonoBehaviour
             UpdateVolumeText(volumeSlider.value);
             volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
         }
+
+        MouseSettingsUiBuilder.EnsurePauseMenu(settingsPanel, volumeSlider, volumeValueText);
     }
 
     private void Update()
@@ -144,6 +146,8 @@ public class PauseMenuManager : MonoBehaviour
 
     public void OpenSettings()
     {
+        MouseSettingsUiBuilder.EnsurePauseMenu(settingsPanel, volumeSlider, volumeValueText);
+
         if (mainPausePanel != null)
         {
             mainPausePanel.SetActive(false);

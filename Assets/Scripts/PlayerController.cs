@@ -10,7 +10,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 3.0f;
 
     [Header("Look Settings")]
-    [SerializeField] private float mouseSensitivity = 0.1f;
+    [SerializeField] private float mouseSensitivity = MouseLookSettings.DefaultSensitivity;
     [SerializeField] private float upDownLookRange = 80f;
 
     [Header("Look Settings")]
@@ -23,8 +23,22 @@ public class PlayerController : MonoBehaviour
     private float currentSpeed => moveSpeed;
 
     private float yaw;
+    private float activeMouseSensitivity;
+    private bool invertHorizontalLook;
+    private bool invertVerticalLook;
 
     private bool rotationReady;
+
+    private void OnEnable()
+    {
+        ApplyMouseLookSettings();
+        MouseLookSettings.Changed += ApplyMouseLookSettings;
+    }
+
+    private void OnDisable()
+    {
+        MouseLookSettings.Changed -= ApplyMouseLookSettings;
+    }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -102,11 +116,29 @@ public class PlayerController : MonoBehaviour
 
         Debug.Log(playerInputHandler.RotationInput);
 
-        float mouseXRotation = playerInputHandler.RotationInput.x * mouseSensitivity;
-        float mouseYRotation = playerInputHandler.RotationInput.y * mouseSensitivity;
+        Vector2 rotationInput = playerInputHandler.RotationInput;
+        if (invertHorizontalLook)
+        {
+            rotationInput.x = -rotationInput.x;
+        }
+        if (invertVerticalLook)
+        {
+            rotationInput.y = -rotationInput.y;
+        }
+
+        float mouseXRotation = rotationInput.x * activeMouseSensitivity;
+        float mouseYRotation = rotationInput.y * activeMouseSensitivity;
 
         ApplyHorizontalRotation(mouseXRotation);
         ApplyVerticalRotation(mouseYRotation);
+    }
+
+    private void ApplyMouseLookSettings()
+    {
+        mouseSensitivity = MouseLookSettings.Sensitivity;
+        activeMouseSensitivity = mouseSensitivity;
+        invertHorizontalLook = MouseLookSettings.InvertHorizontal;
+        invertVerticalLook = MouseLookSettings.InvertVertical;
     }
 
     public void InteractionPoint(Transform point)
