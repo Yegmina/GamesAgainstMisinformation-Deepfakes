@@ -56,7 +56,7 @@ public class GlobalCanvasPersistent : MonoBehaviour
     [SerializeField] private AudioClip globalIncomingRingtone;
     [SerializeField] private Sprite notificationBgSprite;
 
-    private GlobalCallPhase callPhase = GlobalCallPhase.WaitingForNeighbor;
+    private GlobalCallPhase callPhase = GlobalCallPhase.WaitingForMom;
     private float callPhaseElapsed = 0f;
     private bool isCallRinging = false;
     private string ringingCallerName = "";
@@ -146,27 +146,23 @@ public class GlobalCanvasPersistent : MonoBehaviour
             float requiredDelay = GetRequiredDelayForCurrentPhase();
             if (callPhaseElapsed >= requiredDelay)
             {
-                string callerName = "";
                 GlobalCallPhase nextRingPhase = GlobalCallPhase.Complete;
                 if (callPhase == GlobalCallPhase.WaitingForNeighbor)
                 {
-                    callerName = "Neighbor";
                     nextRingPhase = GlobalCallPhase.NeighborRinging;
                 }
                 else if (callPhase == GlobalCallPhase.WaitingForMom)
                 {
-                    callerName = "Mom";
                     nextRingPhase = GlobalCallPhase.MomRinging;
                 }
                 else if (callPhase == GlobalCallPhase.WaitingForMicrosoft)
                 {
-                    callerName = "Microsoft Support";
                     nextRingPhase = GlobalCallPhase.MicrosoftRinging;
                 }
 
                 if (nextRingPhase != GlobalCallPhase.Complete)
                 {
-                    StartRingingCall(nextRingPhase, callerName);
+                    StartRingingCall(nextRingPhase, CallerNameForPhase(nextRingPhase));
                 }
             }
         }
@@ -390,7 +386,7 @@ private bool _hudVisibilityApplied;
 
     private void ResetCallState()
     {
-        callPhase = GlobalCallPhase.WaitingForNeighbor;
+        callPhase = GlobalCallPhase.WaitingForMom;
         callPhaseElapsed = 0f;
         isCallRinging = false;
         ringingCallerName = "";
@@ -472,19 +468,37 @@ private bool _hudVisibilityApplied;
     {
         callPhase = ringPhase;
         isCallRinging = true;
-        ringingCallerName = callerName;
+        ringingCallerName = string.IsNullOrWhiteSpace(callerName) ? CallerNameForPhase(ringPhase) : callerName;
 
         CreateNotificationToast();
         if (notificationToast != null)
         {
             if (notifBodyText != null)
             {
-                notifBodyText.text = $"{callerName} is calling! Go to the phone to answer the call.";
+                notifBodyText.text = $"{ringingCallerName} is calling! Go to the phone to answer the call.";
             }
             notificationToast.SetActive(true);
         }
 
         PlayGlobalRingtone();
+    }
+
+    private string CallerNameForPhase(GlobalCallPhase phase)
+    {
+        switch (phase)
+        {
+            case GlobalCallPhase.MomRinging:
+            case GlobalCallPhase.WaitingForMom:
+                return "Mom";
+            case GlobalCallPhase.NeighborRinging:
+            case GlobalCallPhase.WaitingForNeighbor:
+                return "Neighbor";
+            case GlobalCallPhase.MicrosoftRinging:
+            case GlobalCallPhase.WaitingForMicrosoft:
+                return "Microsoft Support";
+            default:
+                return "Someone";
+        }
     }
 
     public void OnCallEnded(GlobalCallPhase nextPhase)
