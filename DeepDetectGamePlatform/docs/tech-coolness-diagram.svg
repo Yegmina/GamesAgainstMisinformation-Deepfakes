@@ -1,0 +1,251 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1050" viewBox="0 0 1600 1050" role="img" aria-labelledby="title desc">
+  <title id="title">DeepDetect Night Shift Tech Diagram</title>
+  <desc id="desc">A horror styled architecture diagram for the DeepDetect misinformation game, showing Unity client systems, the live game loop, the agent backend, and verification tooling.</desc>
+
+  <defs>
+    <radialGradient id="coldGlow" cx="50%" cy="72%" r="62%">
+      <stop offset="0%" stop-color="#23435a" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#08131c" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#020407"/>
+    </radialGradient>
+    <linearGradient id="panelGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101922"/>
+      <stop offset="56%" stop-color="#071017"/>
+      <stop offset="100%" stop-color="#05070b"/>
+    </linearGradient>
+    <linearGradient id="screenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#111d28"/>
+      <stop offset="48%" stop-color="#071016"/>
+      <stop offset="100%" stop-color="#030609"/>
+    </linearGradient>
+    <filter id="noise" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="3" seed="17"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.22"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="blueGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#bfe8ff" flood-opacity="0.75"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#3da9ff" flood-opacity="0.28"/>
+    </filter>
+    <filter id="redGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ff3b45" flood-opacity="0.8"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#a30012" flood-opacity="0.45"/>
+    </filter>
+    <filter id="panelShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+    <pattern id="scanlines" width="1" height="6" patternUnits="userSpaceOnUse">
+      <rect width="1" height="1.2" fill="#ffffff" opacity="0.09"/>
+      <rect y="3" width="1" height="0.7" fill="#71c9ff" opacity="0.05"/>
+    </pattern>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M1.5,1.5 L7,4 L1.5,6.5 Z" fill="#9ddcff"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M1.5,1.5 L7,4 L1.5,6.5 Z" fill="#ff3b45"/>
+    </marker>
+    <style>
+      .title { font: 800 46px "Segoe UI", Arial, sans-serif; fill: #dff3ff; letter-spacing: 0; filter: url(#blueGlow); }
+      .subtitle { font: 500 18px "Segoe UI", Arial, sans-serif; fill: #9fb4c0; letter-spacing: 0; }
+      .mono { font: 800 12px Consolas, "Courier New", monospace; fill: #9ddcff; letter-spacing: 2px; }
+      .mono-red { font: 800 12px Consolas, "Courier New", monospace; fill: #ff5f67; letter-spacing: 2px; filter: url(#redGlow); }
+      .panel-title { font: 800 23px "Segoe UI", Arial, sans-serif; fill: #edf8ff; letter-spacing: 0; }
+      .card-title { font: 800 17px "Segoe UI", Arial, sans-serif; fill: #f2fbff; letter-spacing: 0; }
+      .copy { font: 500 14px "Segoe UI", Arial, sans-serif; fill: #a7bac5; letter-spacing: 0; }
+      .small { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #92a7b3; letter-spacing: 0; }
+      .panel { fill: url(#panelGrad); stroke: #39586d; stroke-width: 1.4; filter: url(#panelShadow); }
+      .panel-hot { fill: url(#screenGrad); stroke: #ff3b45; stroke-width: 1.5; filter: url(#panelShadow); }
+      .card { fill: #071019; stroke: #244a60; stroke-width: 1.2; }
+      .card-hot { fill: #11090c; stroke: #82303a; stroke-width: 1.2; }
+      .line { fill: none; stroke: #9ddcff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowBlue); filter: url(#blueGlow); }
+      .line-red { fill: none; stroke: #ff3b45; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowRed); filter: url(#redGlow); }
+      .outer-line { fill: none; stroke: #cbefff; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowBlue); filter: url(#blueGlow); }
+      .outer-line-red { fill: none; stroke: #ff3b45; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowRed); filter: url(#redGlow); }
+      .flow-label { font: 800 10px Consolas, "Courier New", monospace; fill: #dff3ff; letter-spacing: 1px; filter: url(#blueGlow); }
+      .flow-label-red { font: 800 10px Consolas, "Courier New", monospace; fill: #ff7a80; letter-spacing: 1px; filter: url(#redGlow); }
+      .thin { fill: none; stroke: #6da9c5; stroke-width: 1; opacity: 0.26; }
+      .tag { font: 800 12px Consolas, "Courier New", monospace; fill: #021018; letter-spacing: 1px; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1050" fill="#020407"/>
+  <rect width="1600" height="1050" fill="url(#coldGlow)"/>
+  <rect width="1600" height="1050" filter="url(#noise)" opacity="0.7"/>
+  <rect width="1600" height="1050" fill="url(#scanlines)" opacity="0.5"/>
+
+  <g opacity="0.52">
+    <path d="M0 162 H1600" class="thin"/>
+    <path d="M0 864 H1600" class="thin"/>
+    <path d="M92 0 L430 1050 M418 0 L756 1050 M1122 0 L1460 1050" class="thin"/>
+    <rect x="0" y="236" width="1600" height="2" fill="#d7f4ff" opacity="0.14"/>
+    <rect x="0" y="498" width="1600" height="1" fill="#d7f4ff" opacity="0.18"/>
+    <rect x="0" y="742" width="1600" height="2" fill="#d7f4ff" opacity="0.12"/>
+    <rect x="106" y="118" width="260" height="3" fill="#d7f4ff" opacity="0.22"/>
+    <rect x="1160" y="134" width="322" height="2" fill="#ff3b45" opacity="0.32"/>
+    <rect x="708" y="905" width="184" height="2" fill="#d7f4ff" opacity="0.2"/>
+  </g>
+
+  <text x="72" y="82" class="title">DeepDetect Night Shift Stack</text>
+  <text x="76" y="116" class="subtitle">Content moderation under pressure: eyes, ears, feeds, family, and systems that can lie back.</text>
+  <rect x="1192" y="54" width="296" height="42" rx="3" fill="#c8edff" opacity="0.92"/>
+  <text x="1218" y="81" class="tag">UNITY / FASTAPI / AGENTS / E2E</text>
+
+  <g transform="translate(64 168)">
+    <rect width="418" height="704" rx="4" class="panel"/>
+    <rect x="18" y="18" width="382" height="2" fill="#9ddcff" opacity="0.38"/>
+    <text x="32" y="43" class="mono">PLAYER TERMINAL</text>
+    <text x="32" y="80" class="panel-title">Unity Horror Client</text>
+    <text x="32" y="110" class="copy">Apartment, phone, PC, and HUD become</text>
+    <text x="32" y="130" class="copy">the night-shift survival loop.</text>
+
+    <g transform="translate(32 150)">
+      <rect width="338" height="82" rx="4" class="card"/>
+      <rect x="0" y="0" width="7" height="82" fill="#9ddcff"/>
+      <text x="26" y="34" class="card-title">Apartment Scene</text>
+      <text x="26" y="58" class="copy">dim room, lamp glow, PC monitor, city night</text>
+    </g>
+    <g transform="translate(32 254)">
+      <rect width="338" height="82" rx="4" class="card-hot"/>
+      <rect x="0" y="0" width="7" height="82" fill="#ff3b45"/>
+      <text x="26" y="34" class="card-title">Phone Pressure</text>
+      <text x="26" y="58" class="copy">deepfake calls, chats, voice notes, video clues</text>
+    </g>
+    <g transform="translate(32 358)">
+      <rect width="338" height="82" rx="4" class="card"/>
+      <rect x="0" y="0" width="7" height="82" fill="#9ddcff"/>
+      <text x="26" y="34" class="card-title">Computer Overlay</text>
+      <text x="26" y="58" class="copy">world-space Newsdesk, Inbox, Telegram, Briefing</text>
+    </g>
+    <g transform="translate(32 462)">
+      <rect width="338" height="82" rx="4" class="card-hot"/>
+      <rect x="0" y="0" width="7" height="82" fill="#ff3b45"/>
+      <text x="26" y="34" class="card-title">Consequence HUD</text>
+      <text x="26" y="58" class="copy">points, paranoia, timer, endings, panic states</text>
+    </g>
+    <g transform="translate(32 596)">
+      <rect width="338" height="54" rx="4" fill="#03080d" stroke="#39586d"/>
+      <text x="22" y="26" class="small">Unity URP 17 / uGUI / TMP</text>
+      <text x="22" y="42" class="small">Input System / VideoPlayer</text>
+    </g>
+  </g>
+
+  <g transform="translate(590 156)">
+    <rect width="420" height="736" rx="4" class="panel-hot"/>
+    <rect x="18" y="18" width="384" height="2" fill="#ff3b45" opacity="0.52"/>
+    <text x="34" y="43" class="mono-red">LIVE THREAT LOOP</text>
+    <text x="34" y="80" class="panel-title">Agentic Mission Engine</text>
+    <text x="34" y="110" class="copy">Every decision changes values, quests,</text>
+    <text x="34" y="130" class="copy">and what arrives next.</text>
+
+    <g transform="translate(40 150)">
+      <rect width="156" height="54" rx="4" class="card"/>
+      <text x="18" y="33" class="copy">NewsScoutAgent</text>
+    </g>
+    <g transform="translate(224 150)">
+      <rect width="156" height="54" rx="4" class="card"/>
+      <text x="18" y="33" class="copy">DistortionAgent</text>
+    </g>
+
+    <g transform="translate(94 256)" filter="url(#blueGlow)">
+      <rect width="234" height="148" rx="5" fill="#02070b" stroke="#9ddcff" stroke-width="2.4"/>
+      <text x="34" y="54" class="card-title">Game State Core</text>
+      <text x="34" y="82" class="copy">score, quests, values</text>
+      <text x="34" y="108" class="copy">world_tick, action_log</text>
+    </g>
+
+    <g transform="translate(40 452)">
+      <rect width="156" height="54" rx="4" class="card-hot"/>
+      <text x="30" y="33" class="copy">InboxAgent</text>
+    </g>
+    <g transform="translate(224 452)">
+      <rect width="156" height="54" rx="4" class="card-hot"/>
+      <text x="18" y="33" class="copy">SideQuestAgent</text>
+    </g>
+    <g transform="translate(40 562)">
+      <rect width="156" height="54" rx="4" class="card"/>
+      <text x="18" y="33" class="copy">MissionDirector</text>
+    </g>
+    <g transform="translate(224 562)">
+      <rect width="156" height="54" rx="4" class="card"/>
+      <text x="22" y="33" class="copy">WorldDirector</text>
+    </g>
+
+    <path d="M118 204 V238 L142 256" class="line"/>
+    <path d="M302 204 V238 L278 256" class="line"/>
+    <path d="M118 452 V428 L136 404" class="line-red"/>
+    <path d="M302 452 V428 L284 404" class="line-red"/>
+    <path d="M118 562 V526 L170 404" class="line"/>
+    <path d="M302 562 V526 L250 404" class="line"/>
+
+    <g transform="translate(34 648)">
+      <rect width="352" height="54" rx="4" fill="#03080d" stroke="#82303a"/>
+      <text x="22" y="24" class="mono-red">WHY IT FEELS COOL</text>
+      <text x="22" y="43" class="small">The world watches every call, then pushes back.</text>
+    </g>
+  </g>
+
+  <g transform="translate(1118 168)">
+    <rect width="418" height="704" rx="4" class="panel"/>
+    <rect x="18" y="18" width="382" height="2" fill="#9ddcff" opacity="0.38"/>
+    <text x="32" y="43" class="mono">BACKEND SIGNAL ROOM</text>
+    <text x="32" y="80" class="panel-title">FastAPI + AI Platform</text>
+    <text x="32" y="110" class="copy">Browser-playable and Unity-callable:</text>
+    <text x="32" y="130" class="copy">auth, generation, state, and sessions.</text>
+
+    <g transform="translate(32 150)">
+      <rect width="338" height="82" rx="4" class="card"/>
+      <rect x="0" y="0" width="7" height="82" fill="#9ddcff"/>
+      <text x="26" y="34" class="card-title">FastAPI Endpoints</text>
+      <text x="26" y="58" class="copy">health, auth, generate, action, tick, backup</text>
+    </g>
+    <g transform="translate(32 254)">
+      <rect width="338" height="82" rx="4" class="card-hot"/>
+      <rect x="0" y="0" width="7" height="82" fill="#ff3b45"/>
+      <text x="26" y="34" class="card-title">Agent Runtime</text>
+      <text x="26" y="58" class="copy">OpenAI or Gemini with no canned chat fallback</text>
+    </g>
+    <g transform="translate(32 358)">
+      <rect width="338" height="82" rx="4" class="card"/>
+      <rect x="0" y="0" width="7" height="82" fill="#9ddcff"/>
+      <text x="26" y="34" class="card-title">Evidence Inputs</text>
+      <text x="26" y="58" class="copy">RSS headlines, distortions, links, attachments</text>
+    </g>
+    <g transform="translate(32 462)">
+      <rect width="338" height="82" rx="4" class="card-hot"/>
+      <rect x="0" y="0" width="7" height="82" fill="#ff3b45"/>
+      <text x="26" y="34" class="card-title">Session Memory</text>
+      <text x="26" y="58" class="copy">SQLite users, saved shifts, backups, JSON export</text>
+    </g>
+    <g transform="translate(32 596)">
+      <rect width="338" height="54" rx="4" fill="#03080d" stroke="#39586d"/>
+      <text x="22" y="34" class="small">FastAPI / Uvicorn / SQLite / feedparser / Playwright</text>
+    </g>
+  </g>
+
+  <text x="502" y="416" class="flow-label">CHOICES</text>
+  <g filter="url(#blueGlow)">
+    <rect x="502" y="427.5" width="58" height="5" fill="#cbefff"/>
+    <path d="M558 418 L582 430 L558 442 Z" fill="#cbefff"/>
+  </g>
+  <text x="1042" y="416" class="flow-label">API</text>
+  <g filter="url(#blueGlow)">
+    <rect x="1026" y="427.5" width="58" height="5" fill="#cbefff"/>
+    <path d="M1082 418 L1106 430 L1082 442 Z" fill="#cbefff"/>
+  </g>
+  <text x="1040" y="650" class="flow-label-red">EVENTS</text>
+  <path d="M1118 642 C1082 674 1052 684 1024 660" class="outer-line-red"/>
+
+  <g transform="translate(148 918)">
+    <rect width="1304" height="86" rx="4" fill="#03080d" stroke="#39586d" filter="url(#panelShadow)"/>
+    <text x="34" y="35" class="mono">END-TO-END VERIFICATION RAIL</text>
+    <text x="34" y="64" class="copy">Browser frontend, Unity integration, Playwright e2e, Docker Compose, smoke scripts, screenshots, and reports.</text>
+    <rect x="984" y="22" width="120" height="42" rx="3" fill="#9ddcff"/>
+    <text x="1014" y="49" class="tag">E2E</text>
+    <rect x="1118" y="22" width="120" height="42" rx="3" fill="#d8f6e7"/>
+    <text x="1146" y="49" class="tag">DOCKER</text>
+    <rect x="1252" y="22" width="120" height="42" rx="3" fill="#ffb2b7"/>
+    <text x="1287" y="49" class="tag">SMOKE</text>
+  </g>
+</svg>

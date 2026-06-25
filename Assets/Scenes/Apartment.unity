@@ -7346,8 +7346,8 @@ Light:
   serializedVersion: 12
   m_Type: 0
   m_Color: {r: 0.25, g: 0.55, b: 0.95, a: 1}
-  m_Intensity: 3
-  m_Range: 40
+  m_Intensity: 0.5
+  m_Range: 8
   m_SpotAngle: 109.70306
   m_InnerSpotAngle: 82.34498
   m_CookieSize2D: {x: 0.5, y: 0.5}
