@@ -8327,7 +8327,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 15
-  mouseSensitivity: 0.1
+  mouseSensitivity: 0.15
   upDownLookRange: 80
   characterController: {fileID: 1737554286}
   mainCamera: {fileID: 783471347}

@@ -376,6 +376,7 @@ private bool _hudVisibilityApplied;
         timerRunning = true;
         paranoia = 0;
         points = 0;
+        ResetCallState();
         UpdateUI();
 
         // Reset phone chat state for a fresh game session
@@ -385,6 +386,15 @@ private bool _hudVisibilityApplied;
         {
             MissionSidebarManager.Instance.ResetMissions();
         }
+    }
+
+    private void ResetCallState()
+    {
+        callPhase = GlobalCallPhase.WaitingForNeighbor;
+        callPhaseElapsed = 0f;
+        isCallRinging = false;
+        ringingCallerName = "";
+        StopGlobalRingtoneAndNotification();
     }
 
     public void UpdateUI()
