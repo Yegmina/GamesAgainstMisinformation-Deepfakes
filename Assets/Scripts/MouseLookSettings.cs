@@ -22,36 +22,39 @@ public static class MouseLookSettings
         value = ClampSensitivity(value);
         if (Mathf.Approximately(Sensitivity, value))
         {
+            Debug.Log($"[MouseLookSettings] Sensitivity unchanged at {FormatSensitivity(value)} ({value:0.00}).");
             return;
         }
 
         PlayerPrefs.SetFloat(SensitivityKey, value);
         PlayerPrefs.Save();
-        Changed?.Invoke();
+        NotifyChanged($"Sensitivity saved as {FormatSensitivity(value)} ({value:0.00}).");
     }
 
     public static void SetInvertHorizontal(bool value)
     {
         if (InvertHorizontal == value)
         {
+            Debug.Log($"[MouseLookSettings] Invert horizontal unchanged at {value}.");
             return;
         }
 
         PlayerPrefs.SetInt(InvertHorizontalKey, value ? 1 : 0);
         PlayerPrefs.Save();
-        Changed?.Invoke();
+        NotifyChanged($"Invert horizontal saved as {value}.");
     }
 
     public static void SetInvertVertical(bool value)
     {
         if (InvertVertical == value)
         {
+            Debug.Log($"[MouseLookSettings] Invert vertical unchanged at {value}.");
             return;
         }
 
         PlayerPrefs.SetInt(InvertVerticalKey, value ? 1 : 0);
         PlayerPrefs.Save();
-        Changed?.Invoke();
+        NotifyChanged($"Invert vertical saved as {value}.");
     }
 
     public static string FormatSensitivity(float value)
@@ -62,5 +65,11 @@ public static class MouseLookSettings
     private static float ClampSensitivity(float value)
     {
         return Mathf.Clamp(value, MinSensitivity, MaxSensitivity);
+    }
+
+    private static void NotifyChanged(string message)
+    {
+        Debug.Log("[MouseLookSettings] " + message);
+        Changed?.Invoke();
     }
 }

@@ -29,6 +29,7 @@ public static class MouseSettingsUiBuilder
     {
         if (settingsPanel == null)
         {
+            Debug.LogWarning("[MouseSettingsUiBuilder] Cannot create mouse settings controls because settingsPanel is not assigned.");
             return;
         }
 
@@ -36,6 +37,7 @@ public static class MouseSettingsUiBuilder
         if (existing != null)
         {
             SyncExisting(existing);
+            Debug.Log($"[MouseSettingsUiBuilder] Synced mouse settings controls under {settingsPanel.name}.");
             return;
         }
 
@@ -62,11 +64,12 @@ public static class MouseSettingsUiBuilder
         sensitivitySlider.onValueChanged.AddListener(value =>
         {
             MouseLookSettings.SetSensitivity(value);
-            sensitivityValue.text = MouseLookSettings.FormatSensitivity(value);
+            sensitivityValue.text = MouseLookSettings.FormatSensitivity(MouseLookSettings.Sensitivity);
         });
 
         CreateToggle(block.transform, InvertHorizontalToggleName, "Invert horizontal", MouseLookSettings.InvertHorizontal, MouseLookSettings.SetInvertHorizontal, textTemplate, new Vector2(0f, -35f));
         CreateToggle(block.transform, InvertVerticalToggleName, "Invert vertical", MouseLookSettings.InvertVertical, MouseLookSettings.SetInvertVertical, textTemplate, new Vector2(270f, -35f));
+        Debug.Log($"[MouseSettingsUiBuilder] Created mouse settings controls under {settingsPanel.name}.");
     }
 
     private static Slider CreateSlider(Transform parent, Slider template, Vector2 anchoredPosition, Vector2 size)

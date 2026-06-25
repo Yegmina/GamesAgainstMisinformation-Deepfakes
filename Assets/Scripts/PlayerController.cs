@@ -23,21 +23,21 @@ public class PlayerController : MonoBehaviour
     private float currentSpeed => moveSpeed;
 
     private float yaw;
-    private float activeMouseSensitivity;
     private bool invertHorizontalLook;
     private bool invertVerticalLook;
+    private bool mouseLookSettingsInitialized;
 
     private bool rotationReady;
 
     private void OnEnable()
     {
-        ApplyMouseLookSettings();
-        MouseLookSettings.Changed += ApplyMouseLookSettings;
+        MouseLookSettings.Changed += HandleMouseLookSettingsChanged;
+        SyncMouseLookSettings(true);
     }
 
     private void OnDisable()
     {
-        MouseLookSettings.Changed -= ApplyMouseLookSettings;
+        MouseLookSettings.Changed -= HandleMouseLookSettingsChanged;
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -51,7 +51,6 @@ public class PlayerController : MonoBehaviour
         yaw = transform.eulerAngles.y;
 
         StartCoroutine(EnableRotationNextFrame());
-        Debug.Log($"Camera X: {verticalRotation}");
     }
 
     private IEnumerator EnableRotationNextFrame()
@@ -64,12 +63,7 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         HandleMovement();
-
-        Debug.Log($"Before: {verticalRotation}");
-
         HandleRotation();
-
-        Debug.Log($"After: {verticalRotation}");
     }
 
     private Vector3 CalculateWorldDirection()
@@ -114,7 +108,7 @@ public class PlayerController : MonoBehaviour
         if (!rotationReady)
             return;
 
-        Debug.Log(playerInputHandler.RotationInput);
+        SyncMouseLookSettings(false);
 
         Vector2 rotationInput = playerInputHandler.RotationInput;
         if (invertHorizontalLook)
@@ -126,19 +120,37 @@ public class PlayerController : MonoBehaviour
             rotationInput.y = -rotationInput.y;
         }
 
-        float mouseXRotation = rotationInput.x * activeMouseSensitivity;
-        float mouseYRotation = rotationInput.y * activeMouseSensitivity;
+        float mouseXRotation = rotationInput.x * mouseSensitivity;
+        float mouseYRotation = rotationInput.y * mouseSensitivity;
 
         ApplyHorizontalRotation(mouseXRotation);
         ApplyVerticalRotation(mouseYRotation);
     }
 
-    private void ApplyMouseLookSettings()
+    private void HandleMouseLookSettingsChanged()
     {
-        mouseSensitivity = MouseLookSettings.Sensitivity;
-        activeMouseSensitivity = mouseSensitivity;
-        invertHorizontalLook = MouseLookSettings.InvertHorizontal;
-        invertVerticalLook = MouseLookSettings.InvertVertical;
+        SyncMouseLookSettings(true);
+    }
+
+    private void SyncMouseLookSettings(bool forceLog)
+    {
+        float newSensitivity = MouseLookSettings.Sensitivity;
+        bool newInvertHorizontal = MouseLookSettings.InvertHorizontal;
+        bool newInvertVertical = MouseLookSettings.InvertVertical;
+        bool changed = !mouseLookSettingsInitialized
+            || !Mathf.Approximately(mouseSensitivity, newSensitivity)
+            || invertHorizontalLook != newInvertHorizontal
+            || invertVerticalLook != newInvertVertical;
+
+        mouseSensitivity = newSensitivity;
+        invertHorizontalLook = newInvertHorizontal;
+        invertVerticalLook = newInvertVertical;
+        mouseLookSettingsInitialized = true;
+
+        if (forceLog || changed)
+        {
+            Debug.Log($"[MouseLook] Applied to {name}: sensitivity={MouseLookSettings.FormatSensitivity(mouseSensitivity)} ({mouseSensitivity:0.00}), invertHorizontal={invertHorizontalLook}, invertVertical={invertVerticalLook}.");
+        }
     }
 
     public void InteractionPoint(Transform point)
