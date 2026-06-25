@@ -199,10 +199,7 @@ public class IncomingCallManager : MonoBehaviour
             GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
             if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
             {
-                if (storyPhase == StoryCallPhase.WaitingForMom)
-                    ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
-                else
-                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
             }
             else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
             {
@@ -237,10 +234,7 @@ public class IncomingCallManager : MonoBehaviour
                 GlobalCanvasPersistent.GlobalCallPhase ringingPhase = GlobalCanvasPersistent.Instance.CallPhase;
                 if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.NeighborRinging)
                 {
-                    if (storyPhase == StoryCallPhase.WaitingForMom)
-                        ShowStoryIncomingCall(StoryCallPhase.MomActive, ActiveCallType.Mom);
-                    else
-                        ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
+                    ShowStoryIncomingCall(StoryCallPhase.NeighborActive, ActiveCallType.Neighbor);
                 }
                 else if (ringingPhase == GlobalCanvasPersistent.GlobalCallPhase.MomRinging)
                 {
